@@ -1,11 +1,17 @@
 {
- "name": "functions",
- "main": "index.js",
- "engines": {
-  "node": "20"
- },
- "dependencies": {
-  "firebase-admin": "^12.0.0",
-  "firebase-functions": "^5.0.0"
- }
+  "name": "nibras-firebase-functions",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js",
+  "packageManager": "npm@10.9.9",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "firebase-admin": "14.5.1",
+    "firebase-functions": "7.4.0"
+  }
 }
