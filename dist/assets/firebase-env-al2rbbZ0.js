@@ -1,0 +1,1 @@
+var e={apiKey:`AIzaSyBErU02l6P8qmFsabfWAorpTumNxw6LDX8`,authDomain:`el-tanagha-shcool.firebaseapp.com`,projectId:`el-tanagha-shcool`,appId:`1:225666541469:web:96bbdee55ccee13d4cf174`},t=Object.values(e).every(e=>typeof e==`string`&&e.trim().length>0),n=Object.freeze({...e}),r=`us-central1`;export{n as firebaseConfig,t as firebaseConfigured,r as functionsRegion};
