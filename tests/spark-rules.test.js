@@ -23,7 +23,7 @@ const base=[
   ['subjects/math',{name:'الرياضيات'}],
   ['admins/adm',{active:true}]
 ];
-const studentProfile=(uid,over={})=>({uid,email:`${uid}@example.com`,displayName:'أحمد محمد علي حسن',role:'student',status:'active',phone:'01012345678',createdAt:serverTimestamp(),studentId:'STU-ABCDEFGH',grade:'1',branch:'',classId:'c1',className:'1/1',rosterVerified:false,...over});
+const studentProfile=(uid,over={})=>({uid,email:`${uid}@example.com`,displayName:'أحمد محمد علي حسن',role:'student',status:'active',phone:'01012345678',createdAt:serverTimestamp(),consentAt:serverTimestamp(),studentId:'STU-ABCDEFGH',grade:'1',branch:'',classId:'c1',className:'1/1',rosterVerified:false,...over});
 
 async function register(uid,data,studentId=data.studentId){
   const database=user(uid);
@@ -58,9 +58,9 @@ test('Spark: قيود الطالب (اسم رباعي، فصل موجود يطا
 
 test('Spark: ولي الأمر يسجل فورًا، والمدرس يحتاج بريدًا موثقًا ويبقى معلقًا', {skip:!emulatorAvailable}, async()=>{
   await seed(base);
-  const parent={uid:'p1',email:'p1@example.com',displayName:'ولي أمر',role:'parent',status:'active',phone:'01012345678',createdAt:serverTimestamp()};
+  const parent={uid:'p1',email:'p1@example.com',displayName:'ولي أمر',role:'parent',status:'active',phone:'01012345678',createdAt:serverTimestamp(),consentAt:serverTimestamp()};
   await assertSucceeds(setDoc(doc(user('p1'),'profiles/p1'),parent));
-  const teacherProfile={uid:'t1',email:'t1@example.com',displayName:'مدرس',role:'teacher_applicant',status:'pending',phone:'01012345678',createdAt:serverTimestamp()};
+  const teacherProfile={uid:'t1',email:'t1@example.com',displayName:'مدرس',role:'teacher_applicant',status:'pending',phone:'01012345678',createdAt:serverTimestamp(),consentAt:serverTimestamp()};
   const application={uid:'t1',displayName:'مدرس',subjectId:'math',subjectName:'الرياضيات',phone:'01012345678',publishConsent:false,status:'pending',submittedAt:serverTimestamp(),emailVerified:true};
   const unverified=user('t1',{email_verified:false});
   const bad=writeBatch(unverified);bad.set(doc(unverified,'profiles/t1'),teacherProfile);bad.set(doc(unverified,'teacherApplications/t1'),application);
@@ -270,4 +270,51 @@ test('أخطاء المتصفح: أي مستخدم يكتب خطأه فقط وا
   await assertFails(setDoc(doc(s,'clientErrors','e3'),{...row,message:'x'.repeat(301)}));
   await assertFails(getDoc(doc(s,'clientErrors','e1')));
   await assertSucceeds(getDoc(doc(user('adm'),'clientErrors','e1')));
+});
+
+test('الأدمن: لا يصبح أحد أدمن بنفسه، الدعوة من أدمن نشط فقط وتُستخدم مرة واحدة', {skip:!emulatorAvailable}, async()=>{
+  await seed([...base,['profiles/s1',studentProfile('s1')]]);
+  const a=user('adm');
+  const invite={email:'new@example.com',createdBy:'adm',createdAt:serverTimestamp(),claimed:false};
+  await assertFails(setDoc(doc(user('s1'),'adminInvites','new@example.com'),{...invite,createdBy:'s1'}));
+  await assertFails(setDoc(doc(a,'adminInvites','New@example.com'),{...invite,email:'New@example.com'}));
+  await assertSucceeds(setDoc(doc(a,'adminInvites','new@example.com'),invite));
+  const claim=async(uid,email,verified=true)=>{
+    const db=environment.authenticatedContext(uid,{email,email_verified:verified}).firestore();
+    const batch=writeBatch(db);
+    batch.update(doc(db,'adminInvites',email),{claimed:true,claimedBy:uid,claimedAt:serverTimestamp()});
+    batch.set(doc(db,'admins',uid),{active:true,email,displayName:'مدير جديد',createdBy:'adm',createdAt:serverTimestamp()});
+    return batch.commit();
+  };
+  await assertFails(claim('x1','other@example.com'));
+  await assertFails(claim('n1','new@example.com',false));
+  await assertSucceeds(claim('n1','new@example.com'));
+  await assertFails(claim('n2','new@example.com'));
+  const self=user('s1');
+  await assertFails(setDoc(doc(self,'admins','s1'),{active:true,email:'s1@example.com',displayName:'x',createdBy:'s1',createdAt:serverTimestamp()}));
+  const n=user('n1');
+  await assertSucceeds(getDoc(doc(n,'admins','adm')));
+  await assertFails(updateDoc(doc(n,'admins','n1'),{active:false}));
+  await assertSucceeds(updateDoc(doc(a,'admins','n1'),{active:false}));
+  await assertFails(updateDoc(doc(a,'admins','adm'),{active:false}));
+});
+
+test('ولي الأمر يرى مهام وجدول فصل ابنه المرتبط فقط ويفقد ذلك عند فك الربط', {skip:!emulatorAvailable}, async()=>{
+  await seed([...base,['classes/c2',{name:'1/2',grade:'1',section:'2',year:'2026-2027'}],
+    ['profiles/s1',studentProfile('s1')],
+    ['profiles/p1',{uid:'p1',email:'p1@example.com',displayName:'ولي',role:'parent',status:'active'}],
+    ['profiles/p2',{uid:'p2',email:'p2@example.com',displayName:'ولي',role:'parent',status:'active'}],
+    ['parentLinks/p1_s1',{parentUid:'p1',studentUid:'s1',active:true}],
+    ['tasks/k1',{teacherUid:'t',grade:'1',classId:'c1',subjectId:'math',subjectName:'ر',kind:'exam',title:'ا',dueDate:'2026-12-20',note:'',createdAt:new Date()}],
+    ['timetables/c1',{classId:'c1',grade:'1',cells:{},updatedAt:new Date()}]]);
+  const p1=user('p1'),p2=user('p2');
+  await assertFails(getDoc(doc(p1,'tasks','k1')));
+  await assertSucceeds(setDoc(doc(p1,'parentClassAccess','p1_c1'),{parentUid:'p1',classId:'c1',studentUid:'s1'}));
+  await assertFails(setDoc(doc(p1,'parentClassAccess','p1_c2'),{parentUid:'p1',classId:'c2',studentUid:'s1'}));
+  await assertFails(setDoc(doc(p2,'parentClassAccess','p2_c1'),{parentUid:'p2',classId:'c1',studentUid:'s1'}));
+  await assertSucceeds(getDoc(doc(p1,'tasks','k1')));
+  await assertSucceeds(getDoc(doc(p1,'timetables','c1')));
+  await assertFails(getDoc(doc(p2,'tasks','k1')));
+  await environment.withSecurityRulesDisabled(async c=>updateDoc(doc(c.firestore(),'parentLinks/p1_s1'),{active:false}));
+  await assertFails(getDoc(doc(p1,'tasks','k1')));
 });

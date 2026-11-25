@@ -66,3 +66,16 @@ export function teacherApprovalPage() {
     <a class="text-link" href="/login/teacher">دخول مسؤول المدرسة من بوابة المدرس</a>
   </div></section>`;
 }
+
+export function adminJoinPage() {
+  return `<section class="section page auth-page"><div class="auth-shell">${sectionHeading('الإدارة','تفعيل دعوة مدير','يدعوك مدير حالي بإيميلك. أنشئ حسابًا بنفس البريد، وثّقه، ثم فعّل الدعوة.')}
+    <div class="auth-panel">
+      <form data-admin-join="create"><label>البريد الإلكتروني (نفس بريد الدعوة)<input name="email" type="email" required maxlength="254" dir="ltr"></label>
+        <label>كلمة المرور (8 أحرف على الأقل)<input name="password" type="password" autocomplete="new-password" required minlength="8" maxlength="128"></label>
+        <button class="button" type="submit">إنشاء الحساب وإرسال رابط التوثيق</button></form>
+      <form data-admin-join="claim"><label>اسمك<input name="displayName" maxlength="80" required style="direction:rtl"></label>
+        <p class="dash-muted">بعد الضغط على رابط التوثيق في بريدك، سجّل الدخول (من /login/teacher إن لزم) ثم اضغط:</p>
+        <button class="button" type="submit">تفعيل الدعوة</button></form>
+      <p class="form-note" data-admin-join-message role="status" aria-live="polite"></p>
+    </div></div></section>`;
+}

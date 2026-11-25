@@ -18,6 +18,7 @@ service cloud.firestore {
     function hasRole(role) {
       return signedIn()
         && exists(/databases/$(database)/documents/profiles/$(request.auth.uid))
+        && request.auth.token.email_verified == true
         && profile(request.auth.uid).role == role
         && profile(request.auth.uid).status == 'active';
     }
@@ -144,14 +145,15 @@ service cloud.firestore {
         && data.displayName is string && data.displayName.size() >= 3 && data.displayName.size() <= 80
         && validPhone(data.phone)
         && data.createdAt == request.time
+        && data.consentAt == request.time
         && (
           (data.role == 'parent' && data.status == 'active'
-            && data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'status', 'phone', 'createdAt']))
+            && data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'status', 'phone', 'createdAt', 'consentAt']))
           || (data.role == 'teacher_applicant' && data.status == 'pending'
-            && data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'status', 'phone', 'createdAt']))
+            && data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'status', 'phone', 'createdAt', 'consentAt']))
           || (data.role == 'student' && data.status == 'active'
             && data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'status', 'phone', 'createdAt',
-              'studentId', 'grade', 'branch', 'classId', 'className', 'rosterVerified', 'birthDate'])
+              'studentId', 'grade', 'branch', 'classId', 'className', 'rosterVerified', 'birthDate', 'consentAt'])
             && data.displayName.split(' ').size() >= 4
             && data.grade in ['1', '2', '3']
             && data.classId is string
@@ -305,9 +307,45 @@ service cloud.firestore {
       allow delete: if isActiveAdmin();
     }
 
+    // الأدمن الأول يُنشأ يدويًا من Firebase Console. بعده الأدمن النشط فقط يدعو أدمن جديدًا بالبريد.
     match /admins/{adminId} {
       allow get, list: if isActiveAdmin();
-      allow create, update, delete: if false;
+      // قبول دعوة: بريد موثق يطابق دعوة غير مستخدمة أنشأها أدمن، وتُعلَّم الدعوة مستخدمة في نفس الدفعة.
+      allow create: if signedIn() && adminId == request.auth.uid
+        && request.auth.token.email_verified == true
+        && exists(/databases/$(database)/documents/adminInvites/$(request.auth.token.email))
+        && get(/databases/$(database)/documents/adminInvites/$(request.auth.token.email)).data.claimed == false
+        && getAfter(/databases/$(database)/documents/adminInvites/$(request.auth.token.email)).data.claimedBy == request.auth.uid
+        && request.resource.data.keys().hasOnly(['active', 'email', 'displayName', 'createdBy', 'createdAt'])
+        && request.resource.data.active == true
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.displayName is string && request.resource.data.displayName.size() <= 80
+        && request.resource.data.createdBy == get(/databases/$(database)/documents/adminInvites/$(request.auth.token.email)).data.createdBy
+        && request.resource.data.createdAt == request.time;
+      // إيقاف أو تفعيل أدمن آخر (لا يوقف نفسه).
+      allow update: if isActiveAdmin() && adminId != request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active']);
+      allow delete: if false;
+    }
+
+    match /adminInvites/{inviteEmail} {
+      allow list: if isActiveAdmin();
+      allow get: if isActiveAdmin()
+        || (signedIn() && request.auth.token.email_verified == true && request.auth.token.email == inviteEmail);
+      allow create: if isActiveAdmin()
+        && request.resource.data.keys().hasOnly(['email', 'createdBy', 'createdAt', 'claimed'])
+        && request.resource.data.email == inviteEmail && inviteEmail == inviteEmail.lower()
+        && inviteEmail.matches('^[^@ ]+@[^@ ]+\\.[^@ ]+$')
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.claimed == false
+        && request.resource.data.createdAt == request.time;
+      allow update: if signedIn() && request.auth.token.email_verified == true && request.auth.token.email == inviteEmail
+        && resource.data.claimed == false
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['claimed', 'claimedBy', 'claimedAt'])
+        && request.resource.data.claimed == true && request.resource.data.claimedBy == request.auth.uid
+        && request.resource.data.claimedAt == request.time
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid)) == false;
+      allow delete: if isActiveAdmin() && resource.data.claimed == false;
     }
 
     match /parentCodes/{code} {
@@ -379,6 +417,7 @@ service cloud.firestore {
         isActiveAdmin()
         || (isActiveTeacher() && resource.data.teacherUid == request.auth.uid)
         || (isActiveStudent() && resource.data.classId == profile(request.auth.uid).classId)
+        || parentSeesClass(resource.data.classId)
       );
       allow create: if isActiveTeacher()
         && request.resource.data.keys().hasOnly(['teacherUid', 'grade', 'classId', 'subjectId', 'subjectName', 'kind', 'title', 'dueDate', 'note', 'createdAt'])
@@ -398,7 +437,7 @@ service cloud.firestore {
 
     // جدول الحصص: الإدارة تكتبه، وطلاب الفصل يقرؤونه.
     match /timetables/{classId} {
-      allow get: if signedIn() && (isActiveAdmin() || (isActiveStudent() && profile(request.auth.uid).classId == classId) || (isActiveTeacher() && assignedToClass(classId)));
+      allow get: if signedIn() && (isActiveAdmin() || (isActiveStudent() && profile(request.auth.uid).classId == classId) || (isActiveTeacher() && assignedToClass(classId)) || parentSeesClass(classId));
       allow list: if false;
       allow create, update: if isActiveAdmin()
         && request.resource.data.keys().hasOnly(['classId', 'grade', 'cells', 'updatedAt'])
@@ -607,6 +646,25 @@ service cloud.firestore {
     }
 
     // آخر مرة فتح فيها المستخدم الجرس (وضع Spark: الإشعارات مشتقة من البيانات نفسها).
+    // ولي الأمر يرى مهام وجدول فصل ابنه المرتبط (والربط ساري وفصل الابن الحالي يطابق).
+    function parentSeesClass(classId) {
+      return isActiveParent()
+        && exists(/databases/$(database)/documents/parentClassAccess/$(request.auth.uid + '_' + classId))
+        && linkedParentTo(get(/databases/$(database)/documents/parentClassAccess/$(request.auth.uid + '_' + classId)).data.studentUid)
+        && profile(get(/databases/$(database)/documents/parentClassAccess/$(request.auth.uid + '_' + classId)).data.studentUid).classId == classId;
+    }
+
+    match /parentClassAccess/{accessId} {
+      allow get: if signedIn() && accessId.matches('^' + request.auth.uid + '_.*');
+      allow create, update: if isActiveParent()
+        && request.resource.data.keys().hasOnly(['parentUid', 'classId', 'studentUid'])
+        && request.resource.data.parentUid == request.auth.uid
+        && accessId == request.auth.uid + '_' + request.resource.data.classId
+        && linkedParentTo(request.resource.data.studentUid)
+        && profile(request.resource.data.studentUid).classId == request.resource.data.classId;
+      allow list, delete: if false;
+    }
+
     // محادثات الطالب والمدرس (بدون مراقبة إدارية بقرار صاحب المنصة). المعرّف: studentUid_teacherUid
     function chatParty(cid) {
       return signedIn() && (cid.split('_')[0] == request.auth.uid || cid.split('_')[1] == request.auth.uid);

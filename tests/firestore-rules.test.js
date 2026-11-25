@@ -26,7 +26,7 @@ async function seed(records){
 }
 
 test('العميل لا ينشئ ملفات أو طلبات أو سجلات إدارة', {skip:!emulatorAvailable}, async()=>{
-  const userDb=environment.authenticatedContext('teacher-uid').firestore();
+  const userDb=environment.authenticatedContext('teacher-uid',{email_verified:true}).firestore();
   await assertFails(setDoc(doc(userDb,'profiles/teacher-uid'),{role:'admin'}));
   await assertFails(setDoc(doc(userDb,'teacherApplications/teacher-uid'),{status:'pending'}));
   await assertFails(setDoc(doc(userDb,'admins/teacher-uid'),{active:true}));
@@ -39,7 +39,7 @@ test('المستخدم يقرأ سجله فقط ولا يقرأ طلب مستخ�
     ['teacherApplications/user-a',{uid:'user-a',status:'pending'}],
     ['teacherApplications/user-b',{uid:'user-b',status:'pending'}]
   ]);
-  const userDb=environment.authenticatedContext('user-a').firestore();
+  const userDb=environment.authenticatedContext('user-a',{email_verified:true}).firestore();
   await assertSucceeds(getDoc(doc(userDb,'profiles/user-a')));
   await assertFails(getDoc(doc(userDb,'profiles/user-b')));
   await assertSucceeds(getDoc(doc(userDb,'teacherApplications/user-a')));
@@ -64,7 +64,7 @@ test('الإدارة النشطة تقرأ طلبات المدرسين لكن ك
     ['admins/admin-uid',{active:true}],
     ['teacherApplications/request-uid',{uid:'request-uid',status:'pending'}]
   ]);
-  const adminDb=environment.authenticatedContext('admin-uid').firestore();
+  const adminDb=environment.authenticatedContext('admin-uid',{email_verified:true}).firestore();
   await assertSucceeds(getDoc(doc(adminDb,'teacherApplications/request-uid')));
   await assertFails(setDoc(doc(adminDb,'teacherApplications/request-uid'),{status:'approved'}));
 });
@@ -77,7 +77,7 @@ test('المدرس لا ينقل محتوى إلى صف آخر ولا ينشر �
     ['teacherAssignments/teacher-a_math_c1',{teacherUid:'teacher-a',subjectId:'math',classId:'c1',grade:'1'}],
     ['content/lesson-a',{teacherUid:'teacher-a',grade:'1',classId:'c1',subjectId:'math',type:'lesson',title:'درس',url:'https://school.example/lesson',published:true,createdAt:new Date()}]
   ]);
-  const teacherDb=environment.authenticatedContext('teacher-a').firestore();
+  const teacherDb=environment.authenticatedContext('teacher-a',{email_verified:true}).firestore();
   const lesson=doc(teacherDb,'content/lesson-a');
   await assertSucceeds(updateDoc(lesson,{title:'عنوان محدث'}));
   await assertFails(updateDoc(lesson,{grade:'2'}));
@@ -101,7 +101,7 @@ test('المدرس لا يكتب درجات أو حضورًا لصف طالب م
     ['grades/grade-two',{teacherUid:'teacher-b',studentUid:'student-one',grade:'1',classId:'c1',subjectId:'math',score:70}],
     ['attendance/attendance-one',{teacherUid:'teacher-a',studentUid:'student-one',grade:'1',classId:'c1',present:true}]
   ]);
-  const teacherDb=environment.authenticatedContext('teacher-a').firestore();
+  const teacherDb=environment.authenticatedContext('teacher-a',{email_verified:true}).firestore();
   await assertSucceeds(updateDoc(doc(teacherDb,'grades/grade-one'),{score:85}));
   await assertFails(updateDoc(doc(teacherDb,'grades/grade-one'),{grade:'2'}));
   await assertFails(updateDoc(doc(teacherDb,'grades/grade-two'),{teacherUid:'teacher-a',score:99}));
@@ -120,7 +120,7 @@ test('الطالب لا يقرأ مستند امتحان قد يحتوي مفت�
     ['profiles/teacher-a',{uid:'teacher-a',role:'teacher',status:'active',grades:['1'],subjectId:'math'}],
     ['exams/exam-one',{teacherUid:'teacher-a',grade:'1',subjectId:'math',answerKey:['A','C']}]
   ]);
-  const studentDb=environment.authenticatedContext('student-one').firestore();
+  const studentDb=environment.authenticatedContext('student-one',{email_verified:true}).firestore();
   await assertFails(getDoc(doc(studentDb,'exams/exam-one')));
   const submission=doc(studentDb,'submissions/student-one_exam-one');
   await assertSucceeds(setDoc(submission,{studentUid:'student-one',examId:'exam-one',answers:['A','B'],submittedAt:serverTimestamp()}));
@@ -139,7 +139,7 @@ test('المعلّم لا يرسل إشعارًا عامًا ولا يعدّل �
     ['parentLinks/parent-linked_student-target',{parentUid:'parent-linked',studentUid:'student-target',active:true}],
     ['notifications/notice-b',{teacherUid:'teacher-b',audience:'grade',grade:'2',title:'تنبيه',body:'نص'}]
   ]);
-  const teacherDb=environment.authenticatedContext('teacher-a').firestore();
+  const teacherDb=environment.authenticatedContext('teacher-a',{email_verified:true}).firestore();
   await assertFails(setDoc(doc(teacherDb,'notifications/broadcast'),{teacherUid:'teacher-a',audience:'all',title:'عام'}));
   await assertFails(setDoc(doc(teacherDb,'notifications/grade-two'),{teacherUid:'teacher-a',audience:'grade',grade:'2',title:'صف آخر'}));
   await assertFails(setDoc(doc(teacherDb,'notifications/private-user'),{teacherUid:'teacher-a',audience:'grade',grade:'1',uid:'victim-uid',title:'إشعار خاص',body:'نص'}));
@@ -147,10 +147,10 @@ test('المعلّم لا يرسل إشعارًا عامًا ولا يعدّل �
   await assertFails(updateDoc(doc(teacherDb,'notifications/notice-b'),{teacherUid:'teacher-a',title:'تلاعب'}));
   await assertSucceeds(setDoc(doc(teacherDb,'notifications/grade-one'),{teacherUid:'teacher-a',audience:'grade',grade:'1',title:'تنبيه',body:'نص'}));
   await assertSucceeds(setDoc(doc(teacherDb,'notifications/student-target'),{teacherUid:'teacher-a',audience:'grade',grade:'1',studentUid:'student-target',title:'تنبيه خاص',body:'نص'}));
-  await assertSucceeds(getDoc(doc(environment.authenticatedContext('student-target').firestore(),'notifications/student-target')));
-  await assertFails(getDoc(doc(environment.authenticatedContext('student-peer').firestore(),'notifications/student-target')));
-  await assertSucceeds(getDoc(doc(environment.authenticatedContext('parent-linked').firestore(),'notifications/student-target')));
-  await assertFails(getDoc(doc(environment.authenticatedContext('parent-unrelated').firestore(),'notifications/student-target')));
+  await assertSucceeds(getDoc(doc(environment.authenticatedContext('student-target',{email_verified:true}).firestore(),'notifications/student-target')));
+  await assertFails(getDoc(doc(environment.authenticatedContext('student-peer',{email_verified:true}).firestore(),'notifications/student-target')));
+  await assertSucceeds(getDoc(doc(environment.authenticatedContext('parent-linked',{email_verified:true}).firestore(),'notifications/student-target')));
+  await assertFails(getDoc(doc(environment.authenticatedContext('parent-unrelated',{email_verified:true}).firestore(),'notifications/student-target')));
 });
 
 test('الإدارة وحدها تُسند المدرسين؛ المدرس لا يقرأ إسناد غيره ولا يكتب إسنادًا لنفسه', {skip:!emulatorAvailable}, async()=>{
@@ -162,14 +162,14 @@ test('الإدارة وحدها تُسند المدرسين؛ المدرس لا 
     ['teacherAssignments/teacher-a_math_c1',{teacherUid:'teacher-a',subjectId:'math',classId:'c1'}],
     ['teacherAssignments/teacher-b_ar_c2',{teacherUid:'teacher-b',subjectId:'ar',classId:'c2'}]
   ]);
-  const teacherDb=environment.authenticatedContext('teacher-a').firestore();
+  const teacherDb=environment.authenticatedContext('teacher-a',{email_verified:true}).firestore();
   await assertSucceeds(getDoc(doc(teacherDb,'teacherAssignments/teacher-a_math_c1')));
   await assertFails(getDoc(doc(teacherDb,'teacherAssignments/teacher-b_ar_c2')));
   await assertFails(setDoc(doc(teacherDb,'teacherAssignments/teacher-a_phy_c1'),{teacherUid:'teacher-a',subjectId:'phy',classId:'c1'}));
-  const adminDb=environment.authenticatedContext('admin-uid').firestore();
+  const adminDb=environment.authenticatedContext('admin-uid',{email_verified:true}).firestore();
   await assertSucceeds(getDoc(doc(adminDb,'teacherAssignments/teacher-b_ar_c2')));
   await assertFails(setDoc(doc(adminDb,'teacherAssignments/x'),{teacherUid:'a'}));
-  const studentDb=environment.authenticatedContext('student-one').firestore();
+  const studentDb=environment.authenticatedContext('student-one',{email_verified:true}).firestore();
   await assertSucceeds(getDoc(doc(studentDb,'teacherAssignments/teacher-a_math_c1')));
   await assertFails(getDoc(doc(studentDb,'teacherAssignments/teacher-b_ar_c2')));
 });
@@ -187,11 +187,11 @@ test('الفصول والمواد تُقرأ علنًا لنموذج التسج�
   await assertSucceeds(getDocs(collection(publicDb,'classes')));
   await assertSucceeds(getDocs(collection(publicDb,'subjects')));
   await assertFails(setDoc(doc(publicDb,'classes/evil'),{grade:'1'}));
-  const adminDb=environment.authenticatedContext('admin-uid').firestore();
+  const adminDb=environment.authenticatedContext('admin-uid',{email_verified:true}).firestore();
   await assertFails(setDoc(doc(adminDb,'classes/evil'),{grade:'1'}));
   for(const path of ['parentCodes/TNG-AAAAAAAA','linkAttempts/parent-a']){
     await assertFails(getDoc(doc(adminDb,path)));
-    await assertFails(getDoc(doc(environment.authenticatedContext('parent-a').firestore(),path)));
+    await assertFails(getDoc(doc(environment.authenticatedContext('parent-a',{email_verified:true}).firestore(),path)));
   }
 });
 
@@ -205,16 +205,16 @@ test('ولي الأمر المرتبط يقرأ درجات ابنه فقط، و�
     ['grades/g1',{teacherUid:'t',studentUid:'student-one',grade:'1',classId:'c1',subjectId:'math',score:90}],
     ['grades/g2',{teacherUid:'t',studentUid:'student-two',grade:'1',classId:'c1',subjectId:'math',score:70}]
   ]);
-  const parentDb=environment.authenticatedContext('parent-linked').firestore();
+  const parentDb=environment.authenticatedContext('parent-linked',{email_verified:true}).firestore();
   const own=await assertSucceeds(getDocs(query(collection(parentDb,'grades'),where('studentUid','==','student-one'))));
   assert.equal(own.size,1);
   await assertFails(getDocs(query(collection(parentDb,'grades'),where('studentUid','==','student-two'))));
   await assertFails(getDoc(doc(parentDb,'grades/g2')));
   await assertSucceeds(getDoc(doc(parentDb,'profiles/student-one')));
   await assertFails(getDoc(doc(parentDb,'profiles/student-two')));
-  const otherParentDb=environment.authenticatedContext('parent-other').firestore();
+  const otherParentDb=environment.authenticatedContext('parent-other',{email_verified:true}).firestore();
   await assertFails(getDocs(query(collection(otherParentDb,'grades'),where('studentUid','==','student-one'))));
-  const peerDb=environment.authenticatedContext('student-two').firestore();
+  const peerDb=environment.authenticatedContext('student-two',{email_verified:true}).firestore();
   await assertFails(getDoc(doc(peerDb,'grades/g1')));
   await assertSucceeds(getDoc(doc(peerDb,'grades/g2')));
 });
@@ -225,7 +225,7 @@ test('الطالب يرى محتوى فصله فقط', {skip:!emulatorAvailable}
     ['content/mine',{teacherUid:'t',grade:'1',classId:'c1',subjectId:'math',type:'lesson',title:'ت',url:'https://x.example/a',published:true}],
     ['content/other-class',{teacherUid:'t',grade:'1',classId:'c1b',subjectId:'math',type:'lesson',title:'ت',url:'https://x.example/b',published:true}]
   ]);
-  const studentDb=environment.authenticatedContext('student-one').firestore();
+  const studentDb=environment.authenticatedContext('student-one',{email_verified:true}).firestore();
   const mine=await assertSucceeds(getDocs(query(collection(studentDb,'content'),where('classId','==','c1'),where('published','==',true))));
   assert.equal(mine.size,1);
   await assertFails(getDoc(doc(studentDb,'content/other-class')));
@@ -237,7 +237,7 @@ test('إشعارات المستخدم: يقرأ إشعاراته فقط ولا �
     ['userNotifications/n1',{uid:'stu1',type:'grade',title:'درجة',body:'x',read:false,createdAt:new Date()}],
     ['userNotifications/n2',{uid:'stu2',type:'grade',title:'درجة',body:'y',read:false,createdAt:new Date()}]
   ]);
-  const mine=environment.authenticatedContext('stu1').firestore();
+  const mine=environment.authenticatedContext('stu1',{email_verified:true}).firestore();
   await assertSucceeds(getDocs(query(collection(mine,'userNotifications'),where('uid','==','stu1'))));
   await assertFails(getDoc(doc(mine,'userNotifications/n2')));
   await assertFails(getDocs(query(collection(mine,'userNotifications'),where('uid','==','stu2'))));
@@ -248,7 +248,7 @@ test('إشعارات المستخدم: يقرأ إشعاراته فقط ولا �
 
 test('أجهزة الإشعارات والتفضيلات: لصاحبها فقط وبحقول محددة', {skip:!emulatorAvailable}, async()=>{
   await seed([]);
-  const mine=environment.authenticatedContext('stu1').firestore();
+  const mine=environment.authenticatedContext('stu1',{email_verified:true}).firestore();
   await assertSucceeds(setDoc(doc(mine,'pushDevices/d1'),{uid:'stu1',token:'abc',createdAt:serverTimestamp()}));
   await assertFails(setDoc(doc(mine,'pushDevices/d2'),{uid:'stu2',token:'abc',createdAt:serverTimestamp()}));
   await assertFails(setDoc(doc(mine,'pushDevices/d3'),{uid:'stu1',token:'abc',createdAt:serverTimestamp(),extra:1}));

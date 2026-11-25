@@ -1,5 +1,5 @@
 import {home,subjectsPage,subjectPage,teachersPage,renderTeacherCards,newsPage,schedulePage,resultsPage,contactPage,privacyPage,notFound} from './pages/public-pages.js';
-import {loginPage,teacherApprovalPage} from './pages/auth-pages.js';
+import {loginPage,teacherApprovalPage,adminJoinPage} from './pages/auth-pages.js';
 import {createRouteHelpers,resolveAppLink} from './utils/routes.js';
 import {initErrorReporter} from './services/error-reporter.js';
 import {initMotion,routeStart,routeEnd,withThemeTransition} from './ui/motion.js';
@@ -31,6 +31,7 @@ const routes=[
   [/^\/privacy\/?$/,privacyPage],
   [/^\/login(?:\/(student|parent|teacher|admin))?\/?$/,loginPage],
   [/^\/dashboard\/?$/,()=>'<section class="section page dashboard-page"><div class="dashboard-shell"><div class="empty-state" role="status"><div class="skeleton-grid" aria-hidden="true"><div class="skeleton-card"><span class="skeleton skeleton-icon"></span><span class="skeleton skeleton-line title"></span><span class="skeleton skeleton-line"></span></div></div><p>جارٍ تحميل لوحة الحساب…</p></div></div></section>'],
+  [/^\/admin\/join\/?$/,adminJoinPage],
   [/^\/admin\/teacher-requests\/?$/,teacherApprovalPage]
 ];
 
@@ -493,8 +494,31 @@ document.addEventListener('click',async event=>{
   render(resolved.route);
 });
 
+async function handleAdminJoin(form){
+  const message=document.querySelector('[data-admin-join-message]');
+  const button=form.querySelector('[type="submit"]');
+  button.disabled=true;
+  try{
+    const api=await import('./auth/auth-service.js');
+    const values=formValues(form);
+    if(form.dataset.adminJoin==='create'){
+      await api.createAuthUser(values.email,values.password);
+      await api.sendVerificationIfNeeded();
+      showMessage(message,'تم إنشاء الحساب وأُرسل رابط التوثيق لبريدك. بعد التوثيق اضغط "تفعيل الدعوة".');
+    }else{
+      const spark=await import('./services/spark-backend.js');
+      await spark.claimAdminInvite(values.displayName);
+      showMessage(message,'تم تفعيل الدعوة. افتح /login/teacher وسجّل الدخول لتصل للوحة الإدارة.');
+    }
+  }catch(error){
+    const api=await import('./auth/auth-service.js').catch(()=>null);
+    showMessage(message,error?.code==='permission-denied'||error?.code==='failed-precondition'?error.message:(api?api.friendlyAuthError(error):'حدث خطأ.'),'error');
+  }finally{button.disabled=false;}
+}
+
 document.addEventListener('submit',event=>{
   const form=event.target;
+  if(form.dataset?.adminJoin){event.preventDefault();handleAdminJoin(form);return;}
   if(form.id==='contact-form'){
     event.preventDefault();
     form.querySelector('.form-note').textContent='لم يتم إرسال رسالتك أو حفظها؛ خدمة الإرسال ستُفعّل لاحقًا.';

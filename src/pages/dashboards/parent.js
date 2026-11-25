@@ -12,6 +12,8 @@ export function renderParent(profile) {
     </section>
     <div class="par-columns" data-detail hidden>
       <section class="par-card"><h2>الدرجات</h2><div data-list="grades"></div><button class="button ghost" type="button" data-more="grades" hidden>المزيد</button></section>
+      <section class="par-card"><h2>امتحانات وواجبات قادمة</h2><div data-par-tasks></div></section>
+      <section class="par-card"><h2>جدول الحصص</h2><div data-par-tt></div></section>
       <section class="par-card"><h2>الحضور والغياب</h2><div data-list="attendance"></div><button class="button ghost" type="button" data-more="attendance" hidden>المزيد</button></section>
     </div>
     <section class="par-card par-link"><h2>ربط ابن جديد</h2>
@@ -41,11 +43,31 @@ export function mountParent(root, { auth, database }) {
     root.querySelector('[data-last]').textContent = formatDate(gradeSnap.docs[0]?.data().createdAt) || '—';
   }
 
+  async function classInfo(uid) {
+    const student = students.find(item => item.uid === uid);
+    const tasksBox = detail.querySelector('[data-par-tasks]'), ttBox = detail.querySelector('[data-par-tt]');
+    tasksBox.innerHTML = ttBox.innerHTML = '';
+    if (!student?.classId) { tasksBox.innerHTML = ttBox.innerHTML = '<p class="dash-empty">لم يُحدد فصل ابنك بعد.</p>'; return; }
+    try {
+      const { doc, getDoc, setDoc, limit } = await import('firebase/firestore');
+      await setDoc(doc(database, 'parentClassAccess', `${auth.getCurrentUser().uid}_${student.classId}`), { parentUid: auth.getCurrentUser().uid, classId: student.classId, studentUid: uid });
+      const today = new Date().toISOString().slice(0, 10);
+      const tasks = await getDocs(query(collection(database, 'tasks'), where('classId', '==', student.classId), where('dueDate', '>=', today), orderBy('dueDate'), limit(20)));
+      tasksBox.innerHTML = tasks.docs.length ? tasks.docs.map(item => { const t = item.data(); return `<div class="par-row"><span>${t.kind === 'exam' ? 'امتحان' : 'واجب'}: ${esc(t.title)} · ${esc(t.subjectName)}</span><b>${esc(t.dueDate)}</b></div>`; }).join('') : '<p class="dash-empty">لا توجد مهام قادمة.</p>';
+      const tt = await getDoc(doc(database, 'timetables', student.classId));
+      if (!tt.exists()) { ttBox.innerHTML = '<p class="dash-empty">لم يُنشر الجدول بعد.</p>'; return; }
+      const cells = tt.data().cells || {}, days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+      const used = Math.max(0, ...Object.keys(cells).map(key => Number(key.split('_')[1]) || 0));
+      ttBox.innerHTML = `<div style="overflow:auto"><table class="adm-table"><tbody><tr><th></th>${days.map(day => `<th>${day}</th>`).join('')}</tr>${Array.from({ length: used }, (_, p) => `<tr><th>${p + 1}</th>${days.map((_, d) => `<td>${esc(cells[`${d}_${p + 1}`] || '')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+    } catch { tasksBox.innerHTML = ttBox.innerHTML = '<p class="dash-empty">تعذر تحميل البيانات.</p>'; }
+  }
+
   function select(uid) {
     current = uid;
     childrenBox.querySelectorAll('[data-child]').forEach(button => button.classList.toggle('is-active', button.dataset.child === uid));
     stats.hidden = false; detail.hidden = false;
     summary(uid).catch(() => {});
+    void classInfo(uid);
     const gradeRow = item => `<div class="par-row"><span>${esc(item.subjectName || item.subjectId || '')} ${esc(item.title || '')}</span><b>${esc(item.score)}${item.max ? '/' + esc(item.max) : ''}</b></div>`;
     const attRow = item => `<div class="par-row"><span>${esc(item.date)}</span><b class="${item.present ? 'ok' : 'bad'}">${item.present ? 'حاضر' : 'غائب'}</b></div>`;
     detail.querySelector('[data-more="grades"]').replaceWith(detail.querySelector('[data-more="grades"]').cloneNode(true));
