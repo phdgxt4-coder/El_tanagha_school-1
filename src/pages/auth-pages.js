@@ -57,6 +57,6 @@ export function teacherApprovalPage() {
   return `<section class="section page"><div class="admin-shell">${sectionHeading('إدارة المدرسة','طلبات اعتماد المدرسين','تُعرض الطلبات هنا بعد تسجيل الدخول بحساب إدارة مخوّل. الاعتماد لا ينشر الاسم والتخصص إلا بموافقة المدرس.')}
     <p class="form-note" data-admin-message role="status" aria-live="polite">جارٍ التحقق من صلاحية الإدارة…</p>
     <div class="admin-request-list" data-admin-requests aria-live="polite"></div>
-    <a class="text-link" href="/login/admin">دخول الإدارة</a>
+    <a class="text-link" href="/login/teacher">دخول مسؤول المدرسة من بوابة المدرس</a>
   </div></section>`;
 }
