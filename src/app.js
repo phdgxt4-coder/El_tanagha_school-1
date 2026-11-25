@@ -36,6 +36,25 @@ let pageCleanup=()=>{};
 let pageGeneration=0;
 const escapeRoute=path=>path.startsWith('/subjects/')?'المادة الدراسية — ':'';
 
+function applyTheme(theme){
+  const selected=theme==='light'?'light':'dark';
+  document.documentElement.dataset.theme=selected;
+  try{localStorage.setItem('tn_theme',selected);}catch{}
+  const toggle=document.querySelector('[data-theme-toggle]');
+  if(toggle){
+    toggle.setAttribute('aria-label',selected==='dark'?'تفعيل الوضع الفاتح':'تفعيل الوضع الداكن');
+    toggle.setAttribute('title',selected==='dark'?'تفعيل الوضع الفاتح':'تفعيل الوضع الداكن');
+    toggle.textContent=selected==='dark'?'☼':'◐';
+  }
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content',selected==='dark'?'#090d16':'#f5f6f8');
+}
+
+function initializeTheme(){
+  let saved='';
+  try{saved=localStorage.getItem('tn_theme')||'';}catch{}
+  applyTheme(saved||(window.matchMedia?.('(prefers-color-scheme: light)').matches?'light':'dark'));
+}
+
 function showMessage(target,message,kind='status'){
   if(!target)return;
   target.textContent=message;
@@ -282,6 +301,28 @@ async function handleRegistration(form){
 }
 
 document.addEventListener('click',async event=>{
+  const themeButton=event.target.closest('[data-theme-toggle]');
+  if(themeButton){applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');return;}
+
+  const resetButton=event.target.closest('[data-password-reset]');
+  if(resetButton){
+    const form=resetButton.closest('form');
+    const message=document.querySelector('[data-auth-message]');
+    const email=form?.elements.namedItem('email')?.value?.trim();
+    if(!email){showMessage(message,'اكتب بريدك الإلكتروني في خانة البريد أولًا.','error');form?.elements.namedItem('email')?.focus();return;}
+    resetButton.disabled=true;
+    try{
+      const api=await import('./auth/auth-service.js');
+      await api.sendPasswordReset(email);
+      showMessage(message,'إذا كان البريد مسجلًا، ستصلك رسالة آمنة لإعادة تعيين كلمة المرور. تحقق من صندوق الوارد والرسائل غير المرغوب فيها.');
+    }catch(error){
+      const api=await import('./auth/auth-service.js').catch(()=>null);
+      if(error?.code==='auth/user-not-found')showMessage(message,'إذا كان البريد مسجلًا، ستصلك رسالة آمنة لإعادة تعيين كلمة المرور. تحقق من صندوق الوارد والرسائل غير المرغوب فيها.');
+      else showMessage(message,api?api.friendlyAuthError(error):'تعذر إرسال رسالة الاستعادة الآن.','error');
+    }finally{if(resetButton.isConnected)resetButton.disabled=false;}
+    return;
+  }
+
   const modeButton=event.target.closest('[data-auth-mode]');
   if(modeButton){setAuthMode(modeButton.dataset.authMode);return;}
 
@@ -350,6 +391,7 @@ document.addEventListener('click',event=>{
 });
 
 window.addEventListener('popstate',()=>render(currentRoutePath()));
+initializeTheme();
 document.querySelector('.menu-toggle')?.addEventListener('click',event=>{
   const nav=document.querySelector('#nav');
   const opened=nav.classList.toggle('open');
