@@ -260,6 +260,17 @@ service cloud.firestore {
         && request.resource.data.email == resource.data.email
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
           ['role', 'status', 'subjectId', 'subjectName', 'grades', 'assignedClassIds', 'subjectIds', 'reviewedAt', 'reviewedBy']);
+      // إدارة حسابات الطلاب وأولياء الأمور: إيقاف، تعديل الاسم والهاتف، نقل فصل، تخريج. لا تغيير للدور أو البريد.
+      allow update: if isActiveAdmin()
+        && resource.data.role in ['student', 'parent']
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.status in ['active', 'disabled', 'graduated']
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+          ['status', 'displayName', 'phone', 'classId', 'className', 'grade', 'updatedBy', 'updatedAt'])
+        && (request.resource.data.get('classId', '') == resource.data.get('classId', '')
+          || get(/databases/$(database)/documents/classes/$(request.resource.data.classId)).data.grade == request.resource.data.grade);
       allow delete: if false;
     }
 

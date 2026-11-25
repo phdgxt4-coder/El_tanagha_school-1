@@ -1,8 +1,9 @@
 import { collection, getCountFromServer, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
+import * as spark from '../../services/spark-backend.js';
 import { invalidateStructure, loadClasses, loadSubjects, loadClassAssignments } from '../../services/structure-service.js';
 import { esc, gradeNames, say, shellActions, skeletonRows } from './common.js';
 
-const SECTIONS = [['overview', 'نظرة عامة', '▦'], ['classes', 'الصفوف والفصول', '▤'], ['subjects', 'المواد', '✎'], ['teachers', 'المدرسون والإسناد', '☺'], ['students', 'استيراد الطلاب', '⇪'], ['links', 'ربط أولياء الأمور', '⚭']];
+const SECTIONS = [['overview', 'نظرة عامة', '▦'], ['classes', 'الصفوف والفصول', '▤'], ['subjects', 'المواد', '✎'], ['teachers', 'المدرسون والإسناد', '☺'], ['students', 'استيراد الطلاب', '⇪'], ['links', 'ربط أولياء الأمور', '⚭'], ['users', 'إدارة الحسابات', '⚙']];
 
 export function renderAdmin(profile) {
   return `<div class="dash dash-admin" data-dash="admin">
@@ -28,11 +29,20 @@ export function renderAdmin(profile) {
         <label>الطلاب<textarea name="rows" rows="8" required placeholder="محمد أحمد علي حسن, 01012345678" style="direction:rtl"></textarea></label><label>أو ملف CSV<input type="file" accept=".csv,text/csv" data-csv></label>
         <button class="button" type="submit">استيراد</button><p class="form-note" data-msg="import" role="status"></p></form></section>
       <section data-panel="links" hidden><h1>ربط أولياء الأمور</h1><p class="dash-muted">الربط يتم بكود الطالب بدون موافقة. هنا تقدر تلغي أي ربط نشط.</p><table class="adm-table"><tbody data-links></tbody></table><button class="button ghost" type="button" data-more-links hidden>تحميل المزيد</button></section>
+      <section data-panel="users" hidden><h1>إدارة الحسابات</h1>
+        <p class="dash-muted">لا يوجد حذف نهائي. الإيقاف يمنع الدخول والبيانات تبقى محفوظة، والتفعيل يرجعه.</p>
+        <form class="adm-inline" data-user-search><select name="role"><option value="student">طلاب</option><option value="parent">أولياء أمور</option><option value="teacher">مدرسون</option></select><input name="q" maxlength="60" placeholder="ابحث بأول الاسم" style="direction:rtl"><button class="button" type="submit">بحث</button></form>
+        <p class="form-note" data-msg="users" role="status"></p><table class="adm-table"><tbody data-users></tbody></table>
+        <h2>استبدال مدرس</h2><p class="dash-muted">ينقل كل إسنادات المدرس الحالي للمدرس الجديد. الحسابان يبقيان.</p>
+        <form class="adm-inline" data-replace-form><select name="oldUid" required data-replace-old><option value="">المدرس الحالي</option></select><select name="newUid" required data-replace-new><option value="">المدرس الجديد</option></select><button class="button" type="submit">استبدال</button></form><p class="form-note" data-msg="replace" role="status"></p>
+        <h2>ترقية فصل / تخريج</h2><p class="dash-muted">ينقل كل طلاب الفصل للفصل الجديد، أو يخرّجهم (حسابهم يبقى محفوظًا ولا يدخلون). الحد 400 طالب في المرة.</p>
+        <form class="adm-inline" data-promote-form><select name="from" required data-promote-from><option value="">من الفصل</option></select><select name="to" data-promote-to><option value="">تخريج (بدون فصل جديد)</option></select><button class="button" type="submit">تنفيذ</button></form><p class="form-note" data-msg="promote" role="status"></p></section>
     </main></div>`;
 }
 
 export function mountAdmin(root, { auth, database }) {
   const loaded = new Set();
+  const confirmAsk = text => window.confirm(text);
   const m = name => root.querySelector(`[data-msg="${name}"]`);
   async function guard(task, message, okText, ok) {
     try { await task(); if (ok) say(message, okText); } catch (error) { say(message, auth.friendlyAuthError(error), 'error'); }
@@ -89,7 +99,58 @@ export function mountAdmin(root, { auth, database }) {
     if (reset) body.innerHTML = html || '<tr><td>لا توجد روابط نشطة.</td></tr>'; else body.insertAdjacentHTML('beforeend', html);
     root.querySelector('[data-more-links]').hidden = snapshot.docs.length <= 20;
   }
-  const loaders = { overview, classes, subjects, teachers, links: () => links(true) };
+  async function usersPanel() {
+    const [classList, teacherSnap] = await Promise.all([loadClasses(), getDocs(query(collection(database, 'profiles'), where('role', '==', 'teacher'), where('status', '==', 'active'), orderBy('displayName'), limit(100)))]);
+    const teacherOptions = teacherSnap.docs.map(item => ({ value: item.id, text: item.data().displayName }));
+    fill(root.querySelector('[data-replace-old]'), teacherOptions, 'المدرس الحالي');
+    fill(root.querySelector('[data-replace-new]'), teacherOptions, 'المدرس الجديد');
+    const classOptions = classList.map(item => ({ value: item.id, text: item.name }));
+    fill(root.querySelector('[data-promote-from]'), classOptions, 'من الفصل');
+    root.querySelector('[data-promote-to]').innerHTML = '<option value="">تخريج (بدون فصل جديد)</option>' + classOptions.map(item => `<option value="${esc(item.value)}">${esc(item.text)}</option>`).join('');
+    root.dataset.classOptions = JSON.stringify(classOptions);
+  }
+  async function searchUsers(form) {
+    const box = root.querySelector('[data-users]');
+    box.innerHTML = '<tr><td>جارٍ البحث…</td></tr>';
+    const list = await spark.adminSearchUsers(form.elements.role.value, form.elements.q.value);
+    const options = JSON.parse(root.dataset.classOptions || '[]');
+    box.innerHTML = list.length ? list.map(user => `<tr data-user="${esc(user.uid)}"><td><b>${esc(user.displayName)}</b><br><small dir="ltr">${esc(user.phone)}</small>${user.className ? `<br><small>${esc(user.className)}</small>` : ''}</td><td>${user.status === 'active' ? 'نشط' : user.status === 'disabled' ? 'موقوف' : esc(user.status)}</td><td>
+      <button class="text-link" type="button" data-toggle-status="${user.status === 'active' ? 'disabled' : 'active'}">${user.status === 'active' ? 'إيقاف' : 'تفعيل'}</button>
+      ${user.role !== 'teacher' ? '<button class="text-link" type="button" data-edit-user>تعديل</button>' : ''}
+      ${user.role === 'student' ? `<select data-move-class><option value="">نقل إلى…</option>${options.map(item => `<option value="${esc(item.value)}">${esc(item.text)}</option>`).join('')}</select>` : ''}</td></tr>`).join('') : '<tr><td>لا توجد نتائج.</td></tr>';
+    box.__list = list;
+  }
+  root.querySelector('[data-user-search]').addEventListener('submit', event => { event.preventDefault(); guard(() => searchUsers(event.currentTarget), m('users'), '', false); });
+  root.querySelector('[data-users]').addEventListener('click', event => {
+    const row = event.target.closest('[data-user]'); if (!row) return;
+    const user = root.querySelector('[data-users]').__list?.find(item => item.uid === row.dataset.user); if (!user) return;
+    const again = () => searchUsers(root.querySelector('[data-user-search]'));
+    const toggle = event.target.closest('[data-toggle-status]');
+    if (toggle && confirmAsk(`${toggle.dataset.toggleStatus === 'disabled' ? 'إيقاف' : 'تفعيل'} حساب ${user.displayName}؟`)) guard(async () => { await spark.adminSetUserStatus(user.uid, toggle.dataset.toggleStatus); await again(); }, m('users'), 'تم.', true);
+    if (event.target.closest('[data-edit-user]')) {
+      const name = window.prompt('الاسم', user.displayName); if (name === null) return;
+      const phone = window.prompt('رقم الهاتف', user.phone); if (phone === null) return;
+      guard(async () => { await spark.adminUpdateUser(user.uid, { displayName: name, phone }); await again(); }, m('users'), 'تم التعديل.', true);
+    }
+  });
+  root.querySelector('[data-users]').addEventListener('change', event => {
+    const select = event.target.closest('[data-move-class]'); if (!select || !select.value) return;
+    const row = select.closest('[data-user]');
+    const user = root.querySelector('[data-users]').__list?.find(item => item.uid === row.dataset.user);
+    if (!user || !confirmAsk(`نقل ${user.displayName} إلى الفصل المختار؟`)) { select.value = ''; return; }
+    guard(async () => { await spark.adminMoveStudent(user.uid, select.value); await searchUsers(root.querySelector('[data-user-search]')); }, m('users'), 'تم النقل.', true);
+  });
+  root.querySelector('[data-replace-form]').addEventListener('submit', event => {
+    event.preventDefault(); const form = event.currentTarget;
+    if (!confirmAsk('نقل كل إسنادات المدرس الحالي للمدرس الجديد؟')) return;
+    guard(async () => { const result = await spark.adminReplaceTeacher(form.elements.oldUid.value, form.elements.newUid.value); say(m('replace'), `تم نقل ${result.moved} إسناد.`); await usersPanel(); }, m('replace'), '', false);
+  });
+  root.querySelector('[data-promote-form]').addEventListener('submit', event => {
+    event.preventDefault(); const form = event.currentTarget;
+    if (!confirmAsk(form.elements.to.value ? 'نقل كل طلاب الفصل للفصل الجديد؟' : 'تخريج كل طلاب هذا الفصل؟ لن يستطيعوا الدخول.')) return;
+    guard(async () => { const result = await spark.adminPromoteClass(form.elements.from.value, form.elements.to.value); say(m('promote'), `تم لـ ${result.count} طالب.${result.more ? ' يوجد طلاب آخرون، نفّذ مرة أخرى.' : ''}`); }, m('promote'), '', false);
+  });
+  const loaders = { users: usersPanel, overview, classes, subjects, teachers, links: () => links(true) };
 
   root.querySelector('.adm-side nav').addEventListener('click', event => {
     const button = event.target.closest('[data-section]');

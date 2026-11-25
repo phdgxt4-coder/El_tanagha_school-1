@@ -85,7 +85,7 @@ test('Spark: اعتماد المدرس وإدارة الهيكل للإدارة 
   await assertSucceeds(updateDoc(doc(user('t1'),'teacherApplications/t1'),{emailVerified:true}));
   await assertSucceeds(updateDoc(doc(admin,'profiles/t1'),{role:'teacher',status:'active',subjectId:'math',grades:[],assignedClassIds:[]}));
   await assertSucceeds(updateDoc(doc(admin,'teacherApplications/t1'),{status:'approved',reviewedBy:'adm',reviewedAt:serverTimestamp()}));
-  await assertFails(updateDoc(doc(admin,'profiles/s1'),{status:'disabled'}));
+  await assertSucceeds(updateDoc(doc(admin,'profiles/s1'),{status:'disabled'}));
   await assertFails(updateDoc(doc(admin,'profiles/t1'),{email:'x@y.z'}));
   await assertSucceeds(setDoc(doc(admin,'classes/c2'),{name:'1/2',grade:'1',section:'2',year:'2026-2027',updatedAt:serverTimestamp()}));
   await assertSucceeds(setDoc(doc(admin,'teacherAssignments/t1_math_c1'),{teacherUid:'t1',subjectId:'math',classId:'c1',subjectName:'الرياضيات',className:'1/1',grade:'1',year:'2026-2027',teacherName:'مدرس',assignedBy:'adm',assignedAt:serverTimestamp()}));
@@ -205,4 +205,23 @@ test('الوسائط: فيديو يوتيوب وملف درايف فقط، وص�
   await assertFails(setDoc(doc(t,'images','i4'),{...img,subjectId:'ar'}));
   await assertSucceeds(getDoc(doc(user('s1'),'images','i1')));
   await assertFails(getDoc(doc(user('s9'),'images','i1')));
+});
+
+test('إدارة الحسابات: الإدارة توقف وتنقل وتعدل الطالب فقط دون تغيير الدور أو البريد، والطالب لا يفعل ذلك', {skip:!emulatorAvailable}, async()=>{
+  await seed([...base,
+    ['classes/c2',{name:'1/2',grade:'2',section:'2',year:'2026-2027'}],
+    ['profiles/s1',studentProfile('s1')],
+    ['profiles/p1',{uid:'p1',email:'p1@example.com',displayName:'ولي أمر',role:'parent',status:'active',phone:'01012345678'}]]);
+  const a=user('adm');
+  await assertSucceeds(updateDoc(doc(a,'profiles','s1'),{status:'disabled',updatedBy:'adm',updatedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(doc(a,'profiles','s1'),{status:'active',classId:'c2',className:'1/2',grade:'2'}));
+  await assertFails(updateDoc(doc(a,'profiles','s1'),{classId:'c1',className:'1/1',grade:'3'}));
+  await assertFails(updateDoc(doc(a,'profiles','s1'),{role:'admin'}));
+  await assertFails(updateDoc(doc(a,'profiles','s1'),{email:'x@example.com'}));
+  await assertFails(updateDoc(doc(a,'profiles','s1'),{status:'weird'}));
+  await assertSucceeds(updateDoc(doc(a,'profiles','p1'),{displayName:'اسم جديد',phone:'01112345678'}));
+  await assertSucceeds(updateDoc(doc(a,'profiles','s1'),{status:'graduated'}));
+  const s=user('s1');
+  await assertFails(updateDoc(doc(s,'profiles','s1'),{status:'active'}));
+  await assertFails(updateDoc(doc(user('p1'),'profiles','s1'),{status:'disabled'}));
 });

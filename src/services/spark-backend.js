@@ -367,3 +367,110 @@ export async function listClassStudents(classId, after = '') {
   };
 }
 
+
+/* ---------- إدارة الحسابات (للإدارة فقط، لا حذف أبدًا: إيقاف أو نقل أو تخريج) ---------- */
+const USER_ROLES = ['student', 'parent', 'teacher'];
+const USER_STATUSES = ['active', 'disabled'];
+const BATCH_LIMIT = 400;
+
+export async function adminSearchUsers(role, prefix = '') {
+  if (!USER_ROLES.includes(role)) throw fail('invalid-argument', 'نوع الحساب غير صالح.');
+  const text = String(prefix).trim().slice(0, 60);
+  const parts = [where('role', '==', role), orderBy('displayName')];
+  if (text) parts.push(where('displayName', '>=', text), where('displayName', '<=', `${text}\uf8ff`));
+  const snapshot = await getDocs(query(collection(db(), 'profiles'), ...parts, limit(30)));
+  return snapshot.docs.map(item => {
+    const data = item.data();
+    return { uid: item.id, role: data.role, status: data.status, displayName: data.displayName ?? '', phone: data.phone ?? '', classId: data.classId ?? '', className: data.className ?? '', grade: data.grade ?? '' };
+  });
+}
+
+export async function adminSetUserStatus(uid, status) {
+  if (!USER_STATUSES.includes(status)) throw fail('invalid-argument', 'الحالة غير صالحة.');
+  if (uid === me().uid) throw fail('failed-precondition', 'لا يمكنك إيقاف حسابك.');
+  const database = db();
+  const snapshot = await getDoc(doc(database, 'profiles', uid));
+  if (!snapshot.exists() || !USER_ROLES.includes(snapshot.data().role)) throw fail('not-found', 'الحساب غير موجود.');
+  const batch = writeBatch(database);
+  batch.update(doc(database, 'profiles', uid), { status, updatedBy: me().uid, updatedAt: serverTimestamp() });
+  audit(batch, status === 'disabled' ? 'user_disabled' : 'user_enabled', { targetUid: uid });
+  await batch.commit();
+  return { status };
+}
+
+export async function adminUpdateUser(uid, { displayName, phone }) {
+  const name = String(displayName ?? '').trim().replace(/\s+/gu, ' ');
+  const phoneKey = normalizePhone(phone);
+  if (name.length < 3 || name.length > 80) throw fail('invalid-argument', 'الاسم غير صالح.');
+  if (!phoneKey) throw fail('invalid-argument', 'رقم الهاتف غير صالح.');
+  const database = db();
+  const snapshot = await getDoc(doc(database, 'profiles', uid));
+  if (!snapshot.exists() || !['student', 'parent'].includes(snapshot.data().role)) throw fail('not-found', 'الحساب غير موجود أو لا يمكن تعديله من هنا.');
+  const batch = writeBatch(database);
+  batch.update(doc(database, 'profiles', uid), { displayName: name, phone: phoneKey, updatedBy: me().uid, updatedAt: serverTimestamp() });
+  audit(batch, 'user_updated', { targetUid: uid });
+  await batch.commit();
+  return { updated: true };
+}
+
+export async function adminMoveStudent(uid, classId) {
+  const database = db();
+  const [student, target] = await Promise.all([getDoc(doc(database, 'profiles', uid)), getDoc(doc(database, 'classes', String(classId)))]);
+  if (!student.exists() || student.data().role !== 'student') throw fail('not-found', 'الطالب غير موجود.');
+  if (!target.exists()) throw fail('not-found', 'الفصل غير موجود.');
+  const batch = writeBatch(database);
+  batch.update(doc(database, 'profiles', uid), { classId: target.id, className: target.data().name, grade: target.data().grade, updatedBy: me().uid, updatedAt: serverTimestamp() });
+  audit(batch, 'student_moved', { targetUid: uid, fromClassId: student.data().classId ?? '', toClassId: target.id });
+  await batch.commit();
+  return { classId: target.id };
+}
+
+/** يحوّل كل إسنادات مدرس إلى مدرس آخر (الإسناد القديم يُحذف، حسابا المدرسين لا يُحذفان). */
+export async function adminReplaceTeacher(oldUid, newUid) {
+  if (!oldUid || !newUid || oldUid === newUid) throw fail('invalid-argument', 'اختر مدرسين مختلفين.');
+  const database = db();
+  const [oldTeacher, newTeacher, assigned] = await Promise.all([
+    getDoc(doc(database, 'profiles', oldUid)), getDoc(doc(database, 'profiles', newUid)),
+    getDocs(query(collection(database, 'teacherAssignments'), where('teacherUid', '==', oldUid), limit(150)))
+  ]);
+  if (!oldTeacher.exists() || oldTeacher.data().role !== 'teacher') throw fail('not-found', 'المدرس الحالي غير موجود.');
+  if (!newTeacher.exists() || newTeacher.data().role !== 'teacher' || newTeacher.data().status !== 'active') throw fail('failed-precondition', 'المدرس الجديد لازم يكون معتمدًا ونشطًا.');
+  if (assigned.empty) throw fail('failed-precondition', 'المدرس الحالي ليس له إسنادات.');
+  const existing = await getDocs(query(collection(database, 'teacherAssignments'), where('teacherUid', '==', newUid), limit(150)));
+  const entries = [...existing.docs.map(item => item.data())];
+  const batch = writeBatch(database);
+  assigned.docs.forEach(item => {
+    const old = item.data();
+    const entry = { ...old, teacherUid: newUid, teacherName: newTeacher.data().displayName ?? '' };
+    delete entry.assignedBy; delete entry.assignedAt;
+    batch.set(doc(database, 'teacherAssignments', `${newUid}_${old.subjectId}_${old.classId}`), { ...entry, assignedBy: me().uid, assignedAt: serverTimestamp() });
+    batch.delete(item.ref);
+    entries.push(entry);
+  });
+  const scope = list => ({
+    grades: [...new Set(list.map(item => item.grade))].sort((a, b) => GRADE_ORDER.indexOf(a) - GRADE_ORDER.indexOf(b)),
+    assignedClassIds: [...new Set(list.map(item => item.classId))], subjectIds: [...new Set(list.map(item => item.subjectId))]
+  });
+  batch.update(doc(database, 'profiles', newUid), scope(entries));
+  batch.update(doc(database, 'profiles', oldUid), scope([]));
+  audit(batch, 'teacher_replaced', { oldUid, newUid, count: assigned.size });
+  await batch.commit();
+  return { moved: assigned.size };
+}
+
+/** ترقية فصل كامل: لفصل جديد، أو تخريج (الحساب يبقى محفوظًا بحالة graduated). */
+export async function adminPromoteClass(fromClassId, toClassId) {
+  const database = db();
+  const [from, to] = await Promise.all([getDoc(doc(database, 'classes', String(fromClassId))), toClassId ? getDoc(doc(database, 'classes', String(toClassId))) : null]);
+  if (!from.exists()) throw fail('not-found', 'الفصل الحالي غير موجود.');
+  if (toClassId && !to.exists()) throw fail('not-found', 'الفصل الجديد غير موجود.');
+  if (toClassId && to.id === from.id) throw fail('invalid-argument', 'اختر فصلًا مختلفًا.');
+  const students = await getDocs(query(collection(database, 'profiles'), where('role', '==', 'student'), where('classId', '==', from.id), limit(BATCH_LIMIT)));
+  if (students.empty) throw fail('failed-precondition', 'لا يوجد طلاب في هذا الفصل.');
+  const batch = writeBatch(database);
+  const stamp = { updatedBy: me().uid, updatedAt: serverTimestamp() };
+  students.docs.forEach(item => batch.update(item.ref, toClassId ? { classId: to.id, className: to.data().name, grade: to.data().grade, ...stamp } : { status: 'graduated', ...stamp }));
+  audit(batch, toClassId ? 'class_promoted' : 'class_graduated', { fromClassId: from.id, toClassId: toClassId || '', count: students.size });
+  await batch.commit();
+  return { count: students.size, more: students.size === BATCH_LIMIT };
+}
