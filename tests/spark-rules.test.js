@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import test, {after, before} from 'node:test';
 import {assertFails,assertSucceeds,initializeTestEnvironment} from '@firebase/rules-unit-testing';
-import {Timestamp,doc,getDoc,serverTimestamp,setDoc,updateDoc,writeBatch} from 'firebase/firestore';
+import {Timestamp,deleteDoc,doc,getDoc,serverTimestamp,setDoc,updateDoc,writeBatch} from 'firebase/firestore';
 
 const emulatorAvailable=Boolean(process.env.FIRESTORE_EMULATOR_HOST);
 let environment;
@@ -259,6 +259,24 @@ test('جدول الحصص: الإدارة تكتب وطلاب الفصل فقط 
   await assertFails(setDoc(doc(user('s1'),'timetables','c1'),{classId:'c1',grade:'1',cells:{},updatedAt:serverTimestamp()}));
   await assertSucceeds(getDoc(doc(user('s1'),'timetables','c1')));
   await assertFails(getDoc(doc(user('s9'),'timetables','c1')));
+});
+
+test('رسائل التواصل: الزائر يكتب فقط والإدارة تقرأ وتعلّم',{skip:!emulatorAvailable},async()=>{
+  await seed([...base]);
+  const anon=environment.unauthenticatedContext().firestore();
+  const row={name:'أحمد',email:'',message:'مرحبا',read:false,createdAt:serverTimestamp()};
+  await assertSucceeds(setDoc(doc(anon,'contactMessages','m1'),row));
+  await assertFails(setDoc(doc(anon,'contactMessages','m2'),{...row,read:true}));
+  await assertFails(setDoc(doc(anon,'contactMessages','m3'),{...row,message:'x'.repeat(801)}));
+  await assertFails(setDoc(doc(anon,'contactMessages','m4'),{...row,extra:1}));
+  await assertFails(getDoc(doc(anon,'contactMessages','m1')));
+  await assertFails(getDoc(doc(user('s1'),'contactMessages','m1')));
+  const a=user('adm');
+  await assertSucceeds(getDoc(doc(a,'contactMessages','m1')));
+  await assertSucceeds(updateDoc(doc(a,'contactMessages','m1'),{read:true}));
+  await assertFails(updateDoc(doc(a,'contactMessages','m1'),{message:'x'}));
+  await assertFails(updateDoc(doc(anon,'contactMessages','m1'),{read:true}));
+  await assertSucceeds(deleteDoc(doc(a,'contactMessages','m1')));
 });
 
 test('أخطاء المتصفح: أي مستخدم يكتب خطأه فقط والإدارة وحدها تقرأ', {skip:!emulatorAvailable}, async()=>{

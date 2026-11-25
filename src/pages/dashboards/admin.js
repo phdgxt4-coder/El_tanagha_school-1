@@ -3,7 +3,7 @@ import * as spark from '../../services/spark-backend.js';
 import { invalidateStructure, loadClasses, loadSubjects, loadClassAssignments } from '../../services/structure-service.js';
 import { esc, gradeNames, say, shellActions, skeletonRows } from './common.js';
 
-const SECTIONS = [['overview', 'نظرة عامة', '▦'], ['classes', 'الصفوف والفصول', '▤'], ['subjects', 'المواد', '✎'], ['teachers', 'المدرسون والإسناد', '☺'], ['students', 'استيراد الطلاب', '⇪'], ['links', 'ربط أولياء الأمور', '⚭'], ['users', 'إدارة الحسابات', '⚙'], ['timetable', 'جدول الحصص', '▦'], ['ops', 'النسخ والأخطاء', '⛁'], ['admins', 'المدراء', '♛']];
+const SECTIONS = [['overview', 'نظرة عامة', '▦'], ['classes', 'الصفوف والفصول', '▤'], ['subjects', 'المواد', '✎'], ['teachers', 'المدرسون والإسناد', '☺'], ['students', 'استيراد الطلاب', '⇪'], ['links', 'ربط أولياء الأمور', '⚭'], ['users', 'إدارة الحسابات', '⚙'], ['timetable', 'جدول الحصص', '▦'], ['ops', 'النسخ والأخطاء', '⛁'], ['admins', 'المدراء', '♛'], ['contact', 'رسائل التواصل', '✉']];
 
 export function renderAdmin(profile) {
   return `<div class="dash dash-admin" data-dash="admin">
@@ -45,6 +45,8 @@ export function renderAdmin(profile) {
         <p class="dash-muted">النسخ التلقائي المجدول يحتاج خطة Blaze، فهنا نسخة يدوية: تنزل ملف JSON فيه الفصول والمواد والحسابات والدرجات والحضور والمحتوى والمهام والجداول. الرسائل لا تدخل النسخة. كل مستند يُحسب قراءة من الحد المجاني (50 ألف يوميًا)، فاعملها خارج وقت الذروة، مرة أسبوعيًا مثلًا.</p>
         <button class="button" type="button" data-export>تنزيل نسخة احتياطية</button><p class="form-note" data-msg="export" role="status"></p>
         <h2>آخر أخطاء المتصفح</h2><button class="button ghost" type="button" data-errors-load>تحديث</button><table class="adm-table"><tbody data-errors></tbody></table></section>
+      <section data-panel="contact" hidden><h1>رسائل التواصل</h1><p class="dash-muted">الرسائل القادمة من نموذج "تواصل معنا" في الموقع. لا يُرسل بريد؛ الرسائل تُحفظ هنا فقط. آخر 50 رسالة.</p>
+        <button class="button ghost" type="button" data-contact-load>تحديث</button><p class="form-note" data-msg="contact" role="status"></p><table class="adm-table"><tbody data-contact-list></tbody></table></section>
       <section data-panel="admins" hidden><h1>المدراء</h1>
         <p class="dash-muted">أضف مديرًا جديدًا ببريده. هو يفتح صفحة <b>/admin/join</b> وينشئ حسابه بنفس البريد ويوثقه ثم يفعّل الدعوة. لا يصبح أحد مديرًا بدون دعوتك.</p>
         <form class="adm-inline" data-admin-invite><input name="email" type="email" required maxlength="254" placeholder="بريد المدير الجديد" dir="ltr"><button class="button" type="submit">دعوة</button></form>
@@ -261,7 +263,18 @@ export function mountAdmin(root, { auth, database }) {
     const revoke = event.target.closest('[data-invite-revoke]');
     if (revoke) guard(async () => { await spark.adminRevokeInvite(revoke.dataset.inviteRevoke); await adminsPanel(); }, m('admins'), 'أُلغيت الدعوة.', true);
   });
-  const loaders = { admins: adminsPanel, ops: errorsPanel, timetable: timetablePanel, users: usersPanel, overview, classes, subjects, teachers, links: () => links(true) };
+  async function contactPanel() {
+    const items = await spark.adminListContactMessages();
+    root.querySelector('[data-contact-list]').innerHTML = items.length ? items.map(item => `<tr><td><b>${esc(item.name)}</b>${item.read ? '' : ' <mark>جديدة</mark>'}<br><small dir="ltr">${esc(item.email)}</small><br>${esc(item.createdAt?.toLocaleString('ar-EG') || '')}</td><td>${esc(item.message)}</td><td><button class="text-link" type="button" data-contact-read="${esc(item.id)}" data-read="${item.read ? '0' : '1'}">${item.read ? 'غير مقروءة' : 'تمت القراءة'}</button> <button class="text-link" type="button" data-contact-del="${esc(item.id)}">حذف</button></td></tr>`).join('') : '<tr><td>لا توجد رسائل.</td></tr>';
+  }
+  root.querySelector('[data-contact-load]').addEventListener('click', () => guard(contactPanel, m('contact'), '', false));
+  root.querySelector('[data-panel="contact"]').addEventListener('click', event => {
+    const read = event.target.closest('[data-contact-read]');
+    if (read) guard(async () => { await spark.adminSetContactRead(read.dataset.contactRead, read.dataset.read === '1'); await contactPanel(); }, m('contact'), '', false);
+    const del = event.target.closest('[data-contact-del]');
+    if (del && confirmAsk('حذف هذه الرسالة؟')) guard(async () => { await spark.adminDeleteContactMessage(del.dataset.contactDel); await contactPanel(); }, m('contact'), 'تم الحذف.', true);
+  });
+  const loaders = { contact: contactPanel, admins: adminsPanel, ops: errorsPanel, timetable: timetablePanel, users: usersPanel, overview, classes, subjects, teachers, links: () => links(true) };
 
   root.querySelector('.adm-side nav').addEventListener('click', event => {
     const button = event.target.closest('[data-section]');
