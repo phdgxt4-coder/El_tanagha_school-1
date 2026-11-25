@@ -3,7 +3,7 @@ import * as spark from '../../services/spark-backend.js';
 import { invalidateStructure, loadClasses, loadSubjects, loadClassAssignments } from '../../services/structure-service.js';
 import { esc, gradeNames, say, shellActions, skeletonRows } from './common.js';
 
-const SECTIONS = [['overview', 'نظرة عامة', '▦'], ['classes', 'الصفوف والفصول', '▤'], ['subjects', 'المواد', '✎'], ['teachers', 'المدرسون والإسناد', '☺'], ['students', 'استيراد الطلاب', '⇪'], ['links', 'ربط أولياء الأمور', '⚭'], ['users', 'إدارة الحسابات', '⚙'], ['timetable', 'جدول الحصص', '▦'], ['ops', 'النسخ والأخطاء', '⛁']];
+const SECTIONS = [['overview', 'نظرة عامة', '▦'], ['classes', 'الصفوف والفصول', '▤'], ['subjects', 'المواد', '✎'], ['teachers', 'المدرسون والإسناد', '☺'], ['students', 'استيراد الطلاب', '⇪'], ['links', 'ربط أولياء الأمور', '⚭'], ['users', 'إدارة الحسابات', '⚙'], ['timetable', 'جدول الحصص', '▦'], ['ops', 'النسخ والأخطاء', '⛁'], ['admins', 'المدراء', '♛']];
 
 export function renderAdmin(profile) {
   return `<div class="dash dash-admin" data-dash="admin">
@@ -45,6 +45,10 @@ export function renderAdmin(profile) {
         <p class="dash-muted">النسخ التلقائي المجدول يحتاج خطة Blaze، فهنا نسخة يدوية: تنزل ملف JSON فيه الفصول والمواد والحسابات والدرجات والحضور والمحتوى والمهام والجداول. الرسائل لا تدخل النسخة. كل مستند يُحسب قراءة من الحد المجاني (50 ألف يوميًا)، فاعملها خارج وقت الذروة، مرة أسبوعيًا مثلًا.</p>
         <button class="button" type="button" data-export>تنزيل نسخة احتياطية</button><p class="form-note" data-msg="export" role="status"></p>
         <h2>آخر أخطاء المتصفح</h2><button class="button ghost" type="button" data-errors-load>تحديث</button><table class="adm-table"><tbody data-errors></tbody></table></section>
+      <section data-panel="admins" hidden><h1>المدراء</h1>
+        <p class="dash-muted">أضف مديرًا جديدًا ببريده. هو يفتح صفحة <b>/admin/join</b> وينشئ حسابه بنفس البريد ويوثقه ثم يفعّل الدعوة. لا يصبح أحد مديرًا بدون دعوتك.</p>
+        <form class="adm-inline" data-admin-invite><input name="email" type="email" required maxlength="254" placeholder="بريد المدير الجديد" dir="ltr"><button class="button" type="submit">دعوة</button></form>
+        <p class="form-note" data-msg="admins" role="status"></p><h2>المدراء</h2><table class="adm-table"><tbody data-admin-list></tbody></table><h2>دعوات لم تُستخدم</h2><table class="adm-table"><tbody data-invite-list></tbody></table></section>
     </main></div>`;
 }
 
@@ -242,7 +246,22 @@ export function mountAdmin(root, { auth, database }) {
     body.innerHTML = snapshot.docs.length ? snapshot.docs.map(item => { const e = item.data(); return `<tr><td dir="ltr">${esc(e.message)}</td><td>${esc(e.route)}</td><td>${esc(e.at?.toDate?.().toLocaleString('ar-EG') || '')}</td></tr>`; }).join('') : '<tr><td>لا توجد أخطاء مسجلة.</td></tr>';
   }
   root.querySelector('[data-errors-load]').addEventListener('click', () => guard(errorsPanel, m('export'), '', false));
-  const loaders = { ops: errorsPanel, timetable: timetablePanel, users: usersPanel, overview, classes, subjects, teachers, links: () => links(true) };
+  async function adminsPanel() {
+    const { admins, invites } = await spark.adminListAdmins();
+    root.querySelector('[data-admin-list]').innerHTML = admins.map(item => `<tr><td><b>${esc(item.displayName)}</b><br><small dir="ltr">${esc(item.email)}</small></td><td>${item.active ? 'نشط' : 'موقوف'}</td><td>${item.self ? '(أنت)' : `<button class="text-link" type="button" data-admin-toggle="${esc(item.uid)}" data-active="${item.active ? '0' : '1'}">${item.active ? 'إيقاف' : 'تفعيل'}</button>`}</td></tr>`).join('');
+    root.querySelector('[data-invite-list]').innerHTML = invites.length ? invites.map(item => `<tr><td dir="ltr">${esc(item.email)}</td><td><button class="text-link" type="button" data-invite-revoke="${esc(item.email)}">إلغاء</button></td></tr>`).join('') : '<tr><td>لا توجد دعوات.</td></tr>';
+  }
+  root.querySelector('[data-admin-invite]').addEventListener('submit', event => {
+    event.preventDefault(); const form = event.currentTarget;
+    guard(async () => { await spark.adminInviteAdmin(form.elements.email.value); form.reset(); await adminsPanel(); }, m('admins'), 'تمت الدعوة. أرسل له رابط الموقع /admin/join.', true);
+  });
+  root.querySelector('[data-panel="admins"]').addEventListener('click', event => {
+    const toggle = event.target.closest('[data-admin-toggle]');
+    if (toggle && confirmAsk('تغيير حالة هذا المدير؟')) guard(async () => { await spark.adminSetAdminActive(toggle.dataset.adminToggle, toggle.dataset.active === '1'); await adminsPanel(); }, m('admins'), 'تم.', true);
+    const revoke = event.target.closest('[data-invite-revoke]');
+    if (revoke) guard(async () => { await spark.adminRevokeInvite(revoke.dataset.inviteRevoke); await adminsPanel(); }, m('admins'), 'أُلغيت الدعوة.', true);
+  });
+  const loaders = { admins: adminsPanel, ops: errorsPanel, timetable: timetablePanel, users: usersPanel, overview, classes, subjects, teachers, links: () => links(true) };
 
   root.querySelector('.adm-side nav').addEventListener('click', event => {
     const button = event.target.closest('[data-section]');

@@ -34,7 +34,12 @@ export async function initializeDashboard(){
     const account=await auth.getMyAccountStatus();
     if(!status.isConnected)return;
     if(account.status!=='active'){
-      settle(status,`حالة الحساب: ${account.status||'غير متاح'}.`);
+      settle(status,account.status==='disabled'||account.status==='graduated'?'هذا الحساب موقوف حاليًا. تواصل مع إدارة المدرسة.':`حالة الحساب: ${account.status||'غير متاح'}.`);
+      return;
+    }
+    if(account.role!=='admin'&&account.emailVerified!==true){
+      status.innerHTML='<p>وثّق بريدك الإلكتروني أولًا لتفتح لوحتك. افتح الرابط المرسل إلى بريدك ثم حدّث الصفحة.</p><button type="button" class="button ghost" data-resend-verify>أرسل رابط التوثيق مرة أخرى</button>';
+      status.querySelector('[data-resend-verify]').addEventListener('click',async event=>{event.currentTarget.disabled=true;try{await auth.sendVerificationIfNeeded();event.currentTarget.textContent='تم الإرسال. افحص بريدك.';}catch{event.currentTarget.textContent='تعذر الإرسال الآن، حاول لاحقًا.';}});
       return;
     }
     const database=getFirestore(getFirebaseApp());

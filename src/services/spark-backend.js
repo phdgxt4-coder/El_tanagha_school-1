@@ -1,7 +1,7 @@
 // تنفيذ عمليات الحسابات والإدارة مباشرة على Firestore بدون Cloud Functions.
 // كل ثابت أمني تفرضه قواعد Firestore (firestore.rules)، وهذا الملف يطابق أشكال بيانات وظائف Blaze.
 import {
-  collection, doc, getDoc, getDocs, getFirestore, limit, orderBy, query, serverTimestamp, startAfter, Timestamp, where, writeBatch
+  collection, deleteDoc, doc, getDoc, getDocs, getFirestore, limit, orderBy, query, serverTimestamp, startAfter, Timestamp, where, writeBatch
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getFirebaseApp } from '../config/firebase-app.js';
@@ -45,7 +45,7 @@ export async function submitAccountRequest(profile) {
   const profileRef = doc(database, 'profiles', user.uid);
   if ((await getDoc(profileRef)).exists()) throw fail('already-exists', 'يوجد ملف حساب بالفعل لهذا المستخدم.');
   const batch = writeBatch(database);
-  const base = { uid: user.uid, email, displayName: profile.displayName, phone: profile.phoneKey, createdAt: serverTimestamp() };
+  const base = { uid: user.uid, email, displayName: profile.displayName, phone: profile.phoneKey, createdAt: serverTimestamp(), consentAt: serverTimestamp() };
 
   if (profile.role === 'teacher') {
     const subject = await getDoc(doc(database, 'subjects', profile.subjectId));
@@ -89,7 +89,7 @@ export async function getMyAccountStatus() {
   }
   const emailVerified = user.emailVerified === true;
   const admin = await getDoc(doc(database, 'admins', user.uid)).catch(() => null);
-  if (admin?.exists() && admin.data().active === true) return { role: 'admin', status: 'active', emailVerified };
+  if (admin?.exists() && admin.data().active === true) return { role: 'admin', status: 'active', emailVerified, displayName: admin.data().displayName ?? '' };
   const snapshot = await getDoc(doc(database, 'profiles', user.uid));
   if (!snapshot.exists()) return { role: 'none', status: 'none', emailVerified };
   const data = snapshot.data();
@@ -506,4 +506,65 @@ export async function adminRunRollover(fromYear, toYear) {
     } catch (error) { if (error.code === 'failed-precondition') result.skipped += 1; else throw error; }
   }
   return result;
+}
+
+
+/* ---------- المدراء: الأول من Firebase Console، والباقي بدعوة من أدمن نشط ---------- */
+const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/u;
+
+export async function adminInviteAdmin(email) {
+  const key = String(email ?? '').trim().toLowerCase();
+  if (!EMAIL_PATTERN.test(key) || key.length > 254) throw fail('invalid-argument', 'البريد الإلكتروني غير صالح.');
+  const database = db();
+  const batch = writeBatch(database);
+  batch.set(doc(database, 'adminInvites', key), { email: key, createdBy: me().uid, createdAt: serverTimestamp(), claimed: false });
+  audit(batch, 'admin_invited', { email: key });
+  await batch.commit();
+  return { email: key };
+}
+
+export async function adminListAdmins() {
+  const database = db();
+  const [admins, invites] = await Promise.all([
+    getDocs(query(collection(database, 'admins'), limit(50))),
+    getDocs(query(collection(database, 'adminInvites'), where('claimed', '==', false), limit(50)))
+  ]);
+  return {
+    admins: admins.docs.map(item => ({ uid: item.id, email: item.data().email ?? '', displayName: item.data().displayName ?? '', active: item.data().active === true, self: item.id === me().uid })),
+    invites: invites.docs.map(item => ({ email: item.id }))
+  };
+}
+
+export async function adminSetAdminActive(uid, active) {
+  if (uid === me().uid) throw fail('failed-precondition', 'لا يمكنك إيقاف حسابك.');
+  const database = db();
+  const batch = writeBatch(database);
+  batch.update(doc(database, 'admins', uid), { active: active === true });
+  audit(batch, active ? 'admin_enabled' : 'admin_disabled', { targetUid: uid });
+  await batch.commit();
+  return { active: active === true };
+}
+
+export async function adminRevokeInvite(email) {
+  await deleteDoc(doc(db(), 'adminInvites', String(email).toLowerCase()));
+  return { revoked: true };
+}
+
+/** يقبل الأدمن الجديد دعوته بعد توثيق بريده. */
+export async function claimAdminInvite(displayName) {
+  const user = me();
+  await user.reload().catch(() => {});
+  if (!user.emailVerified) throw fail('failed-precondition', 'وثّق بريدك الإلكتروني أولًا ثم أعد المحاولة.');
+  await user.getIdToken(true);
+  const database = db();
+  const email = String(user.email ?? '').toLowerCase();
+  const name = String(displayName ?? '').trim().slice(0, 80) || email;
+  const batch = writeBatch(database);
+  const inviteRef = doc(database, 'adminInvites', email);
+  const invite = await getDoc(inviteRef).catch(() => null);
+  if (!invite?.exists() || invite.data().claimed !== false) throw fail('permission-denied', 'لا توجد دعوة إدارة لهذا البريد أو استُخدمت من قبل.');
+  batch.update(inviteRef, { claimed: true, claimedBy: user.uid, claimedAt: serverTimestamp() });
+  batch.set(doc(database, 'admins', user.uid), { active: true, email, displayName: name, createdBy: invite.data().createdBy, createdAt: serverTimestamp() });
+  await batch.commit();
+  return { admin: true };
 }

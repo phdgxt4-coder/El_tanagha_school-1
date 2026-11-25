@@ -1,11 +1,11 @@
-import { addDoc, collection, deleteDoc, doc, getDocs, limit, orderBy, query, serverTimestamp, where, writeBatch } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, where, writeBatch } from 'firebase/firestore';
 import { mountChat, renderChatPanel } from '../chat.js';
 import { contentLinkError } from '../../utils/links.js';
 import { resizeImage } from '../../utils/image-resize.js';
 import { loadTeacherAssignments } from '../../services/structure-service.js';
 import { esc, formatDate, gradeNames, pager, say, shellActions } from './common.js';
 
-const NAV = [['roster', 'طلاب الفصل'], ['content', 'نشر محتوى'], ['grades', 'رصد درجة'], ['mine', 'ما نشرته'], ['bulk', 'رصد جماعي'], ['tasks', 'امتحانات وواجبات'], ['images', 'رفع صورة'], ['chat', 'الرسائل']];
+const NAV = [['roster', 'طلاب الفصل'], ['content', 'نشر محتوى'], ['grades', 'رصد درجة'], ['mine', 'ما نشرته'], ['timetable', 'جدول الفصل'], ['bulk', 'رصد جماعي'], ['tasks', 'امتحانات وواجبات'], ['images', 'رفع صورة'], ['chat', 'الرسائل']];
 
 export function renderTeacher(profile) {
   return `<div class="dash dash-teacher" data-dash="teacher">
@@ -25,6 +25,7 @@ export function renderTeacher(profile) {
         <label>اسم التقييم<input name="title" maxlength="80" required style="direction:rtl;text-align:right" placeholder="اختبار شهري"></label>
         <label>الدرجة<input name="score" type="number" min="0" step="0.5" required></label><label>من<input name="max" type="number" min="1" step="0.5" required value="20"></label>
         <button class="button" type="submit">حفظ الدرجة</button><p class="form-note" data-grade-msg role="status"></p></form></section>
+      <section data-section-panel="timetable" hidden><h1>جدول الفصل المختار</h1><div data-tt></div></section>
       <section data-section-panel="bulk" hidden><h1>رصد جماعي للفصل المختار</h1>
         <div class="tch-toolbar"><button class="button ghost" type="button" data-bulk-load>تحميل طلاب الفصل</button></div>
         <h2>الحضور</h2><label>التاريخ<input type="date" data-bulk-date></label><div data-bulk-att></div><button class="button" type="button" data-bulk-att-save hidden>حفظ الحضور</button><p class="form-note" data-bulk-att-msg role="status"></p>
@@ -198,6 +199,18 @@ export async function mountTeacher(root, { profile, auth, database }) {
     if (result.failed) msg('bulk-grade', `تم حفظ ${result.done} من ${rows.length} فقط. لا تعيد الحفظ كاملًا حتى لا تتكرر الدرجات؛ أدخل الباقي فرديًا.`, 'error');
     else { msg('bulk-grade', `تم حفظ ${result.done} درجة.`); bulkGrades.querySelectorAll('[data-score]').forEach(input => { input.value = ''; }); }
     event.currentTarget.disabled = false;
+  });
+
+  root.querySelector('[data-section="timetable"]').addEventListener('click', async () => {
+    const target = root.querySelector('[data-tt]');
+    if (!current) { target.innerHTML = '<p class="dash-empty">اختر فصلًا أولًا.</p>'; return; }
+    try {
+      const snapshot = await getDoc(doc(database, 'timetables', current.classId));
+      if (!snapshot.exists()) { target.innerHTML = '<p class="dash-empty">لم يُنشر جدول هذا الفصل بعد.</p>'; return; }
+      const cells = snapshot.data().cells || {}, days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+      const used = Math.max(0, ...Object.keys(cells).map(key => Number(key.split('_')[1]) || 0));
+      target.innerHTML = `<div style="overflow:auto"><table class="tch-table"><tbody><tr><th></th>${days.map(day => `<th>${day}</th>`).join('')}</tr>${Array.from({ length: used }, (_, p) => `<tr><th>${p + 1}</th>${days.map((_, d) => `<td>${esc(cells[`${d}_${p + 1}`] || '')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+    } catch { target.innerHTML = '<p class="dash-empty">تعذر تحميل الجدول.</p>'; }
   });
 
   /* امتحانات وواجبات */
