@@ -1,0 +1,11 @@
+/* Living layer visuals. Colours only through variables, motion only transform/opacity, off for reduced motion and low quality. */
+:root{--sc-ambient-a:transparent;--sc-ambient-b:transparent}
+[data-sc-daypart=night]{--sc-ambient-a:rgba(60,70,140,.10);--sc-ambient-b:rgba(10,12,30,.0)}
+[data-sc-daypart=morning]{--sc-ambient-a:rgba(255,214,140,.08);--sc-ambient-b:transparent}
+[data-sc-season=ramadan]{--sc-ambient-a:rgba(212,175,55,.10)}
+[data-sc-season=eid]{--sc-ambient-a:rgba(212,175,55,.14)}
+.sc-ambient{position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(60% 40% at 50% 0,var(--sc-ambient-a),var(--sc-ambient-b));opacity:1;transition:opacity .6s}
+[data-sc-quality=low] .sc-ambient{display:none}
+.sc-glow{animation:sc-glow .9s ease-out 1}
+@keyframes sc-glow{0%{opacity:.6;transform:scale(1)}40%{opacity:1;transform:scale(1.03)}100%{opacity:1;transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){.sc-glow{animation:none}.sc-ambient{transition:none}}
