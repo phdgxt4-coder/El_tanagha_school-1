@@ -38,7 +38,8 @@ export async function initializeDashboard(){
       return;
     }
     if(account.role!=='admin'&&account.emailVerified!==true){
-      status.innerHTML='<p>وثّق بريدك الإلكتروني أولًا لتفتح لوحتك. افتح الرابط المرسل إلى بريدك ثم حدّث الصفحة.</p><button type="button" class="button ghost" data-resend-verify>أرسل رابط التوثيق مرة أخرى</button>';
+      status.innerHTML='<p>وثّق بريدك الإلكتروني أولًا لتفتح لوحتك. افتح الرابط المرسل إلى بريدك ثم اضغط "وثّقت بريدي".</p><button type="button" class="button" data-check-verify>وثّقت بريدي</button> <button type="button" class="button ghost" data-resend-verify>أرسل رابط التوثيق مرة أخرى</button>';
+      status.querySelector('[data-check-verify]').addEventListener('click',()=>location.reload());
       status.querySelector('[data-resend-verify]').addEventListener('click',async event=>{event.currentTarget.disabled=true;try{await auth.sendVerificationIfNeeded();event.currentTarget.textContent='تم الإرسال. افحص بريدك.';}catch{event.currentTarget.textContent='تعذر الإرسال الآن، حاول لاحقًا.';}});
       return;
     }
