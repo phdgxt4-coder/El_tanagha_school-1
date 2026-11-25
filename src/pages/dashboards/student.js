@@ -3,7 +3,7 @@ import { bindTabs, esc, formatDate, gradeNames, pager, shellActions, say } from 
 import { mountChat, renderChatPanel } from '../chat.js';
 import { loadClassAssignments } from '../../services/structure-service.js';
 
-const TABS = [['home', 'الرئيسية', '⌂'], ['lessons', 'الدروس', '▤'], ['grades', 'درجاتي', '★'], ['attendance', 'حضوري', '✓'], ['teachers', 'مدرسيني', '☺'], ['chat', 'رسائل', '✉'], ['parent', 'ولي الأمر', '♥']];
+const TABS = [['home', 'الرئيسية', '⌂'], ['lessons', 'الدروس', '▤'], ['grades', 'درجاتي', '★'], ['attendance', 'حضوري', '✓'], ['teachers', 'مدرسيني', '☺'], ['images', 'الصور', '▣'], ['chat', 'رسائل', '✉'], ['parent', 'ولي الأمر', '♥']];
 
 export function renderStudent(profile) {
   const first = String(profile.displayName || 'طالب').split(' ')[0];
@@ -20,6 +20,7 @@ export function renderStudent(profile) {
     <section data-panel="grades" hidden class="stu-feed"><div class="stu-list" data-list="grades"></div><button class="button ghost" type="button" data-more="grades" hidden>تحميل المزيد</button></section>
     <section data-panel="attendance" hidden class="stu-feed"><div class="stu-list" data-list="attendance"></div><button class="button ghost" type="button" data-more="attendance" hidden>تحميل المزيد</button></section>
     <section data-panel="teachers" hidden class="stu-feed"><div class="stu-list" data-list="teachers"></div></section>
+    <section data-panel="images" hidden class="stu-feed"><div class="stu-list" data-list="images"></div><button class="button ghost" type="button" data-more="images" hidden>تحميل المزيد</button></section>
     <section data-panel="chat" hidden class="stu-feed">${renderChatPanel()}</section>
     <section data-panel="parent" hidden class="stu-feed"><article class="stu-tile">
       <h2>كود ربط ولي الأمر</h2><p class="dash-muted">الكود يُستخدم مرة واحدة وينتهي بعد 15 دقيقة. أعطه لولي أمرك فقط.</p>
@@ -43,6 +44,8 @@ export function mountStudent(root, { profile, auth, database }) {
   const attendance = pager(database, 'attendance', [where('studentUid', '==', profile.uid), orderBy('date', 'desc')], attendanceRow, { target: q('attendance'), more: more('attendance'), empty: 'لا يوجد حضور مسجل بعد.' });
   if (!lessons) q('lessons').innerHTML = '<p class="dash-empty">لم يُحدد فصلك بعد. تواصل مع الإدارة.</p>';
   tabs.onFirstShow('lessons', () => lessons?.load());
+  const images = classId ? pager(database, 'images', [where('classId', '==', classId), orderBy('createdAt', 'desc')], item => `<article class="stu-row"><b>${esc(item.title)}</b><img loading="lazy" alt="${esc(item.title)}" style="max-width:100%;border-radius:12px" src="${/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/u.test(item.data || '') ? item.data : ''}"><span>${formatDate(item.createdAt)}</span></article>`, { target: q('images'), more: more('images'), size: 5, empty: 'لا توجد صور لفصلك بعد.' }) : null;
+  tabs.onFirstShow('images', () => images?.load());
   tabs.onFirstShow('grades', () => grades.load());
   tabs.onFirstShow('attendance', () => attendance.load());
   tabs.onFirstShow('teachers', async () => {

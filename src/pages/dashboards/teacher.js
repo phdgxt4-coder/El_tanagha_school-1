@@ -1,9 +1,11 @@
 import { addDoc, collection, orderBy, serverTimestamp, where } from 'firebase/firestore';
 import { mountChat, renderChatPanel } from '../chat.js';
+import { contentLinkError } from '../../utils/links.js';
+import { resizeImage } from '../../utils/image-resize.js';
 import { loadTeacherAssignments } from '../../services/structure-service.js';
 import { esc, formatDate, gradeNames, pager, say, shellActions } from './common.js';
 
-const NAV = [['roster', 'طلاب الفصل'], ['content', 'نشر محتوى'], ['grades', 'رصد درجة'], ['mine', 'ما نشرته'], ['chat', 'الرسائل']];
+const NAV = [['roster', 'طلاب الفصل'], ['content', 'نشر محتوى'], ['grades', 'رصد درجة'], ['mine', 'ما نشرته'], ['images', 'رفع صورة'], ['chat', 'الرسائل']];
 
 export function renderTeacher(profile) {
   return `<div class="dash dash-teacher" data-dash="teacher">
@@ -23,6 +25,11 @@ export function renderTeacher(profile) {
         <label>اسم التقييم<input name="title" maxlength="80" required style="direction:rtl;text-align:right" placeholder="اختبار شهري"></label>
         <label>الدرجة<input name="score" type="number" min="0" step="0.5" required></label><label>من<input name="max" type="number" min="1" step="0.5" required value="20"></label>
         <button class="button" type="submit">حفظ الدرجة</button><p class="form-note" data-grade-msg role="status"></p></form></section>
+      <section data-section-panel="images" hidden><form class="dashboard-form tch-form" data-image-form>
+        <label>عنوان الصورة<input name="title" maxlength="120" required style="direction:rtl;text-align:right"></label>
+        <label>الصورة<input name="file" type="file" accept="image/*" required></label>
+        <p class="dash-muted">تُصغّر الصورة تلقائيًا (حتى 1400 بكسل و700 كيلو) وتظهر لطلاب هذا الفصل فقط. للملفات استخدم رابط جوجل درايف، وللفيديو رابط يوتيوب.</p>
+        <button class="button" type="submit">نشر الصورة لهذا الفصل</button><p class="form-note" data-image-msg role="status"></p></form></section>
       <section data-section-panel="chat" hidden>${renderChatPanel()}</section>
       <section data-section-panel="mine" hidden><div data-mine></div><button class="button ghost" type="button" data-more-mine hidden>تحميل المزيد</button></section>
     </main></div>`;
@@ -96,11 +103,26 @@ export async function mountTeacher(root, { profile, auth, database }) {
     const form = event.currentTarget;
     const values = Object.fromEntries(new FormData(form));
     if (!/^https:\/\//u.test(values.url)) { msg('content', 'الرابط يجب أن يبدأ بـ https.', 'error'); return; }
+    const linkError = contentLinkError(values.type, values.url);
+    if (linkError) { msg('content', linkError, 'error'); return; }
     form.querySelector('button').disabled = true;
     try {
       await addDoc(collection(database, 'content'), { teacherUid: profile.uid, grade: current.grade, classId: current.classId, subjectId: current.subjectId, type: values.type, title: values.title, url: values.url, published: true, createdAt: serverTimestamp() });
       msg('content', 'تم النشر لطلاب هذا الفصل.'); form.reset(); mine.reset();
     } catch { msg('content', 'تعذر النشر. تأكد أن الفصل والمادة مسندان لك.', 'error'); }
+    finally { form.querySelector('button').disabled = false; }
+  });
+
+  root.querySelector('[data-image-form]').addEventListener('submit', async event => {
+    event.preventDefault();
+    if (!current) { msg('image', 'اختر فصلًا أولًا.', 'error'); return; }
+    const form = event.currentTarget;
+    form.querySelector('button').disabled = true;
+    try {
+      const data = await resizeImage(form.elements.file.files[0]);
+      await addDoc(collection(database, 'images'), { teacherUid: profile.uid, grade: current.grade, classId: current.classId, subjectId: current.subjectId, title: form.elements.title.value.trim(), data, createdAt: serverTimestamp() });
+      msg('image', 'تم نشر الصورة لطلاب هذا الفصل.'); form.reset();
+    } catch (error) { msg('image', /ليس صورة|كبيرة/u.test(error.message) ? error.message : 'تعذر رفع الصورة. تأكد أن الفصل والمادة مسندان لك.', 'error'); }
     finally { form.querySelector('button').disabled = false; }
   });
 

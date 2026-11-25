@@ -107,6 +107,8 @@ service cloud.firestore {
         && data.title.size() <= 120
         && data.url is string
         && data.url.matches('^https://[^ ]+$')
+        && (data.type != 'video' || data.url.matches('^https://(www\\.|m\\.)?(youtube\\.com|youtu\\.be)/[^ ]+$'))
+        && (!(data.type in ['file', 'assignment']) || data.url.matches('^https://(drive|docs)\\.google\\.com/[^ ]+$'))
         && data.published is bool
         && data.createdAt is timestamp;
     }
@@ -336,6 +338,28 @@ service cloud.firestore {
           && request.resource.data.active == false)
         || (resource.data.active == false && validCodeLink(request.resource.data, linkId));
       allow delete: if false;
+    }
+
+    // صور الدروس: JPEG مصغّر (حتى 700 كيلو) داخل Firestore، مرئي لفصل الطالب فقط.
+    match /images/{imageId} {
+      allow get, list: if signedIn() && (
+        isActiveAdmin()
+        || (isActiveTeacher() && resource.data.teacherUid == request.auth.uid)
+        || (isActiveStudent() && resource.data.classId == profile(request.auth.uid).classId)
+      );
+      allow create: if isActiveTeacher()
+        && request.resource.data.keys().hasOnly(['teacherUid', 'grade', 'classId', 'subjectId', 'title', 'data', 'createdAt'])
+        && request.resource.data.teacherUid == request.auth.uid
+        && request.resource.data.grade in ['1', '2', '3']
+        && assignedTo(request.resource.data.subjectId, request.resource.data.classId)
+        && get(/databases/$(database)/documents/classes/$(request.resource.data.classId)).data.grade == request.resource.data.grade
+        && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 120
+        && request.resource.data.data is string
+        && request.resource.data.data.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$')
+        && request.resource.data.data.size() <= 960000
+        && request.resource.data.createdAt == request.time;
+      allow update: if false;
+      allow delete: if isActiveTeacher() && resource.data.teacherUid == request.auth.uid;
     }
 
     match /content/{contentId} {
