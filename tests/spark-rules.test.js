@@ -250,3 +250,13 @@ test('امتحانات وواجبات: المدرس المسند ينشر وطل
   for(let i=0;i<8;i++)gb.set(doc(t,'grades',`g${i}`),{teacherUid:'t1',studentUid:`s${i}`,grade:'1',classId:'c1',subjectId:'math',subjectName:'رياضيات',title:'اختبار',score:15,max:20,createdAt:serverTimestamp()});
   await assertSucceeds(gb.commit());
 });
+
+test('جدول الحصص: الإدارة تكتب وطلاب الفصل فقط يقرؤون', {skip:!emulatorAvailable}, async()=>{
+  await seed([...base,['profiles/s1',studentProfile('s1')],['profiles/s9',studentProfile('s9',{studentId:'STU-9',classId:'c9'})]]);
+  const a=user('adm');
+  await assertSucceeds(setDoc(doc(a,'timetables','c1'),{classId:'c1',grade:'1',cells:{'0_1':'الرياضيات'},updatedAt:serverTimestamp()}));
+  await assertFails(setDoc(doc(a,'timetables','c1'),{classId:'c1',grade:'2',cells:{},updatedAt:serverTimestamp()}));
+  await assertFails(setDoc(doc(user('s1'),'timetables','c1'),{classId:'c1',grade:'1',cells:{},updatedAt:serverTimestamp()}));
+  await assertSucceeds(getDoc(doc(user('s1'),'timetables','c1')));
+  await assertFails(getDoc(doc(user('s9'),'timetables','c1')));
+});

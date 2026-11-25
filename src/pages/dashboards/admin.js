@@ -3,7 +3,7 @@ import * as spark from '../../services/spark-backend.js';
 import { invalidateStructure, loadClasses, loadSubjects, loadClassAssignments } from '../../services/structure-service.js';
 import { esc, gradeNames, say, shellActions, skeletonRows } from './common.js';
 
-const SECTIONS = [['overview', 'نظرة عامة', '▦'], ['classes', 'الصفوف والفصول', '▤'], ['subjects', 'المواد', '✎'], ['teachers', 'المدرسون والإسناد', '☺'], ['students', 'استيراد الطلاب', '⇪'], ['links', 'ربط أولياء الأمور', '⚭'], ['users', 'إدارة الحسابات', '⚙']];
+const SECTIONS = [['overview', 'نظرة عامة', '▦'], ['classes', 'الصفوف والفصول', '▤'], ['subjects', 'المواد', '✎'], ['teachers', 'المدرسون والإسناد', '☺'], ['students', 'استيراد الطلاب', '⇪'], ['links', 'ربط أولياء الأمور', '⚭'], ['users', 'إدارة الحسابات', '⚙'], ['timetable', 'جدول الحصص', '▦']];
 
 export function renderAdmin(profile) {
   return `<div class="dash dash-admin" data-dash="admin">
@@ -39,6 +39,8 @@ export function renderAdmin(profile) {
         <form class="adm-inline" data-rollover-form><input name="from" required pattern="\d{4}-\d{4}" placeholder="السنة الحالية 2026-2027" dir="ltr"><input name="to" required pattern="\d{4}-\d{4}" placeholder="السنة الجديدة 2027-2028" dir="ltr"><button class="button ghost" type="button" data-rollover-preview>معاينة</button><button class="button" type="submit" disabled data-rollover-run>تنفيذ</button></form><div class="dash-muted" data-rollover-plan></div><p class="form-note" data-msg="rollover" role="status"></p>
         <h2>ترقية فصل / تخريج</h2><p class="dash-muted">ينقل كل طلاب الفصل للفصل الجديد، أو يخرّجهم (حسابهم يبقى محفوظًا ولا يدخلون). الحد 400 طالب في المرة.</p>
         <form class="adm-inline" data-promote-form><select name="from" required data-promote-from><option value="">من الفصل</option></select><select name="to" data-promote-to><option value="">تخريج (بدون فصل جديد)</option></select><button class="button" type="submit">تنفيذ</button></form><p class="form-note" data-msg="promote" role="status"></p></section>
+      <section data-panel="timetable" hidden><h1>جدول الحصص</h1><p class="dash-muted">اختر الفصل ثم المادة لكل حصة. الخلية الفارغة تعني لا حصة. يظهر الجدول لطلاب الفصل.</p>
+        <div class="adm-inline"><select data-tt-class><option value="">اختر الفصل</option></select></div><div data-tt-grid></div><button class="button" type="button" data-tt-save hidden>حفظ الجدول</button><p class="form-note" data-msg="timetable" role="status"></p></section>
     </main></div>`;
 }
 
@@ -166,7 +168,37 @@ export function mountAdmin(root, { auth, database }) {
     if (!confirmAsk(form.elements.to.value ? 'نقل كل طلاب الفصل للفصل الجديد؟' : 'تخريج كل طلاب هذا الفصل؟ لن يستطيعوا الدخول.')) return;
     guard(async () => { const result = await spark.adminPromoteClass(form.elements.from.value, form.elements.to.value); say(m('promote'), `تم لـ ${result.count} طالب.${result.more ? ' يوجد طلاب آخرون، نفّذ مرة أخرى.' : ''}`); }, m('promote'), '', false);
   });
-  const loaders = { users: usersPanel, overview, classes, subjects, teachers, links: () => links(true) };
+  const DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+  const PERIODS = 8;
+  let ttSubjects = [];
+  async function timetablePanel() {
+    const [classList, subjectList] = await Promise.all([loadClasses(), loadSubjects()]);
+    ttSubjects = subjectList.map(item => item.name);
+    fill(root.querySelector('[data-tt-class]'), classList.map(item => ({ value: item.id, text: item.name })), 'اختر الفصل');
+    root.dataset.ttClasses = JSON.stringify(classList.map(item => ({ id: item.id, grade: item.grade })));
+  }
+  root.querySelector('[data-tt-class]').addEventListener('change', event => guard(async () => {
+    const classId = event.target.value;
+    const grid = root.querySelector('[data-tt-grid]'), save = root.querySelector('[data-tt-save]');
+    if (!classId) { grid.innerHTML = ''; save.hidden = true; return; }
+    const { doc, getDoc } = await import('firebase/firestore');
+    const existing = await getDoc(doc(database, 'timetables', classId));
+    const cells = existing.exists() ? existing.data().cells || {} : {};
+    const head = `<tr><th></th>${DAYS.map(day => `<th>${day}</th>`).join('')}</tr>`;
+    const rows = Array.from({ length: PERIODS }, (_, p) => `<tr><th>${p + 1}</th>${DAYS.map((_, d) => `<td><select data-cell="${d}_${p + 1}"><option value=""></option>${ttSubjects.map(name => `<option${cells[`${d}_${p + 1}`] === name ? ' selected' : ''}>${esc(name)}</option>`).join('')}</select></td>`).join('')}</tr>`).join('');
+    grid.innerHTML = `<table class="adm-table"><tbody>${head}${rows}</tbody></table>`;
+    save.hidden = false;
+  }, m('timetable'), '', false));
+  root.querySelector('[data-tt-save]').addEventListener('click', () => guard(async () => {
+    const classId = root.querySelector('[data-tt-class]').value;
+    const info = JSON.parse(root.dataset.ttClasses || '[]').find(item => item.id === classId);
+    if (!info) return;
+    const cells = {};
+    root.querySelectorAll('[data-cell]').forEach(select => { if (select.value) cells[select.dataset.cell] = select.value; });
+    const { doc, serverTimestamp, setDoc } = await import('firebase/firestore');
+    await setDoc(doc(database, 'timetables', classId), { classId, grade: info.grade, cells, updatedAt: serverTimestamp() });
+  }, m('timetable'), 'تم حفظ الجدول.', true));
+  const loaders = { timetable: timetablePanel, users: usersPanel, overview, classes, subjects, teachers, links: () => links(true) };
 
   root.querySelector('.adm-side nav').addEventListener('click', event => {
     const button = event.target.closest('[data-section]');

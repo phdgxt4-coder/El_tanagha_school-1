@@ -396,6 +396,20 @@ service cloud.firestore {
       allow delete: if isActiveTeacher() && resource.data.teacherUid == request.auth.uid;
     }
 
+    // جدول الحصص: الإدارة تكتبه، وطلاب الفصل يقرؤونه.
+    match /timetables/{classId} {
+      allow get: if signedIn() && (isActiveAdmin() || (isActiveStudent() && profile(request.auth.uid).classId == classId) || (isActiveTeacher() && assignedToClass(classId)));
+      allow list: if false;
+      allow create, update: if isActiveAdmin()
+        && request.resource.data.keys().hasOnly(['classId', 'grade', 'cells', 'updatedAt'])
+        && request.resource.data.classId == classId
+        && exists(/databases/$(database)/documents/classes/$(classId))
+        && request.resource.data.grade == get(/databases/$(database)/documents/classes/$(classId)).data.grade
+        && request.resource.data.cells is map && request.resource.data.cells.size() <= 48
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+
     match /content/{contentId} {
       allow get, list: if signedIn() && (
         isActiveAdmin()

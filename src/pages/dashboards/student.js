@@ -3,7 +3,7 @@ import { bindTabs, esc, formatDate, gradeNames, pager, shellActions, say } from 
 import { mountChat, renderChatPanel } from '../chat.js';
 import { loadClassAssignments } from '../../services/structure-service.js';
 
-const TABS = [['home', 'الرئيسية', '⌂'], ['lessons', 'الدروس', '▤'], ['grades', 'درجاتي', '★'], ['attendance', 'حضوري', '✓'], ['teachers', 'مدرسيني', '☺'], ['tasks', 'امتحانات وواجبات', '✎'], ['images', 'الصور', '▣'], ['chat', 'رسائل', '✉'], ['parent', 'ولي الأمر', '♥']];
+const TABS = [['home', 'الرئيسية', '⌂'], ['lessons', 'الدروس', '▤'], ['grades', 'درجاتي', '★'], ['attendance', 'حضوري', '✓'], ['teachers', 'مدرسيني', '☺'], ['timetable', 'الجدول', '▦'], ['tasks', 'امتحانات وواجبات', '✎'], ['images', 'الصور', '▣'], ['chat', 'رسائل', '✉'], ['parent', 'ولي الأمر', '♥']];
 
 export function renderStudent(profile) {
   const first = String(profile.displayName || 'طالب').split(' ')[0];
@@ -20,6 +20,7 @@ export function renderStudent(profile) {
     <section data-panel="grades" hidden class="stu-feed"><div class="stu-list" data-list="grades"></div><button class="button ghost" type="button" data-more="grades" hidden>تحميل المزيد</button></section>
     <section data-panel="attendance" hidden class="stu-feed"><div class="stu-list" data-list="attendance"></div><button class="button ghost" type="button" data-more="attendance" hidden>تحميل المزيد</button></section>
     <section data-panel="teachers" hidden class="stu-feed"><div class="stu-list" data-list="teachers"></div></section>
+    <section data-panel="timetable" hidden class="stu-feed"><div data-tt></div></section>
     <section data-panel="tasks" hidden class="stu-feed"><div class="stu-list" data-list="tasks"></div></section>
     <section data-panel="images" hidden class="stu-feed"><div class="stu-list" data-list="images"></div><button class="button ghost" type="button" data-more="images" hidden>تحميل المزيد</button></section>
     <section data-panel="chat" hidden class="stu-feed">${renderChatPanel()}</section>
@@ -46,6 +47,19 @@ export function mountStudent(root, { profile, auth, database }) {
   if (!lessons) q('lessons').innerHTML = '<p class="dash-empty">لم يُحدد فصلك بعد. تواصل مع الإدارة.</p>';
   tabs.onFirstShow('lessons', () => lessons?.load());
   const images = classId ? pager(database, 'images', [where('classId', '==', classId), orderBy('createdAt', 'desc')], item => `<article class="stu-row"><b>${esc(item.title)}</b><img loading="lazy" alt="${esc(item.title)}" style="max-width:100%;border-radius:12px" src="${/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/u.test(item.data || '') ? item.data : ''}"><span>${formatDate(item.createdAt)}</span></article>`, { target: q('images'), more: more('images'), size: 5, empty: 'لا توجد صور لفصلك بعد.' }) : null;
+  tabs.onFirstShow('timetable', async () => {
+    const target = root.querySelector('[data-tt]');
+    if (!classId) { target.innerHTML = '<p class="dash-empty">لم يُحدد فصلك بعد.</p>'; return; }
+    try {
+      const { doc, getDoc } = await import('firebase/firestore');
+      const snapshot = await getDoc(doc(database, 'timetables', classId));
+      if (!snapshot.exists()) { target.innerHTML = '<p class="dash-empty">لم يُنشر جدول فصلك بعد.</p>'; return; }
+      const cells = snapshot.data().cells || {};
+      const days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+      const used = Math.max(0, ...Object.keys(cells).map(key => Number(key.split('_')[1]) || 0));
+      target.innerHTML = `<div style="overflow:auto"><table class="adm-table"><tbody><tr><th></th>${days.map(day => `<th>${day}</th>`).join('')}</tr>${Array.from({ length: used }, (_, p) => `<tr><th>${p + 1}</th>${days.map((_, d) => `<td>${esc(cells[`${d}_${p + 1}`] || '')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+    } catch { target.innerHTML = '<p class="dash-empty">تعذر تحميل الجدول.</p>'; }
+  });
   tabs.onFirstShow('tasks', async () => {
     const target = q('tasks');
     if (!classId) { target.innerHTML = '<p class="dash-empty">لم يُحدد فصلك بعد.</p>'; return; }
