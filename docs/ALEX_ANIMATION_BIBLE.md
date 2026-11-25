@@ -34,3 +34,16 @@ Images load lazily per pose (about 40 KB each as WebP).
 - Layers are cut from flat images. No hidden art exists behind moving parts, so keep angles small (a few degrees). Large turns, a real blink with lashes, finger motion and arm swings need layers drawn separately (Rive or Spine by an artist).
 - Eyelids are a fur-colored overlay, an approximation.
 - Not tested on a real phone.
+
+## Way of living (all five; only Alex is implemented)
+- Alex: curious and smart. Glances around, head leads the eyes, quick ear perks, tilts when thinking, tail flicks when pleased.
+- Arthur: calm and wise. Slow breathing, slow deliberate blinks, small nods, pages-edge (scarf) sways late. Never rushes.
+- Oscar: fast and energetic. Quick bounces, snappy anticipation, arm waves, bow tie and tip bob after each move.
+- Leo: calm and reassuring. Steady glow pulse like breathing, gentle sway, ring on top swings late, never sharp.
+- Chloe: gentle, growing. Slow opening and closing of the petals over several seconds, leaves lag the stem, small happy bloom on success.
+
+## Motion v3 (Alex)
+Extra pieces: torso (shoulders and arms, warped with scale, skew and rotation around the waist), scroll and cap (own springs, lag the torso and head). Breathing shows in chest scale, shoulder lift and head follow with a delay. Weight shift is a slow 13 s cycle (torso slides and rolls, tail counter-sways, feet stay planted). Glances: irregular, head leads, blink starts after the head moves, ears counter-move. Transitions are staged: realisation beat -> head return -> pose crossfade (300 ms, inside the body move) -> body settle. No state swaps directly.
+
+## What flat-image layers cannot do
+No real deformation (bending a limb, turning the head in 3D, squashing the face), no revealed art behind moving parts (seams and thin ghosting during a pose crossfade, one visible frame on the Error swap), no eyelids that match the fur, no cloth or fur simulation. The last mile is an artist-rigged Rive (or Spine) file with separate layers and bones, driven by the same state names.
