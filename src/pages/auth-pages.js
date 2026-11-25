@@ -19,15 +19,15 @@ function registrationFields(role) {
 }
 
 export function loginPage(role = 'student') {
-  const safeRole = Object.hasOwn(ROLE_LABELS, role) ? role : 'student';
+  const safeRole = role === 'admin' ? 'teacher' : (Object.hasOwn(ROLE_LABELS, role) ? role : 'student');
   const roleLabel = ROLE_LABELS[safeRole];
-  const registerAvailable = safeRole !== 'admin';
+  const registerAvailable = role !== 'admin' && safeRole !== 'admin';
   const roleLinks = ['student','parent','teacher'].map(item =>
     `<a class="role-link ${item===safeRole?'selected':''}" href="/login/${item}">${ROLE_LABELS[item]}</a>`
   ).join('');
 
   return `<section class="section page auth-page"><div class="auth-shell" data-role="${safeRole}">${sectionHeading('بوابة المدرسة',`دخول ${roleLabel}`,'المصادقة تتم عبر Firebase Authentication. لا تُحفظ كلمة المرور في الموقع أو قاعدة البيانات.')}
-    <nav class="role-switch" aria-label="نوع الحساب">${roleLinks}${safeRole==='admin'?'':'<a class="role-link" href="/login/admin">الإدارة</a>'}</nav>
+    <nav class="role-switch" aria-label="نوع الحساب">${roleLinks}</nav>
     <div class="auth-panel">
       <div class="auth-tabs" role="tablist" aria-label="الدخول أو إنشاء حساب">
         <button type="button" class="auth-tab selected" data-auth-mode="login" aria-selected="true">تسجيل الدخول</button>
@@ -37,6 +37,7 @@ export function loginPage(role = 'student') {
         <label>البريد الإلكتروني<input name="email" type="email" autocomplete="username" required maxlength="254"></label>
         <label>كلمة المرور<input name="password" type="password" autocomplete="current-password" required minlength="8" maxlength="128"></label>
         <button class="button" type="submit">دخول آمن</button>
+        <button class="text-link password-reset" type="button" data-password-reset>نسيت كلمة المرور؟ أرسل رابط إعادة التعيين إلى بريدي</button>
       </form>
       ${registerAvailable?`<form id="register-form" data-auth-form="register" hidden>
         ${registrationFields(safeRole)}

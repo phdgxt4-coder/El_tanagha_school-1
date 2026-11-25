@@ -1,4 +1,4 @@
-import { createUserWithEmailAndPassword, onAuthStateChanged, sendEmailVerification, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { createUserWithEmailAndPassword, onAuthStateChanged, sendEmailVerification, sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { getAuth } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { validateAccountRequest } from '../../functions/src/validation.js';
@@ -49,6 +49,13 @@ export function signIn(email, password) {
   return signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
 }
 
+export function sendPasswordReset(email) {
+  const {auth} = getAuthClients();
+  const normalizedEmail = String(email ?? '').trim().toLowerCase();
+  if (!normalizedEmail) throw Object.assign(new Error('اكتب البريد الإلكتروني أولًا.'), {code:'auth/invalid-email'});
+  return sendPasswordResetEmail(auth, normalizedEmail);
+}
+
 export function signOutUser() {
   const {auth} = getAuthClients();
   return signOut(auth);
@@ -92,6 +99,7 @@ export function friendlyAuthError(error) {
     'auth/email-already-in-use': 'يوجد حساب بهذا البريد. سجّل الدخول بدلًا من إنشاء حساب جديد.',
     'auth/weak-password': 'اختر كلمة مرور من 8 أحرف على الأقل.',
     'auth/invalid-email': 'اكتب بريدًا إلكترونيًا صحيحًا.',
+    'auth/missing-email': 'اكتب البريد الإلكتروني أولًا.',
     'auth/too-many-requests': 'محاولات كثيرة؛ انتظر قليلًا ثم أعد المحاولة.',
     'functions/unauthenticated': 'انتهت الجلسة؛ سجّل الدخول ثم أعد المحاولة.',
     'functions/permission-denied': 'ليست لديك صلاحية تنفيذ هذا الإجراء.',

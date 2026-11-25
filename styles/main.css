@@ -598,3 +598,28 @@ button,input,textarea {
   .approval-actions{display:grid;grid-template-columns:1fr 1fr}
   .approval-actions .button{padding:.65rem .6rem;font-size:.82rem}
 }
+
+
+/* Theme controls and readable light mode for the mobile-first school portal. */
+.theme-toggle{flex:none;width:42px;height:42px;display:grid;place-items:center;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--gold2);font-size:1.25rem;cursor:pointer}
+.theme-toggle:hover{border-color:var(--gold);background:var(--surface-raised)}
+.password-reset{justify-self:start;border:0;background:transparent;padding:.25rem 0;cursor:pointer;text-align:start;font-size:.88rem}
+:root[data-theme="light"] body{background:var(--bg);color:var(--text)}
+:root[data-theme="light"] .topbar{background:#ffffffed;border-color:var(--line)}
+:root[data-theme="light"] .nav{color:#445064}
+:root[data-theme="light"] .nav a:hover,:root[data-theme="light"] .text-link:hover{color:var(--gold2)}
+:root[data-theme="light"] .nav.open,:root[data-theme="light"] .section-alt,:root[data-theme="light"] .footer{background:#edf0f4}
+:root[data-theme="light"] .hero-shade{background:linear-gradient(90deg,#101827d9 0%,#101827a8 48%,#101827d9 100%),linear-gradient(0deg,#101827 0%,transparent 45%)}
+:root[data-theme="light"] .stats>div,:root[data-theme="light"] .card,:root[data-theme="light"] .contact-panel>div,:root[data-theme="light"] .contact-panel form,:root[data-theme="light"] .auth-panel,:root[data-theme="light"] .approval-card{background:var(--surface-raised);border-color:var(--line);color:var(--text);box-shadow:var(--shadow)}
+:root[data-theme="light"] .card p,:root[data-theme="light"] .stats span,:root[data-theme="light"] .section-heading p,:root[data-theme="light"] .contact-panel a,:root[data-theme="light"] .contact-panel p,:root[data-theme="light"] .form-note,:root[data-theme="light"] .auth-footnote,:root[data-theme="light"] .approval-card p{color:var(--muted)}
+:root[data-theme="light"] .subject-tabs button,:root[data-theme="light"] .grade-button,:root[data-theme="light"] .auth-tab,:root[data-theme="light"] .role-link{background:#f0f2f5;color:#364154;border-color:var(--line)}
+:root[data-theme="light"] .auth-tab.selected,:root[data-theme="light"] .role-link.selected,:root[data-theme="light"] .subject-tabs .selected,:root[data-theme="light"] .grade-button.selected{background:#d5a93d27;color:#6c4b08;border-color:#a77c2080}
+:root[data-theme="light"] .auth-panel label{color:#273244}
+:root[data-theme="light"] .auth-panel input,:root[data-theme="light"] .auth-panel select,:root[data-theme="light"] .contact-panel input,:root[data-theme="light"] .contact-panel textarea{background:#fff;color:#18202c;border-color:#27324435}
+:root[data-theme="light"] .button.ghost{background:#fff;color:#263144;border-color:#26314435}
+:root[data-theme="light"] .empty-state{border-color:#2631443b}
+:root[data-theme="light"] .skip{color:#15130d}
+:root[data-theme="light"] .footer{border-color:var(--line)}
+:root[data-theme="light"] .copyright{border-color:var(--line);color:#657084}
+@media(max-width:850px){.theme-toggle{order:2;margin-inline-start:auto}.topbar>.button{margin-inline-start:0}}
+@media(max-width:560px){.theme-toggle{width:38px;height:38px;border-radius:11px;font-size:1.1rem}.topbar{gap:.45rem}.topbar>.button{font-size:.7rem;padding:.43rem .5rem}.password-reset{font-size:.84rem}}

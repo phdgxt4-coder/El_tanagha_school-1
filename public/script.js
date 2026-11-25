@@ -271,7 +271,7 @@ const setTh=t=>{document.documentElement.dataset.theme=t;try{localStorage.setIte
 setTh(getTh()||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'));
 document.body.insertAdjacentHTML('beforeend','<button id="tgl" type="button" aria-label="تبديل الوضع الليلي">🌓</button>');
 $('#tgl').onclick=()=>setTh(document.documentElement.dataset.theme==='dark'?'light':'dark');
-if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+/* The legacy PWA is no longer the active app. Do not re-register its offline cache. */
 const aiPanel=safe(async()=>{
  W(`<div class="w frm" style="grid-column:1/-1"><h5>المساعد الذكي</h5><div class="li">اسأل عن أي درس أو مسألة وسيشرحها لك. (30 سؤالًا يوميًا، وكل سؤال مستقل عن اللي قبله)</div><div class="ai" id="ai"></div><textarea id="aq" rows="3" maxlength="1000" placeholder="اكتب سؤالك هنا"></textarea><button class="btn full" id="ab">إرسال</button></div>`);
  $('#ab').onclick=async()=>{const q=$('#aq').value.trim(),b=$('#ab'),l=$('#ai');if(!q)return;b.disabled=true;

@@ -1,11 +1,10 @@
-const CACHE = 'tanagha-v1';
-const ASSETS = ['./', './index.html', './css/style.css', './js/app.js', './manifest.webmanifest'];
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
-});
+/* Migration worker for older installs. Current app pages are fetched from network. */
+self.addEventListener('install', e => e.waitUntil(self.skipWaiting()));
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
-});
-self.addEventListener('fetch', e => {
-  e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+  e.waitUntil((async () => {
+    const legacyCaches = new Set(['tn-v1', 'tanagha-v1', 'school-platform-v1']);
+    await Promise.all((await caches.keys()).filter(name => legacyCaches.has(name)).map(name => caches.delete(name)));
+    await self.clients.claim();
+    await self.registration.unregister();
+  })());
 });
