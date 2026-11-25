@@ -259,7 +259,8 @@ service cloud.firestore {
         isActiveAdmin() || resource.data.audience == 'all'
         || resource.data.uid == request.auth.uid
         || (isActiveStudent() && resource.data.audience == 'grade'
-          && resource.data.grade == profile(request.auth.uid).grade)
+          && resource.data.grade == profile(request.auth.uid).grade
+          && (!('studentUid' in resource.data) || resource.data.studentUid == request.auth.uid))
         || (isActiveParent() && resource.data.audience == 'grade'
           && resource.data.studentUid is string && linkedParentTo(resource.data.studentUid)
           && resource.data.grade == profile(resource.data.studentUid).grade)

@@ -120,6 +120,11 @@ test('المعلّم لا يرسل إشعارًا عامًا ولا يعدّل �
   await seed([
     ['profiles/teacher-a',{uid:'teacher-a',role:'teacher',status:'active',grades:['1'],subjectId:'math'}],
     ['profiles/teacher-b',{uid:'teacher-b',role:'teacher',status:'active',grades:['2'],subjectId:'ar'}],
+    ['profiles/student-target',{uid:'student-target',role:'student',status:'active',grade:'1'}],
+    ['profiles/student-peer',{uid:'student-peer',role:'student',status:'active',grade:'1'}],
+    ['profiles/parent-linked',{uid:'parent-linked',role:'parent',status:'active'}],
+    ['profiles/parent-unrelated',{uid:'parent-unrelated',role:'parent',status:'active'}],
+    ['parentLinks/parent-linked_student-target',{parentUid:'parent-linked',studentUid:'student-target',active:true}],
     ['notifications/notice-b',{teacherUid:'teacher-b',audience:'grade',grade:'2',title:'تنبيه',body:'نص'}]
   ]);
   const teacherDb=environment.authenticatedContext('teacher-a').firestore();
@@ -129,4 +134,9 @@ test('المعلّم لا يرسل إشعارًا عامًا ولا يعدّل �
   await assertFails(setDoc(doc(teacherDb,'notifications/private-student'),{teacherUid:'teacher-a',audience:'grade',grade:'1',studentUid:'student-in-other-grade',title:'إشعار خاص',body:'نص'}));
   await assertFails(updateDoc(doc(teacherDb,'notifications/notice-b'),{teacherUid:'teacher-a',title:'تلاعب'}));
   await assertSucceeds(setDoc(doc(teacherDb,'notifications/grade-one'),{teacherUid:'teacher-a',audience:'grade',grade:'1',title:'تنبيه',body:'نص'}));
+  await assertSucceeds(setDoc(doc(teacherDb,'notifications/student-target'),{teacherUid:'teacher-a',audience:'grade',grade:'1',studentUid:'student-target',title:'تنبيه خاص',body:'نص'}));
+  await assertSucceeds(getDoc(doc(environment.authenticatedContext('student-target').firestore(),'notifications/student-target')));
+  await assertFails(getDoc(doc(environment.authenticatedContext('student-peer').firestore(),'notifications/student-target')));
+  await assertSucceeds(getDoc(doc(environment.authenticatedContext('parent-linked').firestore(),'notifications/student-target')));
+  await assertFails(getDoc(doc(environment.authenticatedContext('parent-unrelated').firestore(),'notifications/student-target')));
 });
