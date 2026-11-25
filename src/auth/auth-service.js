@@ -103,16 +103,44 @@ export function unlinkParentFromStudent(studentUid) {
   return callable('unlinkParentFromStudent', { studentUid });
 }
 
-export function listParentLinkRequests() {
-  return callable('listParentLinkRequests', {});
+export function revokeParentLink(linkId) {
+  return callable('revokeParentLink', { linkId });
 }
 
-export function approveParentLink(linkId) {
-  return callable('approveParentLink', { linkId });
+export function adminSaveClass(data) {
+  return callable('adminSaveClass', data);
 }
 
-export function rejectParentLink(linkId) {
-  return callable('rejectParentLink', { linkId });
+export function adminDeleteClass(classId) {
+  return callable('adminDeleteClass', { classId });
+}
+
+export function adminSaveSubject(name) {
+  return callable('adminSaveSubject', { name });
+}
+
+export function adminDeleteSubject(subjectId) {
+  return callable('adminDeleteSubject', { subjectId });
+}
+
+export function adminSeedDefaultSubjects() {
+  return callable('adminSeedDefaultSubjects', {});
+}
+
+export function adminAssignTeacher(teacherUid, subjectId, classId) {
+  return callable('adminAssignTeacher', { teacherUid, subjectId, classId });
+}
+
+export function adminRemoveAssignment(assignmentId) {
+  return callable('adminRemoveAssignment', { assignmentId });
+}
+
+export function adminImportRoster(rows) {
+  return callable('adminImportRoster', { rows });
+}
+
+export function listClassStudents(classId, after = '') {
+  return callable('listClassStudents', { classId, after });
 }
 
 export function waitForInitialAuthState() {
@@ -149,7 +177,8 @@ export function friendlyAuthError(error) {
     'functions/failed-precondition': error?.message || 'يلزم استكمال خطوة تحقق قبل المتابعة.',
     'functions/invalid-argument': error?.message || 'راجع البيانات المدخلة.',
     'functions/already-exists': 'سبق إنشاء ملف لهذا الحساب.',
-    'functions/not-found': 'لم يُعثر على الطلب المطلوب.'
+    'functions/not-found': error?.message || 'لم يُعثر على الطلب المطلوب.',
+    'functions/resource-exhausted': error?.message || 'محاولات كثيرة؛ حاول لاحقًا.'
   };
   return messages[code] || 'تعذر إتمام العملية. تحقق من الاتصال وإعداد Firebase ثم حاول مجددًا.';
 }

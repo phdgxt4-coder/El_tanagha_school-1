@@ -51,19 +51,19 @@ test('لوحة الحساب تتضمن ربط ولي الأمر بكود خاد�
   assert.match(app, /dashboardPage/u);
 });
 
-test('دورة ربط الحسابات تعرض انتظار الموافقة وإصدار كود جديد', () => {
+test('دورة ربط الحسابات فورية بدون موافقة إدارة مع كود عشوائي ومحاولات محدودة', () => {
   const dashboard = read('../src/pages/dashboard-pages.js');
   const functions = read('../functions/src/index.js');
   const auth = read('../src/auth/auth-service.js');
   assert.match(dashboard, /data-issue-parent-code/u);
-  assert.match(dashboard, /إلى إدارة المدرسة للموافقة/u);
-  assert.match(dashboard, /data-parent-link-review/u);
+  assert.doesNotMatch(dashboard, /data-parent-link-review/u);
   assert.match(functions, /PARENT_CODE_TTL_MS = 15 \* 60 \* 1000/u);
-  assert.match(functions, /status: 'pending'/u);
-  assert.match(functions, /action: 'parent_link_requested'/u);
-  assert.match(functions, /export const approveParentLink/u);
+  assert.match(functions, /MAX_LINK_FAILURES = 5/u);
+  assert.match(functions, /action: 'parent_link_created'/u);
+  assert.doesNotMatch(functions, /export const approveParentLink/u);
+  assert.match(functions, /randomInt\(CODE_ALPHABET\.length\)/u);
   assert.match(auth, /export function issueParentCode/u);
-  assert.match(auth, /export function approveParentLink/u);
+  assert.doesNotMatch(auth, /approveParentLink/u);
 });
 
 test('اختيار الصف وتبويب المادة يعرضان الحالة المختارة دون الإيحاء بوجود محتوى غير منشور', () => {
