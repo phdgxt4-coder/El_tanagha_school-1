@@ -142,3 +142,10 @@ test('وضع Spark: كل عملية خادم لها تنفيذ مباشر بنف
   for (const name of names) assert.match(sparkSource, new RegExp(`export (async )?function ${name}\\b`, 'u'), name);
   assert.doesNotMatch(sparkSource, /httpsCallable/u);
 });
+
+test('لوحة الأدمن فيها زر إرسال رابط كلمة المرور ولا تضع كلمة مرور في الكود', async () => {
+  const fs = await import('node:fs');
+  const code = fs.readFileSync(new URL('../src/pages/dashboards/admin.js', import.meta.url), 'utf8');
+  assert.match(code, /data-reset-link/u);
+  assert.match(code, /auth\.sendPasswordReset\(user\.email\)/u);
+});

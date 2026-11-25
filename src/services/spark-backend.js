@@ -382,7 +382,7 @@ export async function adminSearchUsers(role, prefix = '') {
   const snapshot = await getDocs(query(collection(db(), 'profiles'), ...parts, limit(30)));
   return snapshot.docs.map(item => {
     const data = item.data();
-    return { uid: item.id, role: data.role, status: data.status, displayName: data.displayName ?? '', phone: data.phone ?? '', classId: data.classId ?? '', className: data.className ?? '', grade: data.grade ?? '', branch: data.branch ?? '' };
+    return { uid: item.id, role: data.role, status: data.status, displayName: data.displayName ?? '', phone: data.phone ?? '', email: data.email ?? '', classId: data.classId ?? '', className: data.className ?? '', grade: data.grade ?? '', branch: data.branch ?? '' };
   });
 }
 

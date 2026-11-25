@@ -138,6 +138,7 @@ export function mountAdmin(root, { auth, database }) {
     const options = JSON.parse(root.dataset.classOptions || '[]');
     box.innerHTML = list.length ? list.map(user => `<tr data-user="${esc(user.uid)}"><td><b>${esc(user.displayName)}</b><br><small dir="ltr">${esc(user.phone)}</small>${user.className ? `<br><small>${esc(user.className)}${user.branch ? ' · ' + esc(trackLabel(user.branch)) : ''}</small>` : ''}</td><td>${user.status === 'active' ? 'نشط' : user.status === 'disabled' ? 'موقوف' : esc(user.status)}</td><td>
       <button class="text-link" type="button" data-toggle-status="${user.status === 'active' ? 'disabled' : 'active'}">${user.status === 'active' ? 'إيقاف' : 'تفعيل'}</button>
+      ${user.email ? '<button class="text-link" type="button" data-reset-link>إرسال رابط كلمة المرور</button>' : ''}
       ${user.role !== 'teacher' ? '<button class="text-link" type="button" data-edit-user>تعديل</button>' : ''}
       ${user.role === 'student' ? `<select data-move-class><option value="">نقل إلى…</option>${options.map(item => `<option value="${esc(item.value)}">${esc(item.text)}</option>`).join('')}</select>` : ''}</td></tr>`).join('') : '<tr><td>لا توجد نتائج.</td></tr>';
     box.__list = list;
@@ -149,6 +150,9 @@ export function mountAdmin(root, { auth, database }) {
     const again = () => searchUsers(root.querySelector('[data-user-search]'));
     const toggle = event.target.closest('[data-toggle-status]');
     if (toggle && confirmAsk(`${toggle.dataset.toggleStatus === 'disabled' ? 'إيقاف' : 'تفعيل'} حساب ${user.displayName}؟`)) guard(async () => { await spark.adminSetUserStatus(user.uid, toggle.dataset.toggleStatus); await again(); }, m('users'), 'تم.', true);
+    if (event.target.closest('[data-reset-link]') && confirmAsk(`إرسال رابط إعادة تعيين كلمة المرور إلى بريد ${user.displayName}؟`)) {
+      guard(async () => { await auth.sendPasswordReset(user.email); }, m('users'), 'تم إرسال الرابط إلى بريد الحساب. يصل خلال دقائق وقد يكون في Spam.', true);
+    }
     if (event.target.closest('[data-edit-user]')) {
       const name = window.prompt('الاسم', user.displayName); if (name === null) return;
       const phone = window.prompt('رقم الهاتف', user.phone); if (phone === null) return;
