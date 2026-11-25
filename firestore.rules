@@ -60,7 +60,30 @@ service cloud.firestore {
 
     function teachesSubject(subjectId) {
       return isActiveTeacher()
-        && profile(request.auth.uid).subjectId == subjectId;
+        && ((profile(request.auth.uid).subjectIds is list && profile(request.auth.uid).subjectIds.hasAny([subjectId]))
+          || profile(request.auth.uid).subjectId == subjectId);
+    }
+
+    // الإسناد (مادة + فصل) يُنشئه المدير فقط عبر الوظائف الموثوقة.
+    function assignedTo(subjectId, classId) {
+      return isActiveTeacher()
+        && subjectId is string && classId is string
+        && exists(/databases/$(database)/documents/teacherAssignments/$(request.auth.uid + '_' + subjectId + '_' + classId));
+    }
+
+    function assignedToClass(classId) {
+      return isActiveTeacher()
+        && classId is string
+        && profile(request.auth.uid).assignedClassIds is list
+        && profile(request.auth.uid).assignedClassIds.hasAny([classId]);
+    }
+
+    function studentInClass(studentUid, classId) {
+      return studentUid is string && classId is string
+        && exists(/databases/$(database)/documents/profiles/$(studentUid))
+        && profile(studentUid).role == 'student'
+        && profile(studentUid).status == 'active'
+        && profile(studentUid).classId == classId;
     }
 
     function ownsExamSubmission(data) {
@@ -71,12 +94,13 @@ service cloud.firestore {
     }
 
     function validContent(data) {
-      return data.keys().hasOnly(['teacherUid', 'grade', 'subjectId', 'type', 'title', 'url', 'published', 'createdAt'])
-        && data.keys().hasAll(['teacherUid', 'grade', 'subjectId', 'type', 'title', 'url', 'published', 'createdAt'])
+      return data.keys().hasOnly(['teacherUid', 'grade', 'classId', 'subjectId', 'type', 'title', 'url', 'published', 'createdAt'])
+        && data.keys().hasAll(['teacherUid', 'grade', 'classId', 'subjectId', 'type', 'title', 'url', 'published', 'createdAt'])
         && data.teacherUid is string
         && data.grade in ['1', '2', '3']
-        && data.subjectId in ['ar', 'en', 'math', 'phy', 'chem', 'bio', 'hist', 'geo', 'phil', 'psy', 'fr']
-        && teachesSubject(data.subjectId)
+        && data.subjectId is string
+        && assignedTo(data.subjectId, data.classId)
+        && get(/databases/$(database)/documents/classes/$(data.classId)).data.grade == data.grade
         && data.type in ['lesson', 'file', 'video', 'assignment']
         && data.title is string
         && data.title.size() > 0
@@ -101,6 +125,38 @@ service cloud.firestore {
         && data.body.size() <= 2000
         && (!('studentUid' in data) || studentInGrade(data.studentUid, data.grade))
         && (!('createdAt' in data) || data.createdAt is timestamp);
+    }
+
+    match /classes/{classId} {
+      allow get, list: if true;
+      allow write: if false;
+    }
+
+    match /subjects/{subjectId} {
+      allow get, list: if true;
+      allow write: if false;
+    }
+
+    match /teacherAssignments/{assignmentId} {
+      allow get, list: if signedIn() && (
+        isActiveAdmin()
+        || resource.data.teacherUid == request.auth.uid
+        || (isActiveStudent() && resource.data.classId == profile(request.auth.uid).classId)
+      );
+      allow write: if false;
+    }
+
+    match /rosterStudents/{rosterId} {
+      allow read, write: if false;
+    }
+
+    match /linkAttempts/{attemptId} {
+      allow read, write: if false;
+    }
+
+    match /auditLogs/{logId} {
+      allow get, list: if isActiveAdmin();
+      allow write: if false;
     }
 
     match /profiles/{userId} {
@@ -137,7 +193,7 @@ service cloud.firestore {
     match /parentLinks/{linkId} {
       allow get: if signedIn()
         && (resource.data.parentUid == request.auth.uid || resource.data.studentUid == request.auth.uid || isActiveAdmin());
-      allow list: if isActiveAdmin();
+      allow list: if signedIn() && (resource.data.parentUid == request.auth.uid || resource.data.studentUid == request.auth.uid || isActiveAdmin());
       allow create, update, delete: if false;
     }
 
@@ -146,7 +202,7 @@ service cloud.firestore {
         isActiveAdmin()
         || ownsTeacherRecord(resource.data)
         || (isActiveStudent() && resource.data.published == true
-          && resource.data.grade == profile(request.auth.uid).grade)
+          && resource.data.classId == profile(request.auth.uid).classId)
       );
       allow create: if ownsTeacherRecord(request.resource.data)
         && request.resource.data.teacherUid == request.auth.uid
@@ -155,6 +211,7 @@ service cloud.firestore {
       allow update: if ownsTeacherRecord(resource.data)
         && resource.data.teacherUid == request.resource.data.teacherUid
         && resource.data.grade == request.resource.data.grade
+        && resource.data.classId == request.resource.data.classId
         && resource.data.subjectId == request.resource.data.subjectId
         && resource.data.createdAt == request.resource.data.createdAt
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['type', 'title', 'url'])
@@ -219,13 +276,18 @@ service cloud.firestore {
       allow create: if isActiveAdmin() || (ownsTeacherRecord(request.resource.data)
         && request.resource.data.teacherUid == request.auth.uid
         && teachesGrade(request.resource.data.grade)
+        && assignedTo(request.resource.data.subjectId, request.resource.data.classId)
+        && studentInClass(request.resource.data.studentUid, request.resource.data.classId)
         && studentInGrade(request.resource.data.studentUid, request.resource.data.grade));
       allow update: if isActiveAdmin() || (ownsTeacherRecord(resource.data)
         && resource.data.teacherUid == request.resource.data.teacherUid
         && resource.data.studentUid == request.resource.data.studentUid
         && resource.data.grade == request.resource.data.grade
+        && resource.data.classId == request.resource.data.classId
+        && resource.data.subjectId == request.resource.data.subjectId
+        && assignedTo(resource.data.subjectId, resource.data.classId)
         && teachesGrade(request.resource.data.grade)
-        && studentInGrade(request.resource.data.studentUid, request.resource.data.grade));
+        && studentInClass(request.resource.data.studentUid, request.resource.data.classId));
       allow delete: if isActiveAdmin();
     }
 
@@ -239,13 +301,17 @@ service cloud.firestore {
       allow create: if isActiveAdmin() || (ownsTeacherRecord(request.resource.data)
         && request.resource.data.teacherUid == request.auth.uid
         && teachesGrade(request.resource.data.grade)
+        && assignedToClass(request.resource.data.classId)
+        && studentInClass(request.resource.data.studentUid, request.resource.data.classId)
         && studentInGrade(request.resource.data.studentUid, request.resource.data.grade));
       allow update: if isActiveAdmin() || (ownsTeacherRecord(resource.data)
         && resource.data.teacherUid == request.resource.data.teacherUid
         && resource.data.studentUid == request.resource.data.studentUid
         && resource.data.grade == request.resource.data.grade
+        && resource.data.classId == request.resource.data.classId
+        && assignedToClass(resource.data.classId)
         && teachesGrade(request.resource.data.grade)
-        && studentInGrade(request.resource.data.studentUid, request.resource.data.grade));
+        && studentInClass(request.resource.data.studentUid, request.resource.data.classId));
       allow delete: if isActiveAdmin();
     }
 
