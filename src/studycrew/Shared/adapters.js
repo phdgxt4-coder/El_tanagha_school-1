@@ -3,6 +3,9 @@
    to the placeholder. UNTESTED against real runtimes: no Rive or Lottie asset exists yet.
    Interface every renderer implements: { kind, el, setState(name), play(recipe), look(x,y), pause(), resume(), destroy() } */
 import {createPlaceholder} from './placeholder.js';
+import {createImageRenderer} from './image-renderer.js';
+import {createRigRenderer} from './rig-renderer.js';
+const weak=()=>typeof navigator!=='undefined'&&((navigator.deviceMemory&&navigator.deviceMemory<=2)||(navigator.hardwareConcurrency&&navigator.hardwareConcurrency<=2)||new URLSearchParams(location.search).get('quality')==='low');
 export class RendererUnavailable extends Error{}
 const load=async url=>{
   if(!url)throw new RendererUnavailable('no runtime url configured');
@@ -26,6 +29,8 @@ async function lottieRenderer(host,manifest,cfg){
 export async function createRenderer(host,manifest,opts){
   const r=manifest.renderer||{};
   try{
+    if(r.image&&r.image.rig&&!weak()&&!(typeof opts.reduced==='function'&&opts.reduced()))return createRigRenderer(host,manifest,r.image.rig,opts);
+    if(r.image)return createImageRenderer(host,manifest,r.image,opts);
     if(r.rive)return await riveRenderer(host,manifest,r.rive);
     if(r.lottie)return await lottieRenderer(host,manifest,r.lottie);
   }catch(err){

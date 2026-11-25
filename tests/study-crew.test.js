@@ -1,3 +1,4 @@
+import {statSync} from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync,readdirSync,existsSync} from 'node:fs';
@@ -84,8 +85,10 @@ test('every character has a manifest with 20 own idles, known recipes, and a reg
     assert.ok(existsSync(new URL(`../src/studycrew/Characters/${m.name}/manifest.js`,import.meta.url)));
   }
 });
-test('every character manifest points at placeholder art only (no heavy assets yet)',async()=>{
-  for(const id of characterIds()){const m=(await characterLoaders[id]()).default;assert.equal(m.renderer.type,'svg');assert.equal(m.renderer.rive,null);assert.equal(m.renderer.lottie,null);}
+test('manifests use placeholder SVG or the light WebP image renderer (no Rive/Lottie yet)',async()=>{
+  for(const id of characterIds()){const m=(await characterLoaders[id]()).default;assert.ok(['svg','image'].includes(m.renderer.type));assert.equal(m.renderer.rive,null);assert.equal(m.renderer.lottie,null);}
+  const alex=(await characterLoaders.alex()).default.renderer.image;
+  for(const u of Object.values(alex.frames))assert.ok(statSync(new URL(u)).size<60000,'frame too heavy');
 });
 test('every --sc-* variable used in CSS is defined by the tokens',()=>{
   const vars=tokenVars();

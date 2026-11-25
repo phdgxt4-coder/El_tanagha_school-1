@@ -12,9 +12,12 @@
     .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
     .chip{min-height:44px;padding:0 14px;border-radius:999px;border:1px solid #ffffff22;background:#151c29;color:inherit;font:inherit;cursor:pointer}
     .chip[aria-pressed="true"],.chip[aria-current="true"]{background:#c9a24b;color:#090d16;border-color:#c9a24b}
+    html,body{overflow-x:hidden}
     .stage{position:relative;display:grid;place-items:center;min-height:220px;border-radius:22px;background:#111722;padding:16px}
     label{display:inline-flex;gap:6px;align-items:center;min-height:44px}
     pre{margin:0;max-height:160px;overflow:auto;background:#0d121c;border-radius:12px;padding:10px;font-size:12px;direction:ltr;text-align:left}
+    .stage .sc-host{--sc-size-character:min(64vw,300px,36vh);inline-size:var(--sc-size-character);block-size:calc(var(--sc-size-character)*1.15)}
+    @media (max-width:520px){main{padding:10px;gap:10px}h1{font-size:16px}.chip{min-height:40px;padding:0 11px;font-size:13px}.stage{min-height:0;padding:8px}h2{margin-bottom:6px}}
     #gallery{position:relative;display:grid;gap:12px;min-height:160px}
   </style>
 </head>
