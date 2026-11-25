@@ -213,6 +213,8 @@ function initializeAuthPage(generation){
         }else if(status.role==='admin'&&currentRoutePath()==='/login/admin'){
           history.replaceState({},'',routeHelpers.toUrlPath('/dashboard'));
           render('/dashboard');
+        }else if(status.status==='disabled'||status.status==='graduated'){
+          showSignedInMessage(statusTarget,'هذا الحساب موقوف حاليًا. تواصل مع إدارة المدرسة.','error');
         }else if(status.status==='active'){
           showSignedInMessage(statusTarget,'تم تسجيل الدخول. جارٍ فتح لوحتك…');
           if(currentRoutePath().startsWith('/login')){
