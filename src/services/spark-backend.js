@@ -156,8 +156,10 @@ const LAST_CODE_KEY = 'tn:last-parent-code';
 export async function issueParentCode() {
   const user = me();
   const database = db();
+  await user.getIdToken(true).catch(() => {}); // قواعد Firestore تقرأ email_verified من التوكن: حدّثه قبل الكتابة.
   const profile = await getDoc(doc(database, 'profiles', user.uid));
   if (!profile.exists() || profile.data().role !== 'student') throw fail('permission-denied', 'إصدار كود الربط متاح للطالب النشط فقط.');
+  if (!/^STU-[0-9A-Z]{8,12}$/u.test(String(profile.data().studentId ?? ''))) throw fail('failed-precondition', 'حساب الطالب بلا رقم طالب صالح. تواصل مع الإدارة.');
   const code = `TNG-${token(12)}`;
   const batch = writeBatch(database);
   let previous = '';

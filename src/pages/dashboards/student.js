@@ -5,6 +5,15 @@ import { loadClassAssignments } from '../../services/structure-service.js';
 
 const TABS = [['home', 'الرئيسية', '⌂'], ['lessons', 'الدروس', '▤'], ['grades', 'درجاتي', '★'], ['attendance', 'حضوري', '✓'], ['teachers', 'مدرسيني', '☺'], ['timetable', 'الجدول', '▦'], ['tasks', 'امتحانات وواجبات', '✎'], ['images', 'الصور', '▣'], ['chat', 'رسائل', '✉'], ['parent', 'ولي الأمر', '♥']];
 
+function parentCodeErrorMessage(error) {
+  const code = String(error?.code ?? '');
+  if (code === 'permission-denied' || code === 'firestore/permission-denied') return 'تعذر إصدار الكود: الصلاحيات (قواعد Firestore) لا تسمح الآن. تأكد من توثيق البريد ومن نشر آخر قواعد.';
+  if (code === 'failed-precondition') return error.message;
+  if (code === 'unavailable' || code === 'firestore/unavailable') return 'تعذر الاتصال بالخادم. تحقق من الإنترنت وحاول مرة أخرى.';
+  if (code === 'auth/no-current-user') return 'انتهت الجلسة. سجّل الدخول مرة أخرى.';
+  return `تعذر إصدار كود جديد الآن (${code || 'خطأ غير معروف'}).`;
+}
+
 export function renderStudent(profile) {
   const first = String(profile.displayName || 'طالب').split(' ')[0];
   return `<div class="dash dash-student" data-dash="student">
@@ -116,7 +125,7 @@ export function mountStudent(root, { profile, auth, database }) {
     if (issue) {
       issue.disabled = true;
       try { const result = await auth.issueParentCode(); root.querySelector('[data-parent-code]').textContent = result.code; say(message, 'تم إصدار كود جديد صالح 15 دقيقة. الكود القديم أُلغي.'); }
-      catch { say(message, 'تعذر إصدار كود جديد الآن.', 'error'); }
+      catch (error) { say(message, parentCodeErrorMessage(error), 'error'); }
       finally { issue.disabled = false; }
     }
     if (revoke && window.confirm('سيُلغى وصول ولي الأمر لبياناتك. متأكد؟')) {
