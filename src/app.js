@@ -62,6 +62,8 @@ function initializeTheme(){
   applyTheme(saved||(window.matchMedia?.('(prefers-color-scheme: light)').matches?'light':'dark'));
 }
 
+const celebrate=anchor=>import('./ui/celebrate.js').then(m=>m.celebrate(anchor)).catch(()=>{});
+
 function showMessage(target,message,kind='status'){
   if(!target)return;
   target.textContent=message;
@@ -113,7 +115,7 @@ function initializeDashboard(generation){
   }).catch(()=>{
     if(generation!==pageGeneration)return;
     const target=document.querySelector('#app .dashboard-shell');
-    if(target)target.innerHTML='<div class="empty-state" role="status"><p>تعذر تحميل لوحة الحساب الآن. حاول تحديث الصفحة.</p></div>';
+    if(target)target.innerHTML='<div class="empty-state is-settled" data-kind="error" role="status"><p>تعذر تحميل لوحة الحساب الآن. حاول تحديث الصفحة.</p></div>';
   });
 }
 
@@ -400,6 +402,7 @@ async function handleRegistration(form){
         :'تم إنشاء حساب الطالب وهو يعمل الآن. وثّق بريدك الإلكتروني أيضًا.';
     const note=verificationSent?' أُرسل رابط توثيق البريد الإلكتروني.':' تعذر إرسال رسالة التوثيق الآن؛ أعد المحاولة لاحقًا.';
     showMessage(message,`${success}${note}`);
+    celebrate(message);
     if(application.status==='pending')form.reset();
     else if(application.status==='active'){
       history.pushState({},'',routeHelpers.toUrlPath('/dashboard'));
@@ -500,6 +503,7 @@ document.addEventListener('click',async event=>{
       if(reviewButton.dataset.reviewAction==='approve')await api.approveTeacher(reviewButton.dataset.uid);
       else await api.rejectTeacher(reviewButton.dataset.uid);
       showMessage(message,'تم حفظ قرار المراجعة على الخادم.');
+      celebrate(message);
       await loadTeacherApplications();
     }catch(error){
       const api=await import('./auth/auth-service.js').catch(()=>null);
@@ -580,10 +584,26 @@ initErrorReporter();
 if(import.meta.env?.PROD&&'serviceWorker' in navigator){
   addEventListener('load',()=>navigator.serviceWorker.register(`${import.meta.env.BASE_URL||'/'}sw.js`,{scope:import.meta.env.BASE_URL||'/'}).catch(()=>{}));
 }
-function syncOnlineBanner(){
+let wasOffline=false;
+function netBar(text,back){
   let bar=document.getElementById('offline-bar');
-  if(navigator.onLine){bar?.remove();return;}
-  if(!bar){bar=document.createElement('div');bar.id='offline-bar';bar.setAttribute('role','status');bar.textContent='لا يوجد اتصال بالإنترنت. البيانات الحية لن تعمل حتى يعود الاتصال.';bar.style.cssText='position:fixed;inset:auto 0 0 0;z-index:9999;padding:.6rem 1rem;text-align:center;background:#b45309;color:#fff;font-weight:700';document.body.append(bar);}
+  if(!bar){bar=document.createElement('div');bar.id='offline-bar';bar.className='net-bar';bar.setAttribute('role','status');document.body.append(bar);void bar.offsetWidth;}
+  bar.textContent=text;
+  bar.classList.toggle('is-back',back);
+  bar.classList.add('is-in');
+  return bar;
+}
+function syncOnlineBanner(){
+  const bar=document.getElementById('offline-bar');
+  if(navigator.onLine){
+    if(!bar||!wasOffline){bar?.remove();return;}
+    wasOffline=false;
+    const el=netBar('عاد الاتصال بالإنترنت.',true);
+    setTimeout(()=>{el.classList.remove('is-in');setTimeout(()=>el.remove(),500);},2500);
+    return;
+  }
+  wasOffline=true;
+  netBar('لا يوجد اتصال بالإنترنت. البيانات الحية لن تعمل حتى يعود الاتصال.',false);
 }
 addEventListener('online',syncOnlineBanner);addEventListener('offline',syncOnlineBanner);syncOnlineBanner();
 document.querySelector('.menu-toggle')?.addEventListener('click',event=>{
