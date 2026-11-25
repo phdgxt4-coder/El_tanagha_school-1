@@ -163,20 +163,16 @@
       ]
     },
     {
-      "collectionGroup": "classes",
+      "collectionGroup": "parentLinks",
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "year",
+          "fieldPath": "parentUid",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "grade",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "section",
-          "order": "ASCENDING"
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
         }
       ]
     },
@@ -185,7 +181,7 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "parentUid",
+          "fieldPath": "active",
           "order": "ASCENDING"
         },
         {

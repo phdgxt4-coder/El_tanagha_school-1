@@ -1,4 +1,4 @@
-import { createUserWithEmailAndPassword, onAuthStateChanged, sendEmailVerification, sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { browserLocalPersistence, createUserWithEmailAndPassword, onAuthStateChanged, setPersistence, sendEmailVerification, sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { getAuth } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { validateAccountRequest } from '../../functions/src/validation.js';
@@ -13,6 +13,8 @@ function getAuthClients() {
   if (!authClient || !functionsClient) {
     const app = getFirebaseApp();
     authClient = getAuth(app);
+    // تسجيل الدخول يبقى محفوظًا على الجهاز حتى يضغط المستخدم تسجيل الخروج.
+    setPersistence(authClient, browserLocalPersistence).catch(() => {});
     functionsClient = getFunctions(app, functionsRegion);
   }
   return { auth: authClient, functions: functionsClient };

@@ -10,9 +10,9 @@ const ROLE_LABELS = Object.freeze({
 
 function registrationFields(role) {
   const roleFields = role === 'student'
-    ? `<label>الصف الدراسي<select name="grade" required><option value="">اختر الصف</option><option value="1">الأول الثانوي</option><option value="2">الثاني الثانوي</option><option value="3">الثالث الثانوي</option></select></label><label>الشعبة<select name="branch" required><option value="">اختر الشعبة</option><option value="science">علمي علوم</option><option value="math">علمي رياضة</option><option value="literary">أدبي</option></select></label><label>الفصل<input name="className" required maxlength="40" placeholder="مثال: 1/أ"></label><label>تاريخ الميلاد<input name="birthDate" type="date" required></label>`
+    ? `<label>الصف الدراسي<select name="grade" required data-grade-select><option value="">اختر الصف</option><option value="1">الأول الثانوي</option><option value="2">الثاني الثانوي</option><option value="3">الثالث الثانوي</option></select></label><label>الفصل<select name="classId" data-class-select disabled><option value="">اختر الصف أولًا</option></select></label><label hidden data-class-fallback>الفصل<input name="className" maxlength="40" placeholder="مثال: 1/أ"></label><label>الشعبة (اختياري)<select name="branch"><option value="">غير محددة</option><option value="science">علمي علوم</option><option value="math">علمي رياضة</option><option value="literary">أدبي</option></select></label>`
     : role === 'teacher'
-      ? `<label>التخصص<select name="subjectId" required><option value="">اختر التخصص</option>${Object.entries(SUBJECTS).map(([id,label])=>`<option value="${id}">${label}</option>`).join('')}</select></label><label class="consent-row"><input type="checkbox" name="publishConsent" value="yes"><span>أوافق على نشر اسمي وتخصصي في دليل المدرسين بعد اعتماد الإدارة. لن يُنشر بريدي أو هاتفي.</span></label>`
+      ? `<label>المادة<select name="subjectId" required data-subject-select><option value="">اختر المادة</option>${Object.entries(SUBJECTS).map(([id,label])=>`<option value="${id}">${label}</option>`).join('')}</select></label><label class="consent-row"><input type="checkbox" name="publishConsent" value="yes"><span>أوافق على نشر اسمي وتخصصي في دليل المدرسين بعد اعتماد الإدارة. لن يُنشر بريدي أو هاتفي.</span></label>`
       : '';
 
   return `<label>الاسم الكامل (للطالب: اسم رباعي)<input name="displayName" autocomplete="name" required minlength="2" maxlength="80"></label>${roleFields}<label>رقم الهاتف<input name="phone" type="tel" autocomplete="tel" required maxlength="24"></label>`;
@@ -44,8 +44,8 @@ export function loginPage(role = 'student') {
         <label>البريد الإلكتروني<input name="email" type="email" autocomplete="email" required maxlength="254"></label>
         <label>كلمة المرور (8 أحرف على الأقل)<input name="password" type="password" autocomplete="new-password" required minlength="8" maxlength="128"></label>
         <label>تأكيد كلمة المرور<input name="confirmPassword" type="password" autocomplete="new-password" required minlength="8" maxlength="128"></label>
-        <button class="button" type="submit">إنشاء الحساب وإرسال طلب ${roleLabel}</button>
-        ${safeRole==='teacher'?'<p class="form-note">طلب المدرس يبقى بانتظار اعتماد الإدارة. لا يظهر الاسم أو التخصص قبل الاعتماد وموافقة النشر.</p>':''}
+        <button class="button" type="submit">${safeRole==='teacher'?'إرسال طلب المدرس':'إنشاء حساب '+roleLabel}</button>
+        ${safeRole==='teacher'?'<p class="form-note">طلب المدرس يبقى بانتظار اعتماد الإدارة، وبعدها تسند لك الإدارة المادة والفصول. لا يظهر الاسم أو التخصص للعامة قبل الاعتماد وموافقة النشر.</p>':'<p class="form-note">حسابك يعمل فور إنشائه بدون موافقة الإدارة.</p>'}
       </form>`:''}
       <p class="form-note auth-status" data-auth-message role="status" aria-live="polite"></p>
     </div>
