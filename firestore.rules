@@ -280,6 +280,10 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
           ['status', 'displayName', 'phone', 'classId', 'className', 'grade', 'branch', 'updatedBy', 'updatedAt'])
         && request.resource.data.get('branch', '') in ['', 'bac_med', 'bac_eng', 'bac_biz', 'bac_arts', 'science', 'math', 'literary']
+        && (resource.data.role == 'parent'
+          || ((request.resource.data.grade == '1' && request.resource.data.get('branch', '') == '')
+            || (request.resource.data.grade == '2' && request.resource.data.get('branch', '') in ['bac_med', 'bac_eng', 'bac_biz', 'bac_arts'])
+            || (request.resource.data.grade == '3' && request.resource.data.get('branch', '') in ['science', 'math', 'literary'])))
         && (request.resource.data.get('classId', '') == resource.data.get('classId', '')
           || (get(/databases/$(database)/documents/classes/$(request.resource.data.classId)).data.grade == request.resource.data.grade
             && ((get(/databases/$(database)/documents/classes/$(request.resource.data.classId)).data.get('branch', '') == '' && request.resource.data.get('branch', '') == '')
