@@ -260,3 +260,14 @@ test('جدول الحصص: الإدارة تكتب وطلاب الفصل فقط 
   await assertSucceeds(getDoc(doc(user('s1'),'timetables','c1')));
   await assertFails(getDoc(doc(user('s9'),'timetables','c1')));
 });
+
+test('أخطاء المتصفح: أي مستخدم يكتب خطأه فقط والإدارة وحدها تقرأ', {skip:!emulatorAvailable}, async()=>{
+  await seed([...base,['profiles/s1',studentProfile('s1')]]);
+  const s=user('s1');
+  const row={uid:'s1',message:'x is undefined',source:'app.js',route:'/dashboard',agent:'UA',at:serverTimestamp()};
+  await assertSucceeds(setDoc(doc(s,'clientErrors','e1'),row));
+  await assertFails(setDoc(doc(s,'clientErrors','e2'),{...row,uid:'other'}));
+  await assertFails(setDoc(doc(s,'clientErrors','e3'),{...row,message:'x'.repeat(301)}));
+  await assertFails(getDoc(doc(s,'clientErrors','e1')));
+  await assertSucceeds(getDoc(doc(user('adm'),'clientErrors','e1')));
+});
