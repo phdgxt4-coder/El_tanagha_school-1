@@ -117,7 +117,7 @@ export function createPuppetRenderer(host,manifest,cfg,opts={}){
 
     HiddenPassword:async w=>{
       look(0,-.15,.5,.1);await w(260);set({headY:2});                                                                 // look at the screen
-      set({ec:1,earLb:30,earRb:-30,crouch:.05,bodyY:3,lean:-2,tailB:-6});await w(420);                                  // ears fold down over the eyes, body shrinks a little
+      set({earLb:58,earRb:-58,crouch:.05,bodyY:3,lean:-2,tailB:-6,headR:2});await w(420);                              // ears droop out to the sides of the face (the cap stays visible), body shrinks a little
       set({lid:1,headY:5,gy:.1});S.lid.hold=1;await w(160);},                                                         // eyes close behind the ears
 
     Sleep:async w=>{
@@ -216,7 +216,7 @@ export function createPuppetRenderer(host,manifest,cfg,opts={}){
     setState(name){
       box.dataset.state=name;const prev=state;state=name;
       run(async w=>{busy=true;
-        if(prev==='HiddenPassword'){set({lid:.4,ec:0,earLb:0,earRb:0});S.lid.hold=0;await w(380);set({lid:0,crouch:0,bodyY:0,lean:0,tailB:0,headY:0});await w(260);}   // ears unfold first, then the eyes open
+        if(prev==='HiddenPassword'){set({lid:.4,ec:0,earLb:0,earRb:0});S.lid.hold=0;await w(380);set({lid:0,crouch:0,bodyY:0,lean:0,tailB:0,headY:0});await w(260);}   // ears lift back first, then the eyes open
         else if(prev!==name){set({crouch:.012,headY:-3});await w(110);}
         const fn=SEQ[name]||SEQ[ALIAS[name]]||SEQ.Idle;
         if(!HIDE.includes(name)&&!HIDE.includes(ALIAS[name]||''))calm=1;
