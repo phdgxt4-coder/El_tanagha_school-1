@@ -68,5 +68,65 @@ export function bindTabs(root) {
 }
 
 export function shellActions() {
-  return '<button class="dash-signout" type="button" data-dashboard-sign-out>تسجيل الخروج</button>';
+  return '<span data-bell-slot></span><button class="dash-signout" type="button" data-dashboard-sign-out>تسجيل الخروج</button>';
+}
+
+const NOTICE_ICONS = { content: '📚', grade: '📝', attendance: '📍', chat: '💬' };
+
+/** جرس الإشعارات: عدّاد غير المقروء، قائمة آخر 20، تفضيلات، وتفعيل الإشعارات اللحظية. */
+export async function mountBell(root, { profile, database }) {
+  const slot = root.querySelector('[data-bell-slot]');
+  if (!slot) return () => {};
+  const service = await import('../../services/notifications-service.js');
+  slot.innerHTML = `<div class="bell"><button class="bell-btn" type="button" aria-label="الإشعارات" aria-expanded="false" data-bell-btn>🔔<b class="bell-count" data-bell-count hidden>0</b></button>
+    <div class="bell-panel" data-bell-panel hidden role="dialog" aria-label="الإشعارات">
+      <div class="bell-head"><b>الإشعارات</b><button type="button" class="bell-link" data-bell-all>تعليم الكل كمقروء</button></div>
+      <div class="bell-list" data-bell-list><p class="dash-empty">لا توجد إشعارات.</p></div>
+      <details class="bell-prefs"><summary>إعدادات الإشعارات</summary>
+        <div data-bell-prefs></div>
+        <button type="button" class="bell-link" data-bell-push>تفعيل إشعارات الجهاز</button>
+        <p class="form-note" data-bell-note role="status"></p></details></div></div>`;
+  const button = slot.querySelector('[data-bell-btn]');
+  const panel = slot.querySelector('[data-bell-panel]');
+  const count = slot.querySelector('[data-bell-count]');
+  const list = slot.querySelector('[data-bell-list]');
+  const note = slot.querySelector('[data-bell-note]');
+  let current = [];
+  const stop = service.watchNotifications(database, profile.uid, (items, unread) => {
+    current = items;
+    count.hidden = unread === 0;
+    count.textContent = unread > 99 ? '99+' : String(unread);
+    button.classList.toggle('has-unread', unread > 0);
+    list.innerHTML = items.length ? items.map(item => `<button type="button" class="bell-item ${item.read ? '' : 'is-unread'}" data-id="${esc(item.id)}"><span aria-hidden="true">${NOTICE_ICONS[item.type] || '🔔'}</span><span><b>${esc(item.title)}</b><small>${esc(item.body)}</small><time>${formatDate(item.createdAt)}</time></span></button>`).join('') : '<p class="dash-empty">لا توجد إشعارات.</p>';
+  });
+  button.addEventListener('click', () => {
+    panel.hidden = !panel.hidden;
+    button.setAttribute('aria-expanded', String(!panel.hidden));
+  });
+  document.addEventListener('click', event => { if (!slot.contains(event.target)) { panel.hidden = true; button.setAttribute('aria-expanded', 'false'); } });
+  list.addEventListener('click', event => {
+    const item = event.target.closest('[data-id]');
+    if (item) service.markRead(database, item.dataset.id).catch(() => {});
+  });
+  slot.querySelector('[data-bell-all]').addEventListener('click', () => service.markAllRead(database, current).catch(() => {}));
+  const prefsBox = slot.querySelector('[data-bell-prefs]');
+  const prefs = await service.loadPrefs(database, profile.uid).catch(() => ({}));
+  prefsBox.innerHTML = service.PREF_KEYS.map(([key, label]) => `<label class="bell-pref"><input type="checkbox" data-pref="${key}" ${prefs[key] === false ? '' : 'checked'}> ${label}</label>`).join('');
+  prefsBox.addEventListener('change', async () => {
+    const next = {};
+    prefsBox.querySelectorAll('[data-pref]').forEach(box => { next[box.dataset.pref] = box.checked; });
+    try { await service.savePrefs(database, profile.uid, next); say(note, 'تم حفظ الإعدادات.'); } catch { say(note, 'تعذر الحفظ.', 'error'); }
+  });
+  slot.querySelector('[data-bell-push]').addEventListener('click', async () => {
+    const result = await service.enablePush(database, profile.uid).catch(() => ({ ok: false, reason: 'error' }));
+    const texts = {
+      '': 'تم تفعيل إشعارات هذا الجهاز.',
+      'ios-install': 'على الآيفون: أضف الموقع إلى الشاشة الرئيسية ثم افتحه من الأيقونة وفعّل الإشعارات (iOS 16.4 أو أحدث).',
+      unsupported: 'هذا المتصفح لا يدعم الإشعارات اللحظية. ستظهر الإشعارات داخل المنصة.',
+      denied: 'تم رفض الإذن. يمكنك تغييره من إعدادات المتصفح.',
+      'no-vapid': 'الإشعارات اللحظية غير مفعّلة بعد من إعدادات المدرسة.'
+    };
+    say(note, texts[result.reason] ?? 'تعذر تفعيل الإشعارات.', result.ok ? 'status' : 'error');
+  });
+  return stop;
 }

@@ -122,3 +122,12 @@ test('الجلسة محفوظة على الجهاز وتُفتح اللوحة ت
   assert.match(auth, /setPersistence\(authClient, browserLocalPersistence\)/u);
   assert.match(app, /جارٍ فتح لوحتك/u);
 });
+
+test('جرس الإشعارات والعامل اللحظي موجودان في كل لوحة', () => {
+  const common = read('../src/pages/dashboards/common.js');
+  assert.match(common, /data-bell-slot/u);
+  assert.match(common, /mountBell/u);
+  assert.match(read('../src/pages/dashboard-pages.js'), /mountBell/u);
+  assert.match(read('../src/services/notifications-service.js'), /requestPermission/u);
+  assert.ok(fs.existsSync(new URL('../public/push-sw.js', import.meta.url)));
+});

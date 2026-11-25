@@ -747,3 +747,4 @@ export const revokeParentLink = onCall(async request => {
   });
   return { revoked: true };
 });
+export { notifyOnAttendance, notifyOnContent, notifyOnGrade } from './notifications.js';

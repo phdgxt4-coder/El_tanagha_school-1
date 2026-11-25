@@ -230,3 +230,28 @@ test('الطالب يرى محتوى فصله فقط', {skip:!emulatorAvailable}
   await assertFails(getDoc(doc(studentDb,'content/other-class')));
   await assertFails(getDocs(query(collection(studentDb,'content'),where('classId','==','c1b'),where('published','==',true))));
 });
+
+test('إشعارات المستخدم: يقرأ إشعاراته فقط ولا ينشئ ولا يغيّر غير حقل read', {skip:!emulatorAvailable}, async()=>{
+  await seed([
+    ['userNotifications/n1',{uid:'stu1',type:'grade',title:'درجة',body:'x',read:false,createdAt:new Date()}],
+    ['userNotifications/n2',{uid:'stu2',type:'grade',title:'درجة',body:'y',read:false,createdAt:new Date()}]
+  ]);
+  const mine=environment.authenticatedContext('stu1').firestore();
+  await assertSucceeds(getDocs(query(collection(mine,'userNotifications'),where('uid','==','stu1'))));
+  await assertFails(getDoc(doc(mine,'userNotifications/n2')));
+  await assertFails(getDocs(query(collection(mine,'userNotifications'),where('uid','==','stu2'))));
+  await assertSucceeds(updateDoc(doc(mine,'userNotifications/n1'),{read:true}));
+  await assertFails(updateDoc(doc(mine,'userNotifications/n1'),{title:'تلاعب'}));
+  await assertFails(setDoc(doc(mine,'userNotifications/n9'),{uid:'stu1',type:'grade',title:'مزيف',body:'',read:false}));
+});
+
+test('أجهزة الإشعارات والتفضيلات: لصاحبها فقط وبحقول محددة', {skip:!emulatorAvailable}, async()=>{
+  await seed([]);
+  const mine=environment.authenticatedContext('stu1').firestore();
+  await assertSucceeds(setDoc(doc(mine,'pushDevices/d1'),{uid:'stu1',token:'abc',createdAt:serverTimestamp()}));
+  await assertFails(setDoc(doc(mine,'pushDevices/d2'),{uid:'stu2',token:'abc',createdAt:serverTimestamp()}));
+  await assertFails(setDoc(doc(mine,'pushDevices/d3'),{uid:'stu1',token:'abc',createdAt:serverTimestamp(),extra:1}));
+  await assertSucceeds(setDoc(doc(mine,'notificationPrefs/stu1'),{content:true,grade:false,attendance:true,chat:true}));
+  await assertFails(setDoc(doc(mine,'notificationPrefs/stu2'),{content:true,grade:true,attendance:true,chat:true}));
+  await assertFails(setDoc(doc(mine,'notificationPrefs/stu1'),{content:'x',grade:true,attendance:true,chat:true}));
+});
