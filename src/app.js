@@ -211,8 +211,8 @@ function initializeAuthPage(generation){
         }else if(status.status==='rejected'){
           showSignedInMessage(statusTarget,'لم تتم الموافقة على طلب المدرس. تواصل مع إدارة المدرسة للمراجعة.','error');
         }else if(status.role==='admin'&&currentRoutePath()==='/login/admin'){
-          history.replaceState({},'',routeHelpers.toUrlPath('/admin/teacher-requests'));
-          render('/admin/teacher-requests');
+          history.replaceState({},'',routeHelpers.toUrlPath('/dashboard'));
+          render('/dashboard');
         }else if(status.status==='active'){
           showSignedInMessage(statusTarget,'تم تسجيل الدخول بنجاح. يمكنك متابعة بياناتك من لوحة الحساب.');
         }
@@ -321,8 +321,8 @@ async function handleLogin(form){
     await api.signIn(email,password);
     const status=await api.getMyAccountStatus();
     if(status.role==='admin'){
-      history.pushState({},'',routeHelpers.toUrlPath('/admin/teacher-requests'));
-      render('/admin/teacher-requests');
+      history.pushState({},'',routeHelpers.toUrlPath('/dashboard'));
+      render('/dashboard');
     }else if(status.role==='teacher_applicant'&&status.status==='pending'){
       showMessage(message,'تم الدخول؛ طلب المدرس ما زال بانتظار اعتماد الإدارة.');
     }else if(status.status==='rejected'){

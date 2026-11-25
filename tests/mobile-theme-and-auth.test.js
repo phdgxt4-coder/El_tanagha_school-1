@@ -43,7 +43,7 @@ test('عامل الخدمة يزيل مخازن النسخة القديمة ال
 });
 
 test('لوحة الحساب تتضمن ربط ولي الأمر بكود خادمي', () => {
-  const dashboard = read('../src/pages/dashboard-pages.js');
+  const dashboard = read('../src/pages/dashboards/parent.js');
   const app = read('../src/app.js');
   assert.match(dashboard, /data-parent-link/u);
   assert.match(dashboard, /linkParentToStudent/u);
@@ -51,7 +51,7 @@ test('لوحة الحساب تتضمن ربط ولي الأمر بكود خاد�
 });
 
 test('دورة ربط الحسابات فورية بدون موافقة إدارة مع كود عشوائي ومحاولات محدودة', () => {
-  const dashboard = read('../src/pages/dashboard-pages.js');
+  const dashboard = read('../src/pages/dashboards/student.js') + read('../src/pages/dashboards/parent.js');
   const functions = read('../functions/src/index.js');
   const auth = read('../src/auth/auth-service.js');
   assert.match(dashboard, /data-issue-parent-code/u);
@@ -91,4 +91,27 @@ test('نموذج التسجيل يطلب الاسم والهاتف ويحمّل 
   assert.match(teacher, /data-subject-select/u);
   assert.doesNotMatch(teacher, /name="grades"/u);
   assert.match(teacher, /بانتظار اعتماد الإدارة/u);
+});
+
+test('أربع لوحات مختلفة: لكل دور تخطيط وتنقل وألوان وحركة خاصة', () => {
+  const css = read('../styles/dashboards.css');
+  for (const role of ['student', 'teacher', 'parent', 'admin']) {
+    assert.ok(fs.existsSync(new URL(`../src/pages/dashboards/${role}.js`, import.meta.url)));
+    assert.match(css, new RegExp(`\\.dash-${role}\\{--d-accent`, 'u'));
+  }
+  assert.match(css, /stu-tabs/u);
+  assert.match(css, /tch-side/u);
+  assert.match(css, /par-stats/u);
+  assert.match(css, /adm-side/u);
+  const accents = [...css.matchAll(/\.dash-(student|teacher|parent|admin)\{--d-accent:(#[0-9a-f]+)/gu)].map(match => match[2]);
+  assert.equal(new Set(accents).size, 4);
+  assert.match(css, /prefers-reduced-motion:no-preference/u);
+});
+
+test('لوحات الأدوار تستخدم الترقيم بالمؤشر ولا تجلب مجموعات كاملة', () => {
+  for (const role of ['student', 'teacher', 'parent', 'admin']) {
+    const source = read(`../src/pages/dashboards/${role}.js`);
+    assert.doesNotMatch(source, /getDocs\(collection\(database, '[a-zA-Z]+'\)\)/u);
+  }
+  assert.match(read('../src/pages/dashboards/common.js'), /startAfter/u);
 });
