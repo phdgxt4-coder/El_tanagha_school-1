@@ -116,9 +116,9 @@ export function createPuppetRenderer(host,manifest,cfg,opts={}){
       set({headR:0,yaw:0,earLb:0,earRb:0,tailB:0,lean:0,tm:1});await w(300);await settle(w);},
 
     HiddenPassword:async w=>{
-      look(0,-.15,.5,.1);await w(260);set({headY:2});                                                                 // look at the screen
-      set({earLb:58,earRb:-58,crouch:.05,bodyY:3,lean:-2,tailB:-6,headR:2});await w(420);                              // ears droop out to the sides of the face (the cap stays visible), body shrinks a little
-      set({lid:1,headY:5,gy:.1});S.lid.hold=1;await w(160);},                                                         // eyes close behind the ears
+      look(0,-.1,.5,.1);await w(240);                                                                                // look at the screen
+      look(-.7,.55,.9,.5,40);set({yaw:-16,headY:9,headR:-5,lean:-3,bodyX:-5,crouch:.05,bodyY:3,tailB:-9,tm:.4});calm=.7;await w(520);   // head turns away and down, body turns and shrinks a little, tail tucks calm
+      set({lid:1});S.lid.hold=1;await w(220);},                                                                      // slow lid closes; the ears only follow the head
 
     Sleep:async w=>{
       calm=.5;look(0,.9,.9,.3);set({crouch:.045,headY:16,headR:9,earLb:14,earRb:-14,tailB:-5,lean:-4,cL:20,cR:20,tm:.2});await w(500);set({lid:1});S.lid.hold=1;},
@@ -216,7 +216,7 @@ export function createPuppetRenderer(host,manifest,cfg,opts={}){
     setState(name){
       box.dataset.state=name;const prev=state;state=name;
       run(async w=>{busy=true;
-        if(prev==='HiddenPassword'){set({lid:.4,ec:0,earLb:0,earRb:0});S.lid.hold=0;await w(380);set({lid:0,crouch:0,bodyY:0,lean:0,tailB:0,headY:0});await w(260);}   // ears lift back first, then the eyes open
+        if(prev==='HiddenPassword'){look(-.2,.2,.8,.4,40);set({yaw:-4,headY:3,headR:0,lean:0,bodyX:0,crouch:.02,bodyY:0,tailB:0,tm:1});calm=1;await w(380);set({lid:.4});S.lid.hold=0;await w(200);set({lid:0,crouch:0,headY:0,yaw:0});look(0,0,.5,.2);await w(260);}   // head returns first, then the eyes open
         else if(prev!==name){set({crouch:.012,headY:-3});await w(110);}
         const fn=SEQ[name]||SEQ[ALIAS[name]]||SEQ.Idle;
         if(!HIDE.includes(name)&&!HIDE.includes(ALIAS[name]||''))calm=1;
