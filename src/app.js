@@ -551,9 +551,15 @@ document.addEventListener('submit',event=>{
     const note=form.querySelector('.form-note');
     const button=form.querySelector('button[type=submit]');
     button.disabled=true;note.textContent='جارٍ الإرسال...';
-    import('./services/spark-backend.js').then(api=>api.sendContactMessage({name:form.elements.name.value,email:form.elements.email.value,message:form.elements.message.value}))
+    import('./config/firebase-env.js').then(async env=>{
+      if(!env.firebaseConfigured){
+        const info=(await import('./config/school-info.js')).schoolInfo;
+        const ways=[info.phone&&`الهاتف: ${info.phone}`,info.email&&`البريد: ${info.email}`].filter(Boolean).join(' · ');
+        throw Object.assign(new Error('unconfigured'),{unconfigured:true,ways});
+      }
+    }).then(()=>import('./services/spark-backend.js')).then(api=>api.sendContactMessage({name:form.elements.name.value,email:form.elements.email.value,message:form.elements.message.value}))
       .then(()=>{form.reset();note.textContent='وصلت رسالتك للإدارة. شكرًا لك.';})
-      .catch(()=>{note.textContent='تعذر الإرسال الآن. حاول لاحقًا أو اتصل بالمدرسة.';})
+      .catch(error=>{note.textContent=error?.unconfigured?`إرسال الرسائل من الموقع غير متاح حاليًا. تواصل مع المدرسة مباشرة. ${error.ways}`:'تعذر الإرسال الآن. حاول لاحقًا أو اتصل بالمدرسة.';})
       .finally(()=>{button.disabled=false;});
     return;
   }
