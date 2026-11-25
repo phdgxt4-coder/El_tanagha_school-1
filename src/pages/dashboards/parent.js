@@ -10,6 +10,7 @@ export function renderParent(profile) {
       <article><span>نسبة الحضور</span><strong data-rate>—</strong></article>
       <article><span>آخر نشاط</span><strong data-last>—</strong></article>
     </section>
+    <p class="par-report" data-report-wrap hidden><button class="button ghost" type="button" data-report-card>شهادة الدرجات والحضور (PDF)</button> <span class="form-note" data-report-note role="status"></span></p>
     <div class="par-columns" data-detail hidden>
       <section class="par-card"><h2>الدرجات</h2><div data-list="grades"></div><button class="button ghost" type="button" data-more="grades" hidden>المزيد</button></section>
       <section class="par-card"><h2>امتحانات وواجبات قادمة</h2><div data-par-tasks></div></section>
@@ -65,7 +66,7 @@ export function mountParent(root, { auth, database }) {
   function select(uid) {
     current = uid;
     childrenBox.querySelectorAll('[data-child]').forEach(button => button.classList.toggle('is-active', button.dataset.child === uid));
-    stats.hidden = false; detail.hidden = false;
+    stats.hidden = false; detail.hidden = false; root.querySelector('[data-report-wrap]').hidden = false;
     summary(uid).catch(() => {});
     void classInfo(uid);
     const gradeRow = item => `<div class="par-row"><span>${esc(item.subjectName || item.subjectId || '')} ${esc(item.title || '')}</span><b>${esc(item.score)}${item.max ? '/' + esc(item.max) : ''}</b></div>`;
@@ -115,6 +116,15 @@ export function mountParent(root, { auth, database }) {
       form.reset();
       await refresh();
     } catch (error) { say(message, auth.friendlyAuthError(error), 'error'); }
+    finally { button.disabled = false; }
+  });
+  root.querySelector('[data-report-card]').addEventListener('click', async event => {
+    const student = students.find(item => item.uid === current);
+    if (!student) return;
+    const button = event.currentTarget, note = root.querySelector('[data-report-note]');
+    button.disabled = true; note.textContent = 'جارٍ تجهيز الشهادة...';
+    try { const { openReportCard } = await import('../report-card.js'); await openReportCard(database, { uid: student.uid, name: student.displayName, className: student.className, gradeLabel: gradeNames[student.grade] || '' }); note.textContent = ''; }
+    catch { note.textContent = 'تعذر تجهيز الشهادة الآن.'; }
     finally { button.disabled = false; }
   });
   void refresh();
