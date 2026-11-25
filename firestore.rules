@@ -375,7 +375,7 @@ service cloud.firestore {
         && request.resource.data.active == true
         && request.resource.data.createdAt == request.time
         && request.resource.data.expiresAt > request.time
-        && request.resource.data.expiresAt <= request.time + duration.value(16, 'm');
+        && request.resource.data.expiresAt <= request.time + duration.value(30, 'm'); // هامش لفرق ساعة الجهاز
       // الطالب يلغي كوده، والولي يستهلكه مرة واحدة مع إنشاء الربط في نفس الدفعة.
       allow update: if (resource.data.studentUid == request.auth.uid
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active'])

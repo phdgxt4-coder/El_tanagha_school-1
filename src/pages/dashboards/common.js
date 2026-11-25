@@ -59,7 +59,7 @@ export function bindTabs(root) {
   const loaded = new Set();
   const handlers = new Map();
   function show(name) {
-    tabs.forEach(tab => { const on = tab.dataset.tab === name; tab.classList.toggle('is-active', on); tab.setAttribute('aria-selected', String(on)); });
+    tabs.forEach(tab => { const on = tab.dataset.tab === name; tab.classList.toggle('is-active', on); tab.setAttribute('aria-selected', String(on)); if (on) tab.scrollIntoView?.({ block: 'nearest', inline: 'center' }); });
     panels.forEach(panel => { panel.hidden = panel.dataset.panel !== name; });
     if (!loaded.has(name)) { loaded.add(name); handlers.get(name)?.(); }
   }
