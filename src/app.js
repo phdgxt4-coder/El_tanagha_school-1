@@ -528,9 +528,20 @@ document.addEventListener('click',async event=>{
   const resolved=resolveAppLink(rawHref,location.href,routeHelpers,routePatterns);
   if(!resolved)return;
   event.preventDefault();
-  history.pushState({},'',`${routeHelpers.toUrlPath(resolved.route)}${resolved.search}${resolved.hash}`);
+  let destination=resolved;
+  if(resolved.route==='/'){
+    try{
+      const auth=await import('./auth/auth-service.js');
+      if(await auth.waitForInitialAuthState()){
+        destination={...resolved,route:'/dashboard',search:'',hash:''};
+      }
+    }catch{
+      // Keep the public home available if account status cannot be checked.
+    }
+  }
+  history.pushState({},'',`${routeHelpers.toUrlPath(destination.route)}${destination.search}${destination.hash}`);
   window.scrollTo({top:0,behavior:'instant'});
-  withPageTransition(()=>render(resolved.route));
+  withPageTransition(()=>render(destination.route));
 });
 
 async function handleAdminJoin(form){
