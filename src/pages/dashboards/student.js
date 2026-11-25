@@ -1,8 +1,9 @@
 import { orderBy, where } from 'firebase/firestore';
 import { bindTabs, esc, formatDate, gradeNames, pager, shellActions, say } from './common.js';
+import { mountChat, renderChatPanel } from '../chat.js';
 import { loadClassAssignments } from '../../services/structure-service.js';
 
-const TABS = [['home', 'الرئيسية', '⌂'], ['lessons', 'الدروس', '▤'], ['grades', 'درجاتي', '★'], ['attendance', 'حضوري', '✓'], ['teachers', 'مدرسيني', '☺'], ['parent', 'ولي الأمر', '♥']];
+const TABS = [['home', 'الرئيسية', '⌂'], ['lessons', 'الدروس', '▤'], ['grades', 'درجاتي', '★'], ['attendance', 'حضوري', '✓'], ['teachers', 'مدرسيني', '☺'], ['chat', 'رسائل', '✉'], ['parent', 'ولي الأمر', '♥']];
 
 export function renderStudent(profile) {
   const first = String(profile.displayName || 'طالب').split(' ')[0];
@@ -19,6 +20,7 @@ export function renderStudent(profile) {
     <section data-panel="grades" hidden class="stu-feed"><div class="stu-list" data-list="grades"></div><button class="button ghost" type="button" data-more="grades" hidden>تحميل المزيد</button></section>
     <section data-panel="attendance" hidden class="stu-feed"><div class="stu-list" data-list="attendance"></div><button class="button ghost" type="button" data-more="attendance" hidden>تحميل المزيد</button></section>
     <section data-panel="teachers" hidden class="stu-feed"><div class="stu-list" data-list="teachers"></div></section>
+    <section data-panel="chat" hidden class="stu-feed">${renderChatPanel()}</section>
     <section data-panel="parent" hidden class="stu-feed"><article class="stu-tile">
       <h2>كود ربط ولي الأمر</h2><p class="dash-muted">الكود يُستخدم مرة واحدة وينتهي بعد 15 دقيقة. أعطه لولي أمرك فقط.</p>
       <strong class="parent-code" dir="ltr" data-parent-code>${esc(profile.parentCode || '—')}</strong>
@@ -51,6 +53,7 @@ export function mountStudent(root, { profile, auth, database }) {
       target.innerHTML = list.length ? list.map(item => `<article class="stu-row"><b>${esc(item.subjectName)}</b><span>${esc(item.teacherName)}</span></article>`).join('') : '<p class="dash-empty">لم تُسند مواد لفصلك بعد.</p>';
     } catch { target.innerHTML = '<p class="dash-empty">تعذر تحميل المدرسين.</p>'; }
   });
+  tabs.onFirstShow('chat', () => mountChat(root.querySelector('[data-panel="chat"]'), { profile, database }));
   tabs.onFirstShow('parent', async () => {
     const target = root.querySelector('[data-links]');
     try {

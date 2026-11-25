@@ -89,6 +89,7 @@ export const saveLastSeen = (database, uid) => setDoc(doc(database, 'notificatio
 const DERIVED = {
   content: item => ({ type: 'content', title: 'محتوى جديد', body: String(item.title ?? '').slice(0, 80) }),
   grade: item => ({ type: 'grade', title: 'درجة جديدة', body: `${String(item.subjectName ?? '').slice(0, 40)}: ${String(item.title ?? '').slice(0, 60)} (${item.score}/${item.max})` }),
+  message: item => ({ type: 'message', title: 'رسالة جديدة', body: `${String(item.lastText ?? '').slice(0, 80)}` }),
   attendance: item => ({ type: 'attendance', title: 'تسجيل غياب', body: `تم تسجيل غياب بتاريخ ${String(item.date ?? '').slice(0, 10)}.` })
 };
 
@@ -96,14 +97,16 @@ const DERIVED = {
 export function derivedQueries(database, profile, lastSeen, childUids = []) {
   const since = Timestamp.fromDate(lastSeen);
   const make = (path, kind, ...filters) => ({ kind, q: query(collection(database, path), ...filters, where('createdAt', '>', since), orderBy('createdAt', 'desc'), limit(5)) });
+  const chat = field => ({ kind: 'message', skipOwn: profile.uid, q: query(collection(database, 'conversations'), where(field, '==', profile.uid), where('lastAt', '>', since), orderBy('lastAt', 'desc'), limit(5)) });
   if (profile.role === 'student') {
-    const list = [make('grades', 'grade', where('studentUid', '==', profile.uid)), make('attendance', 'attendance', where('studentUid', '==', profile.uid), where('present', '==', false))];
+    const list = [chat('studentUid'), make('grades', 'grade', where('studentUid', '==', profile.uid)), make('attendance', 'attendance', where('studentUid', '==', profile.uid), where('present', '==', false))];
     if (profile.classId) list.push(make('content', 'content', where('classId', '==', profile.classId), where('published', '==', true)));
     return list;
   }
   if (profile.role === 'parent') {
     return childUids.slice(0, 5).flatMap(uid => [make('grades', 'grade', where('studentUid', '==', uid)), make('attendance', 'attendance', where('studentUid', '==', uid), where('present', '==', false))]);
   }
+  if (profile.role === 'teacher') return [chat('teacherUid')];
   return [];
 }
 
@@ -114,8 +117,8 @@ export function watchDerived(database, profile, lastSeen, childUids, onChange) {
     const items = buckets.flat().sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0)).slice(0, LIST_SIZE);
     onChange(items, items.length);
   };
-  const stops = queries.map(({ kind, q }, index) => onSnapshot(q, snapshot => {
-    buckets[index] = snapshot.docs.map(item => ({ id: `${kind}-${item.id}`, ...DERIVED[kind](item.data()), createdAt: item.data().createdAt, read: false }));
+  const stops = queries.map(({ kind, q, skipOwn }, index) => onSnapshot(q, snapshot => {
+    buckets[index] = snapshot.docs.filter(item => !skipOwn || item.data().lastBy !== skipOwn).map(item => ({ id: `${kind}-${item.id}`, ...DERIVED[kind](item.data()), createdAt: item.data().createdAt ?? item.data().lastAt, read: false }));
     publish();
   }, () => { buckets[index] = []; publish(); }));
   publish();

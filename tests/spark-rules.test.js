@@ -147,3 +147,41 @@ test('Spark: حالة الإشعارات (آخر فتح) لصاحبها فقط',
   await assertFails(setDoc(doc(b,'notificationState','u1'),{lastSeen:serverTimestamp()}));
   await assertFails(setDoc(doc(a,'notificationState','u1'),{lastSeen:serverTimestamp(),x:1}));
 });
+
+const T0=Timestamp.fromMillis(Date.now()-60000);
+const chatBase=()=>[...base,
+  ['profiles/s1',studentProfile('s1')],
+  ['profiles/t1',{uid:'t1',role:'teacher',status:'active',displayName:'مدرس'}],
+  ['profiles/t2',{uid:'t2',role:'teacher',status:'pending',displayName:'معلق'}],
+  ['profiles/s2',studentProfile('s2',{studentId:'STU-2'})]];
+async function sendMsg(db,cid,teacherUid,text,first){
+  const batch=writeBatch(db);
+  const conv=doc(db,'conversations',cid);
+  const me=db._authUid;
+  if(first)batch.set(conv,{studentUid:'s1',teacherUid,studentName:'أحمد',teacherName:'مدرس',lastAt:serverTimestamp(),lastText:text.slice(0,80),lastBy:'s1'});
+  else batch.update(conv,{lastAt:serverTimestamp(),lastText:text.slice(0,80),lastBy:me});
+  batch.set(doc(db,'conversations',cid,'messages',String(Math.random()).slice(2)),{senderUid:me,text,createdAt:serverTimestamp()});
+  return batch.commit();
+}
+test('Spark chat: الطالب يبدأ محادثة مع مدرس نشط فقط والغريب لا يقرأ', {skip:!emulatorAvailable}, async()=>{
+  await seed(chatBase());
+  const s=user('s1');s._authUid='s1';
+  await assertSucceeds(sendMsg(s,'s1_t1','t1','أهلاً',true));
+  const s2=user('s2');
+  await assertFails(getDoc(doc(s2,'conversations','s1_t1')));
+  await assertFails(getDoc(doc(s2,'conversations','s1_t1','messages','x')));
+  const t=user('t1');
+  await assertSucceeds(getDoc(doc(t,'conversations','s1_t1')));
+  await assertFails(sendMsg(s,'s1_t2','t2','مرحبا',true));
+  const s3=user('s2');s3._authUid='s2';
+  await assertFails(sendMsg(s3,'s1_t1','t1','تطفل',false));
+});
+test('Spark chat: حد الطول والمعدل والمدرس يرد ولا ينتحل', {skip:!emulatorAvailable}, async()=>{
+  await seed([...chatBase(),['conversations/s1_t1',{studentUid:'s1',teacherUid:'t1',studentName:'أ',teacherName:'م',lastAt:T0,lastText:'x',lastBy:'s1'}]]);
+  const t=user('t1');t._authUid='t1';
+  await assertFails(sendMsg(t,'s1_t1','t1','x'.repeat(1001),false));
+  await assertFails(sendMsg(t,'s1_t1','t1','',false));
+  await assertSucceeds(sendMsg(t,'s1_t1','t1','أهلا بيك',false));
+  await assertFails(sendMsg(t,'s1_t1','t1','تاني فورًا',false));
+  await assertFails(setDoc(doc(t,'conversations','s1_t1','messages','z'),{senderUid:'s1',text:'انتحال',createdAt:serverTimestamp()}));
+});

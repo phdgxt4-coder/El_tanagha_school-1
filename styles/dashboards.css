@@ -135,3 +135,10 @@
 .bell-prefs{margin-top:.6rem;border-top:1px solid var(--line);padding-top:.5rem}
 .bell-pref{display:block;padding:.25rem 0}
 @media (prefers-reduced-motion:no-preference){.bell-btn.has-unread{animation:bell-ring 1.6s ease 1}@keyframes bell-ring{0%,100%{transform:rotate(0)}20%{transform:rotate(14deg)}40%{transform:rotate(-12deg)}60%{transform:rotate(8deg)}}}
+
+.chat{display:grid;gap:.75rem}.chat input,.chat textarea{width:100%;padding:.7rem .9rem;border-radius:14px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:inherit;font:inherit}
+.chat-conv{width:100%;text-align:right;cursor:pointer}.chat-thread header{display:flex;gap:.75rem;align-items:center;margin-bottom:.5rem}
+.chat-msgs{display:flex;flex-direction:column;gap:.4rem;max-height:50vh;overflow:auto;padding:.5rem}
+.chat-msg{max-width:80%;margin:0;padding:.55rem .8rem;border-radius:16px;background:rgba(255,255,255,.08);overflow-wrap:anywhere;white-space:pre-wrap}
+.chat-msg.mine{align-self:flex-start;background:rgba(212,175,55,.22)}.chat-msg.theirs{align-self:flex-end}
+.chat-msg time{display:block;font-size:.7rem;opacity:.6}.chat form{display:flex;gap:.5rem;align-items:flex-end}
