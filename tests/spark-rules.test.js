@@ -261,17 +261,6 @@ test('جدول الحصص: الإدارة تكتب وطلاب الفصل فقط 
   await assertFails(getDoc(doc(user('s9'),'timetables','c1')));
 });
 
-test('إيصال القراءة: كل طرف يكتب وقته فقط',{skip:!emulatorAvailable},async()=>{
-  await seed([...chatBase(),['conversations/s1_t1',{studentUid:'s1',teacherUid:'t1',studentName:'أ',teacherName:'م',lastAt:T0,lastText:'x',lastBy:'s1'}]]);
-  const s=user('s1'),t=user('t1');
-  await assertSucceeds(updateDoc(doc(t,'conversations','s1_t1'),{teacherReadAt:serverTimestamp()}));
-  await assertFails(updateDoc(doc(t,'conversations','s1_t1'),{studentReadAt:serverTimestamp()}));
-  await assertFails(updateDoc(doc(s,'conversations','s1_t1'),{teacherReadAt:serverTimestamp()}));
-  await assertFails(updateDoc(doc(s,'conversations','s1_t1'),{studentReadAt:Timestamp.fromMillis(1)}));
-  await assertSucceeds(updateDoc(doc(s,'conversations','s1_t1'),{studentReadAt:serverTimestamp()}));
-  await assertFails(updateDoc(doc(user('s2'),'conversations','s1_t1'),{studentReadAt:serverTimestamp()}));
-});
-
 test('أخطاء المتصفح: أي مستخدم يكتب خطأه فقط والإدارة وحدها تقرأ', {skip:!emulatorAvailable}, async()=>{
   await seed([...base,['profiles/s1',studentProfile('s1')]]);
   const s=user('s1');
@@ -328,4 +317,15 @@ test('ولي الأمر يرى مهام وجدول فصل ابنه المرتب�
   await assertFails(getDoc(doc(p2,'tasks','k1')));
   await environment.withSecurityRulesDisabled(async c=>updateDoc(doc(c.firestore(),'parentLinks/p1_s1'),{active:false}));
   await assertFails(getDoc(doc(p1,'tasks','k1')));
+});
+
+test('إيصال القراءة: كل طرف يكتب وقته فقط',{skip:!emulatorAvailable},async()=>{
+  await seed([...chatBase(),['conversations/s1_t1',{studentUid:'s1',teacherUid:'t1',studentName:'أ',teacherName:'م',lastAt:T0,lastText:'x',lastBy:'s1'}]]);
+  const s=user('s1'),t=user('t1');
+  await assertSucceeds(updateDoc(doc(t,'conversations','s1_t1'),{teacherReadAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(t,'conversations','s1_t1'),{studentReadAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(s,'conversations','s1_t1'),{teacherReadAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(s,'conversations','s1_t1'),{studentReadAt:Timestamp.fromMillis(1)}));
+  await assertSucceeds(updateDoc(doc(s,'conversations','s1_t1'),{studentReadAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(user('s2'),'conversations','s1_t1'),{studentReadAt:serverTimestamp()}));
 });
