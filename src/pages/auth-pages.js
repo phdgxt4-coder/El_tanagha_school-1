@@ -36,8 +36,8 @@ export function loginPage(role = 'student') {
     <nav class="role-switch" aria-label="نوع الحساب">${roleLinks}</nav>
     <div class="auth-panel">
       <div class="auth-tabs" role="tablist" aria-label="الدخول أو إنشاء حساب">
-        <button type="button" class="auth-tab selected" data-auth-mode="login" aria-selected="true">تسجيل الدخول</button>
-        ${registerAvailable?'<button type="button" class="auth-tab" data-auth-mode="register" aria-selected="false">إنشاء حساب</button>':''}
+        <button type="button" class="auth-tab selected" role="tab" data-auth-mode="login" aria-selected="true">تسجيل الدخول</button>
+        ${registerAvailable?'<button type="button" class="auth-tab" role="tab" data-auth-mode="register" aria-selected="false">إنشاء حساب</button>':''}
       </div>
       <form id="login-form" data-auth-form="login">
         <label>البريد الإلكتروني<input name="email" type="email" autocomplete="username" required maxlength="254"></label>
