@@ -2,7 +2,7 @@ import {home,subjectsPage,subjectPage,teachersPage,renderTeacherCards,newsPage,s
 import {loginPage,teacherApprovalPage,adminJoinPage} from './pages/auth-pages.js';
 import {createRouteHelpers,resolveAppLink} from './utils/routes.js';
 import {initErrorReporter} from './services/error-reporter.js';
-import {TRACKS} from '../functions/src/validation.js';
+import {trackOptions,classState,canSubmitStudent} from './utils/registration-logic.js';
 import {initMotion,routeStart,routeEnd,withThemeTransition,withPageTransition} from './ui/motion.js';
 
 const moduleScriptUrl=document.querySelector('script[type="module"][src]')?.src;
@@ -159,28 +159,47 @@ function setAuthMode(mode){
   showMessage(root.querySelector('[data-auth-message]'),'');
 }
 
-function setupTrackSelect(){
-  const gradeSelect=document.querySelector('[data-grade-select]');
-  const branchSelect=document.querySelector('[data-branch-select]');
+let resyncRegistration=()=>{};
+/* Registration selects. Tracks are static (no Firebase). Classes come from the backend; a real classId is required, never typed by hand. */
+function setupRegistrationSelects(isStale){
+  const grade=document.querySelector('[data-grade-select]');
+  const branch=document.querySelector('[data-branch-select]');
   const branchLabel=document.querySelector('[data-branch-label]');
-  if(!gradeSelect||!branchSelect||!branchLabel)return;
-  const render=()=>{
-    const tracks=Object.entries(TRACKS[gradeSelect.value]||{});
-    const keep=branchSelect.value;
+  const classSelect=document.querySelector('[data-class-select]');
+  const note=document.querySelector('[data-class-note]');
+  const submit=document.querySelector('#register-form [type="submit"]');
+  if(!grade||!branch||!branchLabel||!classSelect)return null;
+  const view={load:'loading',classes:[]};
+  const refreshTracks=()=>{
+    const tracks=trackOptions(grade.value);
+    const keep=branch.value;
     branchLabel.hidden=!tracks.length;
-    branchSelect.required=tracks.length>0;
-    branchSelect.innerHTML='<option value="">اختر المسار</option>'+tracks.map(([id,label])=>`<option value="${id}">${label}</option>`).join('');
-    if(tracks.some(([id])=>id===keep))branchSelect.value=keep;
+    branch.required=tracks.length>0;
+    branch.innerHTML='<option value="">اختر الشعبة / المسار</option>'+tracks.map(t=>`<option value="${t.id}">${t.label}</option>`).join('');
+    if(tracks.some(t=>t.id===keep))branch.value=keep;
   };
-  gradeSelect.addEventListener('change',render);
-  render();
+  const refresh=()=>{
+    const state=classState({grade:grade.value,branch:branch.value,load:view.load,classes:view.classes});
+    const keep=classSelect.value;
+    classSelect.innerHTML=(state.status==='ready'?'<option value="">اختر الفصل</option>':`<option value="">${state.status==='pick-grade'?'اختر الصف أولًا':state.status==='pick-track'?'اختر المسار أولًا':'لا يوجد فصل متاح'}</option>`)+state.options.map(o=>`<option value="${escapeHtml(o.id)}">${escapeHtml(o.label)}</option>`).join('');
+    if(state.options.some(o=>o.id===keep))classSelect.value=keep;
+    classSelect.disabled=state.status!=='ready';
+    if(note){note.textContent=state.message;note.dataset.kind=state.status==='empty'||state.status==='unavailable'?'error':'status';}
+    if(submit)submit.disabled=!canSubmitStudent(state,classSelect.value);
+  };
+  resyncRegistration=refresh;
+  grade.addEventListener('change',()=>{refreshTracks();refresh();});
+  branch.addEventListener('change',refresh);
+  classSelect.addEventListener('change',refresh);
+  refreshTracks();refresh();
+  return {setClasses(classes){view.load='ready';view.classes=classes;refresh();},setError(){if(isStale())return;view.load='error';refresh();}};
 }
 
+let registrationView=null;
 async function populateRegistrationOptions(isStale){
-  const classSelect=document.querySelector('[data-class-select]');
   const subjectSelect=document.querySelector('[data-subject-select]');
+  const classSelect=document.querySelector('[data-class-select]');
   if(!classSelect&&!subjectSelect)return;
-  setupTrackSelect();
   try{
     const structure=await import('./services/structure-service.js');
     if(subjectSelect){
@@ -191,41 +210,22 @@ async function populateRegistrationOptions(isStale){
     if(classSelect){
       const classes=await structure.loadClasses();
       if(isStale())return;
-      const gradeSelect=document.querySelector('[data-grade-select]');
-      const fallback=document.querySelector('[data-class-fallback]');
-      const branchSelect=document.querySelector('[data-branch-select]');
-      const refresh=()=>{
-        const grade=gradeSelect?.value||'';
-        const branch=branchSelect?.value||'';
-        const options=classes.filter(item=>item.grade===grade&&(!item.branch||item.branch===branch));
-        if(!classes.length){classSelect.hidden=true;classSelect.closest('label').hidden=true;if(fallback)fallback.hidden=false;return;}
-        classSelect.disabled=!grade;
-        classSelect.innerHTML=grade
-          ?'<option value="">اختر الفصل</option>'+options.map(item=>`<option value="${escapeHtml(item.id)}">${escapeHtml(item.section)}</option>`).join('')
-          :'<option value="">اختر الصف أولًا</option>';
-        classSelect.required=Boolean(grade&&options.length);
-      };
-      gradeSelect?.addEventListener('change',refresh);
-      branchSelect?.addEventListener('change',refresh);
-      refresh();
+      registrationView?.setClasses(classes);
     }
-  }catch{
-    const fallback=document.querySelector('[data-class-fallback]');
-    if(fallback&&!isStale()){fallback.hidden=false;classSelect?.closest('label')?.setAttribute('hidden','');}
-  }
+  }catch{registrationView?.setError();}
 }
 
 function initializeAuthPage(generation){
   const statusTarget=document.querySelector('[data-auth-message]');
   let cancelled=false;
+  registrationView=setupRegistrationSelects(()=>cancelled||!statusTarget?.isConnected);
   let unsubscribe=()=>{};
   pageCleanup=()=>{cancelled=true;unsubscribe();};
   import('./config/firebase-env.js').then(async env=>{
     if(cancelled||generation!==pageGeneration||!statusTarget?.isConnected)return;
     if(!env.firebaseConfigured){
       showMessage(statusTarget,'لم تُضبط إعدادات Firebase في بيئة التطبيق، لذلك لا تُرسل بيانات الدخول.');
-      document.querySelector('[data-class-fallback]')?.removeAttribute('hidden');
-      document.querySelector('[data-class-select]')?.closest('label')?.setAttribute('hidden','');
+      registrationView?.setError();
       return;
     }
     const api=await import('./auth/auth-service.js');
@@ -383,6 +383,7 @@ async function handleRegistration(form){
   const button=form.querySelector('[type="submit"]');
   const values=formValues(form);
   const {password,confirmPassword,email,acceptPrivacy,...rest}=values;
+  if(form.querySelector('[data-class-select]')&&!values.classId){showMessage(message,'اختر الفصل أولًا. لو مفيش فصول متاحة تواصل مع إدارة المدرسة.','error');return;}
   if(values.acceptPrivacy!=='yes'){showMessage(message,'لازم توافق على سياسة الخصوصية لإنشاء الحساب.','error');return;}
   if(password!==confirmPassword){showMessage(message,'كلمتا المرور غير متطابقتين.','error');return;}
   const role=document.querySelector('.auth-shell')?.dataset.role;
@@ -411,7 +412,7 @@ async function handleRegistration(form){
   }catch(error){
     const api=await import('./auth/auth-service.js').catch(()=>null);
     showMessage(message,api?api.friendlyAuthError(error):'تعذر تهيئة خدمة المصادقة.','error');
-  }finally{if(button.isConnected)button.disabled=false;}
+  }finally{if(button.isConnected){button.disabled=false;resyncRegistration();}}
 }
 
 document.addEventListener('click',async event=>{
