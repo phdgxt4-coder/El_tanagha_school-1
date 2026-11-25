@@ -15,7 +15,13 @@ function registrationFields(role) {
       ? `<label>المادة<select name="subjectId" required data-subject-select><option value="">اختر المادة</option>${Object.entries(SUBJECTS).map(([id,label])=>`<option value="${id}">${label}</option>`).join('')}</select></label><label class="consent-row"><input type="checkbox" name="publishConsent" value="yes"><span>أوافق على نشر اسمي وتخصصي في دليل المدرسين بعد اعتماد الإدارة. لن يُنشر بريدي أو هاتفي.</span></label>`
       : '';
 
-  return `<label>الاسم الكامل (للطالب: اسم رباعي)<input name="displayName" autocomplete="name" required minlength="2" maxlength="80"></label>${roleFields}<label>رقم الهاتف<input name="phone" type="tel" autocomplete="tel" required maxlength="24"></label>`;
+  const consentText = role === 'student'
+    ? 'أوافق على <a class="text-link" href="./privacy" target="_blank" rel="noopener">سياسة الخصوصية</a>، وأقر أن ولي أمري على علم باستخدامي المنصة.'
+    : role === 'parent'
+      ? 'أوافق على <a class="text-link" href="./privacy" target="_blank" rel="noopener">سياسة الخصوصية</a> وعلى معالجة بيانات ابني الدراسية داخل المنصة.'
+      : 'أوافق على <a class="text-link" href="./privacy" target="_blank" rel="noopener">سياسة الخصوصية</a>.';
+
+  return `<label>الاسم الكامل (للطالب: اسم رباعي)<input name="displayName" autocomplete="name" required minlength="2" maxlength="80"></label>${roleFields}<label>رقم الهاتف<input name="phone" type="tel" autocomplete="tel" required maxlength="24"></label><label class="consent-row"><input type="checkbox" name="acceptPrivacy" value="yes" required><span>${consentText}</span></label>`;
 }
 
 export function loginPage(role = 'student') {
