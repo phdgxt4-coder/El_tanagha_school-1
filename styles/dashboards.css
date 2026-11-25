@@ -142,3 +142,4 @@
 .chat-msg{max-width:80%;margin:0;padding:.55rem .8rem;border-radius:16px;background:rgba(255,255,255,.08);overflow-wrap:anywhere;white-space:pre-wrap}
 .chat-msg.mine{align-self:flex-start;background:rgba(212,175,55,.22)}.chat-msg.theirs{align-self:flex-end}
 .chat-msg time{display:block;font-size:.7rem;opacity:.6}.chat form{display:flex;gap:.5rem;align-items:flex-end}
+.chat-tick{margin-inline-start:.5rem;font-size:.8rem;opacity:.8}

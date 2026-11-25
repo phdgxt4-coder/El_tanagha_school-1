@@ -697,6 +697,14 @@ service cloud.firestore {
         && request.resource.data.lastBy == request.auth.uid
         && request.resource.data.lastAt == request.time
         && request.resource.data.lastText is string && request.resource.data.lastText.size() <= 80;
+      // إيصال القراءة: كل طرف يكتب وقت قراءته هو فقط (studentReadAt للطالب، teacherReadAt للمدرس).
+      allow update: if signedIn()
+        && ((resource.data.studentUid == request.auth.uid
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['studentReadAt'])
+              && request.resource.data.studentReadAt == request.time)
+          || (resource.data.teacherUid == request.auth.uid
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['teacherReadAt'])
+              && request.resource.data.teacherReadAt == request.time));
       allow delete: if false;
 
       match /messages/{messageId} {
