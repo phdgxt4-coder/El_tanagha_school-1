@@ -91,6 +91,29 @@ export function linkParentToStudent(code) {
   return callable('linkParentToStudent', { code });
 }
 
+export function listLinkedStudents() {
+  return callable('listLinkedStudents', {});
+}
+
+export function unlinkParentFromStudent(studentUid) {
+  return callable('unlinkParentFromStudent', { studentUid });
+}
+
+export function waitForInitialAuthState() {
+  if (!firebaseConfigured) return Promise.resolve(null);
+  const {auth}=getAuthClients();
+  return new Promise((resolve,reject)=>{
+    let unsubscribe=()=>{};
+    unsubscribe=onAuthStateChanged(auth,user=>{
+      unsubscribe();
+      resolve(user);
+    },error=>{
+      unsubscribe();
+      reject(error);
+    });
+  });
+}
+
 export function friendlyAuthError(error) {
   if (error?.message === 'firebase/not-configured') {
     return 'لم تُضبط إعدادات Firebase لهذا التطبيق بعد. لم يُرسل طلب الدخول.';

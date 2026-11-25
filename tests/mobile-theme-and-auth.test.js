@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 import { loginPage } from '../src/pages/auth-pages.js';
+import { schedulePage, subjectPage } from '../src/pages/public-pages.js';
 
 const read = path => fs.readFileSync(new URL(path, import.meta.url), 'utf8');
 
@@ -48,4 +49,20 @@ test('لوحة الحساب تتضمن ربط ولي الأمر بكود خاد�
   assert.match(dashboard, /data-parent-link/u);
   assert.match(dashboard, /linkParentToStudent/u);
   assert.match(app, /dashboardPage/u);
+});
+
+test('اختيار الصف وتبويب المادة يعرضان الحالة المختارة دون الإيحاء بوجود محتوى غير منشور', () => {
+  const schedule = schedulePage();
+  const subject = subjectPage('math');
+  const app = read('../src/app.js');
+  assert.match(schedule, /data-schedule-grade/u);
+  assert.match(schedule, /aria-pressed="true"/u);
+  assert.match(schedule, /data-schedule-message/u);
+  assert.match(subject, /role="tablist"/u);
+  assert.match(subject, /data-subject-kind="lessons"/u);
+  assert.match(subject, /aria-selected="true"/u);
+  assert.match(subject, /data-subject-content/u);
+  assert.match(app, /button\.setAttribute\('aria-pressed',String\(selected\)\)/u);
+  assert.match(app, /لا يوجد محتوى منشور في قسم \$\{label\}/u);
+  assert.match(app, /لم يُنشر جدول \$\{gradeName\} بعد/u);
 });

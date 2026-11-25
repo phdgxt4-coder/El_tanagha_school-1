@@ -190,6 +190,56 @@ export const linkParentToStudent = onCall(async request => {
   return { linked: true, studentUid, displayName: studentProfile.data()?.displayName ?? '' };
 });
 
+export const listLinkedStudents = onCall(async request => {
+  const auth = requireAuth(request);
+  const parentSnapshot = await db.collection(PROFILE_COLLECTION).doc(auth.uid).get();
+  if (!parentSnapshot.exists || parentSnapshot.data()?.role !== 'parent' || parentSnapshot.data()?.status !== 'active') {
+    throw new HttpsError('permission-denied', 'عرض الأبناء متاح لحساب ولي الأمر النشط فقط.');
+  }
+
+  const links = await db.collection(PARENT_LINK_COLLECTION)
+    .where('parentUid', '==', auth.uid)
+    .limit(100)
+    .get();
+  const activeLinks = links.docs.filter(document => document.data()?.active === true);
+  const students = await Promise.all(activeLinks.map(async link => {
+    const studentUid = requireUid(link.data()?.studentUid);
+    const studentSnapshot = await db.collection(PROFILE_COLLECTION).doc(studentUid).get();
+    if (!studentSnapshot.exists) return null;
+    const student = studentSnapshot.data();
+    if (student?.role !== 'student' || student?.status !== 'active') return null;
+    return {
+      uid: studentUid,
+      displayName: student.displayName ?? '',
+      grade: student.grade ?? '',
+      branch: student.branch ?? '',
+      className: student.className ?? ''
+    };
+  }));
+  return { students: students.filter(Boolean) };
+});
+
+export const unlinkParentFromStudent = onCall(async request => {
+  const auth = requireAuth(request);
+  const parentSnapshot = await db.collection(PROFILE_COLLECTION).doc(auth.uid).get();
+  if (!parentSnapshot.exists || parentSnapshot.data()?.role !== 'parent' || parentSnapshot.data()?.status !== 'active') {
+    throw new HttpsError('permission-denied', 'فك الربط متاح لحساب ولي الأمر النشط فقط.');
+  }
+  const studentUid = requireUid(request.data?.studentUid);
+  const linkRef = db.collection(PARENT_LINK_COLLECTION).doc(`${auth.uid}_${studentUid}`);
+  await db.runTransaction(async transaction => {
+    const snapshot = await transaction.get(linkRef);
+    if (!snapshot.exists || snapshot.data()?.parentUid !== auth.uid || snapshot.data()?.active !== true) {
+      throw new HttpsError('not-found', 'لا يوجد ربط نشط لهذا الطالب.');
+    }
+    transaction.update(linkRef, {
+      active: false,
+      unlinkedAt: FieldValue.serverTimestamp()
+    });
+  });
+  return { unlinked: true };
+});
+
 export const listTeacherApplications = onCall(async request => {
   const auth = requireAuth(request);
   await requireActiveAdmin(auth.uid);

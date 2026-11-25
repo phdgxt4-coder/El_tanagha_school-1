@@ -59,7 +59,14 @@ export function validateAccountRequest(input) {
     result.branch = branch;
     result.className = requiredString(input.className, 'الفصل', 40);
     const birthDate = String(input.birthDate ?? '');
-    if (!/^\d{4}-\d{2}-\d{2}$/u.test(birthDate)) throw new InputValidationError('أدخل تاريخ الميلاد الصحيح.');
+    const parsedBirthDate = /^\d{4}-\d{2}-\d{2}$/u.test(birthDate)
+      ? new Date(`${birthDate}T00:00:00.000Z`)
+      : null;
+    if (!parsedBirthDate || Number.isNaN(parsedBirthDate.getTime())
+        || parsedBirthDate.toISOString().slice(0, 10) !== birthDate
+        || parsedBirthDate.getTime() > Date.now()) {
+      throw new InputValidationError('أدخل تاريخ الميلاد الصحيح.');
+    }
     result.birthDate = birthDate;
   }
 

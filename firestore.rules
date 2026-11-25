@@ -40,13 +40,67 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/parentLinks/$(request.auth.uid + '_' + studentUid)).data.active == true;
     }
 
+    function studentInGrade(studentUid, grade) {
+      return studentUid is string
+        && exists(/databases/$(database)/documents/profiles/$(studentUid))
+        && profile(studentUid).role == 'student'
+        && profile(studentUid).status == 'active'
+        && profile(studentUid).grade == grade;
+    }
+
     function ownsTeacherRecord(data) {
       return isActiveTeacher() && data.teacherUid == request.auth.uid;
     }
 
     function teachesGrade(grade) {
       return isActiveTeacher()
+        && profile(request.auth.uid).grades is list
         && profile(request.auth.uid).grades.hasAny([grade]);
+    }
+
+    function teachesSubject(subjectId) {
+      return isActiveTeacher()
+        && profile(request.auth.uid).subjectId == subjectId;
+    }
+
+    function ownsExamSubmission(data) {
+      return isActiveTeacher()
+        && data.examId is string
+        && exists(/databases/$(database)/documents/exams/$(data.examId))
+        && get(/databases/$(database)/documents/exams/$(data.examId)).data.teacherUid == request.auth.uid;
+    }
+
+    function validContent(data) {
+      return data.keys().hasOnly(['teacherUid', 'grade', 'subjectId', 'type', 'title', 'url', 'published', 'createdAt'])
+        && data.keys().hasAll(['teacherUid', 'grade', 'subjectId', 'type', 'title', 'url', 'published', 'createdAt'])
+        && data.teacherUid is string
+        && data.grade in ['1', '2', '3']
+        && data.subjectId in ['ar', 'en', 'math', 'phy', 'chem', 'bio', 'hist', 'geo', 'phil', 'psy', 'fr']
+        && teachesSubject(data.subjectId)
+        && data.type in ['lesson', 'file', 'video', 'assignment']
+        && data.title is string
+        && data.title.size() > 0
+        && data.title.size() <= 120
+        && data.url is string
+        && data.url.matches('^https://[^ ]+$')
+        && data.published is bool
+        && data.createdAt is timestamp;
+    }
+
+    function validTeacherNotification(data) {
+      return data.keys().hasOnly(['teacherUid', 'audience', 'grade', 'studentUid', 'title', 'body', 'createdAt'])
+        && data.keys().hasAll(['teacherUid', 'audience', 'grade', 'title', 'body'])
+        && data.teacherUid == request.auth.uid
+        && data.audience == 'grade'
+        && data.grade in ['1', '2', '3']
+        && teachesGrade(data.grade)
+        && data.title is string
+        && data.title.size() > 0
+        && data.title.size() <= 120
+        && data.body is string
+        && data.body.size() <= 2000
+        && (!('studentUid' in data) || studentInGrade(data.studentUid, data.grade))
+        && (!('createdAt' in data) || data.createdAt is timestamp);
     }
 
     match /profiles/{userId} {
@@ -77,8 +131,7 @@ service cloud.firestore {
     }
 
     match /parentCodes/{code} {
-      allow read: if false;
-      allow create, update, delete: if false;
+      allow read, write: if false;
     }
 
     match /parentLinks/{linkId} {
@@ -90,57 +143,109 @@ service cloud.firestore {
 
     match /content/{contentId} {
       allow get, list: if signedIn() && (
-        isActiveAdmin() || ownsTeacherRecord(resource.data)
-        || (isActiveStudent() && resource.data.grade == profile(request.auth.uid).grade)
-        || (linkedParentTo(resource.data.studentUid) && resource.data.grade == profile(resource.data.studentUid).grade)
+        isActiveAdmin()
+        || ownsTeacherRecord(resource.data)
+        || (isActiveStudent() && resource.data.published == true
+          && resource.data.grade == profile(request.auth.uid).grade)
       );
       allow create: if ownsTeacherRecord(request.resource.data)
+        && request.resource.data.teacherUid == request.auth.uid
         && teachesGrade(request.resource.data.grade)
-        && request.resource.data.title is string
-        && request.resource.data.type in ['lesson', 'file', 'video', 'assignment'];
-      allow update, delete: if ownsTeacherRecord(resource.data)
+        && validContent(request.resource.data);
+      allow update: if ownsTeacherRecord(resource.data)
+        && resource.data.teacherUid == request.resource.data.teacherUid
+        && resource.data.grade == request.resource.data.grade
+        && resource.data.subjectId == request.resource.data.subjectId
+        && resource.data.createdAt == request.resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['type', 'title', 'url'])
+        && teachesGrade(request.resource.data.grade)
+        && validContent(request.resource.data);
+      allow delete: if ownsTeacherRecord(resource.data)
         && teachesGrade(resource.data.grade);
     }
 
+    // لا تُتاح مستندات الامتحان للطالب قبل تصميم فصل آمن بين الأسئلة ومفتاح الإجابة.
     match /exams/{examId} {
-      allow get, list: if signedIn() && (
-        isActiveAdmin() || ownsTeacherRecord(resource.data)
-        || (isActiveStudent() && resource.data.grade == profile(request.auth.uid).grade)
-        || linkedParentTo(resource.data.studentUid)
-      );
-      allow create: if ownsTeacherRecord(request.resource.data);
-      allow update, delete: if ownsTeacherRecord(resource.data) || isActiveAdmin();
+      allow get, list: if signedIn() && (isActiveAdmin() || ownsTeacherRecord(resource.data));
+      allow create: if ownsTeacherRecord(request.resource.data)
+        && request.resource.data.teacherUid == request.auth.uid
+        && teachesGrade(request.resource.data.grade)
+        && teachesSubject(request.resource.data.subjectId);
+      allow update: if isActiveAdmin() || (ownsTeacherRecord(resource.data)
+        && resource.data.teacherUid == request.resource.data.teacherUid
+        && resource.data.grade == request.resource.data.grade
+        && resource.data.subjectId == request.resource.data.subjectId
+        && teachesGrade(request.resource.data.grade)
+        && teachesSubject(request.resource.data.subjectId));
+      allow delete: if isActiveAdmin() || (ownsTeacherRecord(resource.data)
+        && teachesGrade(resource.data.grade));
     }
 
     match /submissions/{submissionId} {
       allow get: if signedIn() && (
         isActiveAdmin() || resource.data.studentUid == request.auth.uid
-        || ownsTeacherRecord(resource.data) || linkedParentTo(resource.data.studentUid)
+        || ownsExamSubmission(resource.data)
+        || (isActiveParent() && resource.data.studentUid is string
+          && linkedParentTo(resource.data.studentUid))
       );
       allow list: if isActiveAdmin()
         || (isActiveStudent() && resource.data.studentUid == request.auth.uid)
-        || ownsTeacherRecord(resource.data)
-        || linkedParentTo(resource.data.studentUid);
-      allow create: if isActiveStudent() && request.resource.data.studentUid == request.auth.uid;
-      allow update: if ownsTeacherRecord(resource.data) || isActiveAdmin();
+        || ownsExamSubmission(resource.data)
+        || (isActiveParent() && resource.data.studentUid is string
+          && linkedParentTo(resource.data.studentUid));
+      allow create: if isActiveStudent()
+        && request.resource.data.studentUid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['studentUid', 'examId', 'answers', 'submittedAt'])
+        && request.resource.data.keys().hasAll(['studentUid', 'examId', 'answers', 'submittedAt'])
+        && request.resource.data.examId is string
+        && submissionId == request.auth.uid + '_' + request.resource.data.examId
+        && exists(/databases/$(database)/documents/exams/$(request.resource.data.examId))
+        && get(/databases/$(database)/documents/exams/$(request.resource.data.examId)).data.grade == profile(request.auth.uid).grade
+        && request.resource.data.submittedAt == request.time;
+      allow update: if isActiveAdmin() || (ownsExamSubmission(resource.data)
+        && resource.data.studentUid == request.resource.data.studentUid
+        && resource.data.examId == request.resource.data.examId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['score', 'reviewedAt', 'reviewedBy']));
       allow delete: if false;
     }
 
     match /grades/{gradeId} {
       allow get, list: if signedIn() && (
         isActiveAdmin() || resource.data.studentUid == request.auth.uid
-        || ownsTeacherRecord(resource.data) || linkedParentTo(resource.data.studentUid)
+        || ownsTeacherRecord(resource.data)
+        || (isActiveParent() && resource.data.studentUid is string
+          && linkedParentTo(resource.data.studentUid))
       );
-      allow create, update: if ownsTeacherRecord(request.resource.data) || isActiveAdmin();
+      allow create: if isActiveAdmin() || (ownsTeacherRecord(request.resource.data)
+        && request.resource.data.teacherUid == request.auth.uid
+        && teachesGrade(request.resource.data.grade)
+        && studentInGrade(request.resource.data.studentUid, request.resource.data.grade));
+      allow update: if isActiveAdmin() || (ownsTeacherRecord(resource.data)
+        && resource.data.teacherUid == request.resource.data.teacherUid
+        && resource.data.studentUid == request.resource.data.studentUid
+        && resource.data.grade == request.resource.data.grade
+        && teachesGrade(request.resource.data.grade)
+        && studentInGrade(request.resource.data.studentUid, request.resource.data.grade));
       allow delete: if isActiveAdmin();
     }
 
     match /attendance/{attendanceId} {
       allow get, list: if signedIn() && (
         isActiveAdmin() || resource.data.studentUid == request.auth.uid
-        || ownsTeacherRecord(resource.data) || linkedParentTo(resource.data.studentUid)
+        || ownsTeacherRecord(resource.data)
+        || (isActiveParent() && resource.data.studentUid is string
+          && linkedParentTo(resource.data.studentUid))
       );
-      allow create, update: if ownsTeacherRecord(request.resource.data) || isActiveAdmin();
+      allow create: if isActiveAdmin() || (ownsTeacherRecord(request.resource.data)
+        && request.resource.data.teacherUid == request.auth.uid
+        && teachesGrade(request.resource.data.grade)
+        && studentInGrade(request.resource.data.studentUid, request.resource.data.grade));
+      allow update: if isActiveAdmin() || (ownsTeacherRecord(resource.data)
+        && resource.data.teacherUid == request.resource.data.teacherUid
+        && resource.data.studentUid == request.resource.data.studentUid
+        && resource.data.grade == request.resource.data.grade
+        && teachesGrade(request.resource.data.grade)
+        && studentInGrade(request.resource.data.studentUid, request.resource.data.grade));
       allow delete: if isActiveAdmin();
     }
 
@@ -153,15 +258,36 @@ service cloud.firestore {
       allow get, list: if signedIn() && (
         isActiveAdmin() || resource.data.audience == 'all'
         || resource.data.uid == request.auth.uid
+        || (isActiveStudent() && resource.data.audience == 'grade'
+          && resource.data.grade == profile(request.auth.uid).grade)
+        || (isActiveParent() && resource.data.audience == 'grade'
+          && resource.data.studentUid is string && linkedParentTo(resource.data.studentUid)
+          && resource.data.grade == profile(resource.data.studentUid).grade)
       );
-      allow create, update, delete: if isActiveAdmin() || isActiveTeacher();
+      allow create: if isActiveAdmin() || (isActiveTeacher()
+        && validTeacherNotification(request.resource.data));
+      allow update: if isActiveAdmin() || (ownsTeacherRecord(resource.data)
+        && resource.data.teacherUid == request.resource.data.teacherUid
+        && resource.data.audience == request.resource.data.audience
+        && resource.data.grade == request.resource.data.grade
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'body', 'updatedAt'])
+        && request.resource.data.audience == 'grade'
+        && teachesGrade(request.resource.data.grade)
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 120
+        && request.resource.data.body is string
+        && request.resource.data.body.size() <= 2000);
+      allow delete: if isActiveAdmin() || (ownsTeacherRecord(resource.data)
+        && resource.data.audience == 'grade' && teachesGrade(resource.data.grade));
     }
 
     match /messages/{messageId} {
       allow get, list: if signedIn() && (
         isActiveAdmin() || resource.data.fromUid == request.auth.uid
         || resource.data.toUid == request.auth.uid
-        || linkedParentTo(resource.data.studentUid)
+        || (isActiveParent() && resource.data.studentUid is string
+          && linkedParentTo(resource.data.studentUid))
       );
       allow create: if signedIn() && (isActiveAdmin() || isActiveTeacher() || isActiveParent());
       allow update, delete: if isActiveAdmin() || resource.data.fromUid == request.auth.uid;

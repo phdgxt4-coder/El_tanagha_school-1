@@ -1,6 +1,5 @@
 import {home,subjectsPage,subjectPage,teachersPage,renderTeacherCards,newsPage,schedulePage,resultsPage,contactPage,notFound} from './pages/public-pages.js';
 import {loginPage,teacherApprovalPage} from './pages/auth-pages.js';
-import {dashboardPage,initializeDashboard} from './pages/dashboard-pages.js';
 import {createRouteHelpers,resolveAppLink} from './utils/routes.js';
 
 const moduleScriptUrl=document.querySelector('script[type="module"][src]')?.src;
@@ -28,7 +27,7 @@ const routes=[
   [/^\/results\/?$/,resultsPage],
   [/^\/contact\/?$/,contactPage],
   [/^\/login(?:\/(student|parent|teacher|admin))?\/?$/,loginPage],
-  [/^\/dashboard\/?$/,dashboardPage],
+  [/^\/dashboard\/?$/,()=>'<section class="section page dashboard-page"><div class="dashboard-shell"><div class="empty-state" role="status"><span aria-hidden="true">◷</span><p>جارٍ تحميل لوحة الحساب…</p></div></div></section>'],
   [/^\/admin\/teacher-requests\/?$/,teacherApprovalPage]
 ];
 
@@ -91,7 +90,22 @@ function render(path=currentRoutePath()){
   if(/^\/teachers\/?$/.test(path)) initializeTeacherDirectory(generation);
   if(/^\/login(?:\/|$)/.test(path)) initializeAuthPage(generation);
   if(/^\/admin\/teacher-requests\/?$/.test(path)) initializeTeacherApprovals(generation);
-  if(/^\/dashboard\/?$/.test(path)) initializeDashboard();
+  if(/^\/dashboard\/?$/.test(path)) initializeDashboard(generation);
+}
+
+function initializeDashboard(generation){
+  import('./pages/dashboard-pages.js').then(({dashboardPage,initializeDashboard:loadAccount})=>{
+    if(generation!==pageGeneration||currentRoutePath()!=='/dashboard')return;
+    const app=document.querySelector('#app');
+    if(!app)return;
+    app.innerHTML=dashboardPage();
+    normalizeInternalLinks(app);
+    loadAccount();
+  }).catch(()=>{
+    if(generation!==pageGeneration)return;
+    const target=document.querySelector('#app .dashboard-shell');
+    if(target)target.innerHTML='<div class="empty-state" role="status"><p>تعذر تحميل لوحة الحساب الآن. حاول تحديث الصفحة.</p></div>';
+  });
 }
 
 function initializeTeacherDirectory(generation){
@@ -157,7 +171,7 @@ function initializeAuthPage(generation){
           history.replaceState({},'',routeHelpers.toUrlPath('/admin/teacher-requests'));
           render('/admin/teacher-requests');
         }else if(status.status==='active'){
-          showSignedInMessage(statusTarget,'تم تسجيل الدخول بنجاح. لوحات الحساب تُستكمل في المرحلة التالية.');
+          showSignedInMessage(statusTarget,'تم تسجيل الدخول بنجاح. يمكنك متابعة بياناتك من لوحة الحساب.');
         }
       }catch(error){showMessage(statusTarget,api.friendlyAuthError(error),'error');}
     },error=>showMessage(statusTarget,api.friendlyAuthError(error),'error'));
@@ -315,6 +329,50 @@ document.addEventListener('click',async event=>{
   const themeButton=event.target.closest('[data-theme-toggle]');
   if(themeButton){applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');return;}
 
+  const dashboardSignOut=event.target.closest('[data-dashboard-sign-out]');
+  if(dashboardSignOut){
+    dashboardSignOut.disabled=true;
+    try{
+      const api=await import('./auth/auth-service.js');
+      await api.signOutUser();
+      history.replaceState({},'',routeHelpers.toUrlPath('/login'));
+      render('/login');
+    }catch{
+      dashboardSignOut.disabled=false;
+      const status=document.querySelector('[data-dashboard-status]');
+      if(status)showMessage(status.querySelector('p'),'تعذر تسجيل الخروج. حاول مرة أخرى.','error');
+    }
+    return;
+  }
+
+  const scheduleGrade=event.target.closest('[data-schedule-grade]');
+  if(scheduleGrade){
+    document.querySelectorAll('[data-schedule-grade]').forEach(button=>{
+      const selected=button===scheduleGrade;
+      button.classList.toggle('selected',selected);
+      button.setAttribute('aria-pressed',String(selected));
+    });
+    const gradeName=scheduleGrade.dataset.gradeName||'';
+    const message=document.querySelector('[data-schedule-message]');
+    if(message)message.textContent=`لم يُنشر جدول ${gradeName} بعد.`;
+    return;
+  }
+
+  const subjectTab=event.target.closest('[data-subject-kind]');
+  if(subjectTab){
+    const tabs=subjectTab.closest('[role="tablist"]');
+    tabs?.querySelectorAll('[data-subject-kind]').forEach(button=>{
+      const selected=button===subjectTab;
+      button.classList.toggle('selected',selected);
+      button.setAttribute('aria-selected',String(selected));
+      button.tabIndex=selected?0:-1;
+    });
+    const target=document.querySelector('[data-subject-content]');
+    const label=subjectTab.dataset.subjectLabel||subjectTab.textContent.trim();
+    if(target)target.textContent=`لا يوجد محتوى منشور في قسم ${label} لهذه المادة حتى الآن.`;
+    return;
+  }
+
   const resetButton=event.target.closest('[data-password-reset]');
   if(resetButton){
     const form=resetButton.closest('form');
@@ -393,12 +451,6 @@ document.addEventListener('submit',event=>{
     event.preventDefault();
     handleRegistration(form);
   }
-});
-
-document.addEventListener('click',event=>{
-  const gradeButton=event.target.closest('[data-grade]');
-  if(!gradeButton)return;
-  document.querySelectorAll('[data-grade]').forEach(button=>button.classList.toggle('selected',button===gradeButton));
 });
 
 window.addEventListener('popstate',()=>render(currentRoutePath()));
