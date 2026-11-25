@@ -92,3 +92,10 @@ test('نموذج التسجيل يطلب الاسم والهاتف ويحمّل 
   assert.doesNotMatch(teacher, /name="grades"/u);
   assert.match(teacher, /بانتظار اعتماد الإدارة/u);
 });
+
+test('الجلسة محفوظة على الجهاز وتُفتح اللوحة تلقائيًا لمن سجّل دخوله', () => {
+  const auth = read('../src/auth/auth-service.js');
+  const app = read('../src/app.js');
+  assert.match(auth, /setPersistence\(authClient, browserLocalPersistence\)/u);
+  assert.match(app, /جارٍ فتح لوحتك/u);
+});

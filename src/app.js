@@ -214,7 +214,11 @@ function initializeAuthPage(generation){
           history.replaceState({},'',routeHelpers.toUrlPath('/admin/teacher-requests'));
           render('/admin/teacher-requests');
         }else if(status.status==='active'){
-          showSignedInMessage(statusTarget,'تم تسجيل الدخول بنجاح. يمكنك متابعة بياناتك من لوحة الحساب.');
+          showSignedInMessage(statusTarget,'تم تسجيل الدخول. جارٍ فتح لوحتك…');
+          if(currentRoutePath().startsWith('/login')){
+            history.replaceState({},'',routeHelpers.toUrlPath('/dashboard'));
+            render('/dashboard');
+          }
         }
       }catch(error){showMessage(statusTarget,api.friendlyAuthError(error),'error');}
     },error=>showMessage(statusTarget,api.friendlyAuthError(error),'error'));
