@@ -141,9 +141,12 @@ function initializeTeacherDirectory(generation){
   }).catch(()=>showMessage(target.querySelector('p'),'تعذر تهيئة خدمة Firebase الآن.'));
 }
 
+let pendingRegistrationOptions=null;
+function loadRegistrationOptionsOnce(){const run=pendingRegistrationOptions;pendingRegistrationOptions=null;if(run)void run();}
 function setAuthMode(mode){
   const root=document.querySelector('.auth-shell');
   if(!root)return;
+  if(mode==='register')queueMicrotask(loadRegistrationOptionsOnce);
   root.querySelectorAll('[data-auth-form]').forEach(form=>{form.hidden=form.dataset.authForm!==mode;});
   root.querySelectorAll('[data-auth-mode]').forEach(button=>{
     const selected=button.dataset.authMode===mode;
@@ -203,7 +206,9 @@ function initializeAuthPage(generation){
     }
     const api=await import('./auth/auth-service.js');
     if(cancelled||generation!==pageGeneration||!statusTarget.isConnected)return;
-    void populateRegistrationOptions(()=>cancelled||!statusTarget.isConnected);
+    // قوائم الفصول والمواد تحتاج Firestore، فلا تُحمَّل إلا عند فتح نموذج التسجيل
+    pendingRegistrationOptions=()=>populateRegistrationOptions(()=>cancelled||!statusTarget.isConnected);
+    if(document.querySelector('[data-auth-form="register"]:not([hidden])'))loadRegistrationOptionsOnce();
     unsubscribe=api.subscribeToAuth(async user=>{
       if(!user||cancelled||!statusTarget.isConnected)return;
       try{

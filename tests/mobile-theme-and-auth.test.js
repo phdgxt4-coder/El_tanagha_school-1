@@ -136,7 +136,7 @@ test('وضع Spark: كل عملية خادم لها تنفيذ مباشر بنف
   const auth = read('../src/auth/auth-service.js');
   const sparkSource = read('../src/services/spark-backend.js');
   assert.match(read('../src/config/backend-mode.js'), /'spark'/u);
-  const names = [...auth.matchAll(/if \(isSpark\) return spark\.(\w+)\(/gu)].map(match => match[1]);
+  const names = [...auth.matchAll(/spark => spark\.(\w+)\(/gu)].map(match => match[1]);
   assert.ok(names.length >= 19);
   for (const name of names) assert.match(sparkSource, new RegExp(`export (async )?function ${name}\\b`, 'u'), name);
   assert.doesNotMatch(sparkSource, /httpsCallable/u);
