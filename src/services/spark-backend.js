@@ -474,3 +474,36 @@ export async function adminPromoteClass(fromClassId, toClassId) {
   await batch.commit();
   return { count: students.size, more: students.size === BATCH_LIMIT };
 }
+
+/* ---------- ترقية السنة الدراسية: إنشاء فصول السنة الجديدة ونقل الطلاب ---------- */
+const YEAR_PATTERN = /^\d{4}-\d{4}$/u;
+
+export async function adminPlanRollover(fromYear, toYear) {
+  if (!YEAR_PATTERN.test(String(fromYear)) || !YEAR_PATTERN.test(String(toYear)) || fromYear === toYear) throw fail('invalid-argument', 'اكتب السنتين بصيغة 2026-2027 ومختلفتين.');
+  const snapshot = await getDocs(query(collection(db(), 'classes'), where('year', '==', fromYear), limit(100)));
+  if (snapshot.empty) throw fail('failed-precondition', 'لا توجد فصول في سنة المصدر.');
+  const plan = snapshot.docs.map(item => item.data()).sort((a, b) => String(a.grade).localeCompare(b.grade) || String(a.section).localeCompare(String(b.section), 'ar')).map(item => {
+    const next = GRADE_ORDER[GRADE_ORDER.indexOf(String(item.grade)) + 1];
+    return { fromYear, fromGrade: item.grade, section: item.section, fromName: item.name, toGrade: next ?? null };
+  });
+  const intake = snapshot.docs.map(item => item.data()).filter(item => String(item.grade) === '1').map(item => ({ grade: '1', section: item.section }));
+  return { plan, intake, toYear };
+}
+
+export async function adminRunRollover(fromYear, toYear) {
+  const { plan, intake } = await adminPlanRollover(fromYear, toYear);
+  const result = { created: 0, moved: 0, graduated: 0, skipped: 0 };
+  const idOf = (year, grade, section) => stableId('c', year, grade, String(section).toLowerCase());
+  // أولًا الفصول الجديدة (الأعلى أولًا حتى لا يختلط الطلاب)، ثم النقل.
+  const wanted = [...plan.filter(item => item.toGrade).map(item => ({ grade: item.toGrade, section: item.section })), ...intake];
+  for (const item of wanted) { await adminSaveClass({ grade: item.grade, section: item.section, year: toYear }); result.created += 1; }
+  for (const item of [...plan].reverse()) {
+    const fromId = await idOf(fromYear, item.fromGrade, item.section);
+    const toId = item.toGrade ? await idOf(toYear, item.toGrade, item.section) : '';
+    try {
+      const done = await adminPromoteClass(fromId, toId);
+      if (toId) result.moved += done.count; else result.graduated += done.count;
+    } catch (error) { if (error.code === 'failed-precondition') result.skipped += 1; else throw error; }
+  }
+  return result;
+}

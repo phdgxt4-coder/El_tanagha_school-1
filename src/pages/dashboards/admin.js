@@ -35,6 +35,8 @@ export function renderAdmin(profile) {
         <p class="form-note" data-msg="users" role="status"></p><table class="adm-table"><tbody data-users></tbody></table>
         <h2>استبدال مدرس</h2><p class="dash-muted">ينقل كل إسنادات المدرس الحالي للمدرس الجديد. الحسابان يبقيان.</p>
         <form class="adm-inline" data-replace-form><select name="oldUid" required data-replace-old><option value="">المدرس الحالي</option></select><select name="newUid" required data-replace-new><option value="">المدرس الجديد</option></select><button class="button" type="submit">استبدال</button></form><p class="form-note" data-msg="replace" role="status"></p>
+        <h2>ترقية السنة الدراسية</h2><p class="dash-muted">ينشئ فصول السنة الجديدة بنفس الشعب، وينقل كل صف للصف الأعلى، ويخرّج الصف الأخير. اضغط معاينة أولًا.</p>
+        <form class="adm-inline" data-rollover-form><input name="from" required pattern="\d{4}-\d{4}" placeholder="السنة الحالية 2026-2027" dir="ltr"><input name="to" required pattern="\d{4}-\d{4}" placeholder="السنة الجديدة 2027-2028" dir="ltr"><button class="button ghost" type="button" data-rollover-preview>معاينة</button><button class="button" type="submit" disabled data-rollover-run>تنفيذ</button></form><div class="dash-muted" data-rollover-plan></div><p class="form-note" data-msg="rollover" role="status"></p>
         <h2>ترقية فصل / تخريج</h2><p class="dash-muted">ينقل كل طلاب الفصل للفصل الجديد، أو يخرّجهم (حسابهم يبقى محفوظًا ولا يدخلون). الحد 400 طالب في المرة.</p>
         <form class="adm-inline" data-promote-form><select name="from" required data-promote-from><option value="">من الفصل</option></select><select name="to" data-promote-to><option value="">تخريج (بدون فصل جديد)</option></select><button class="button" type="submit">تنفيذ</button></form><p class="form-note" data-msg="promote" role="status"></p></section>
     </main></div>`;
@@ -144,6 +146,20 @@ export function mountAdmin(root, { auth, database }) {
     event.preventDefault(); const form = event.currentTarget;
     if (!confirmAsk('نقل كل إسنادات المدرس الحالي للمدرس الجديد؟')) return;
     guard(async () => { const result = await spark.adminReplaceTeacher(form.elements.oldUid.value, form.elements.newUid.value); say(m('replace'), `تم نقل ${result.moved} إسناد.`); await usersPanel(); }, m('replace'), '', false);
+  });
+  const rolloverForm = root.querySelector('[data-rollover-form]');
+  const runButton = root.querySelector('[data-rollover-run]');
+  rolloverForm.addEventListener('input', () => { runButton.disabled = true; });
+  root.querySelector('[data-rollover-preview]').addEventListener('click', () => guard(async () => {
+    const { plan, intake } = await spark.adminPlanRollover(rolloverForm.elements.from.value.trim(), rolloverForm.elements.to.value.trim());
+    root.querySelector('[data-rollover-plan]').innerHTML = '<ul>' + plan.map(item => `<li>${esc(item.fromName)} ← ${item.toGrade ? `إلى ${esc(gradeNames[item.toGrade])} فصل ${esc(item.section)}` : 'تخريج'}</li>`).join('') + `</ul><p>وسيُنشأ ${intake.length} فصل جديد للصف الأول بدون طلاب.</p>`;
+    runButton.disabled = false;
+  }, m('rollover'), '', false));
+  rolloverForm.addEventListener('submit', event => {
+    event.preventDefault();
+    if (!confirmAsk('تنفيذ الترقية الآن؟ سيُنقل كل الطلاب حسب المعاينة.')) return;
+    runButton.disabled = true;
+    guard(async () => { const result = await spark.adminRunRollover(rolloverForm.elements.from.value.trim(), rolloverForm.elements.to.value.trim()); invalidateStructure(); say(m('rollover'), `تم: نُقل ${result.moved} طالب وخُرّج ${result.graduated} وأُنشئت ${result.created} فصل.`); }, m('rollover'), '', false);
   });
   root.querySelector('[data-promote-form]').addEventListener('submit', event => {
     event.preventDefault(); const form = event.currentTarget;
