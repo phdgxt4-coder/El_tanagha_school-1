@@ -5,7 +5,8 @@ import { validateAccountRequest } from '../../functions/src/validation.js';
 import { getFirebaseApp } from '../config/firebase-app.js';
 import { firebaseConfigured, functionsRegion } from '../config/firebase-env.js';
 import { isSpark } from '../config/backend-mode.js';
-import * as spark from '../services/spark-backend.js';
+// يُحمَّل عند أول استخدام فقط حتى لا تدخل Firestore في صفحة الدخول
+const loadSpark = () => import('../services/spark-backend.js');
 
 let authClient;
 let functionsClient;
@@ -38,7 +39,7 @@ export function createAuthUser(email, password) {
 
 export function submitAccountRequest(formData) {
   const profile = validateAccountRequest(formData);
-  if (isSpark) return spark.submitAccountRequest(profile);
+  if (isSpark) return loadSpark().then(spark => spark.submitAccountRequest(profile));
   return callable('submitAccountRequest', profile);
 }
 
@@ -77,92 +78,92 @@ export function subscribeToAuth(callback, onError = () => {}) {
 }
 
 export function getMyAccountStatus() {
-  if (isSpark) return spark.getMyAccountStatus();
+  if (isSpark) return loadSpark().then(spark => spark.getMyAccountStatus());
   return callable('getMyAccountStatus', {});
 }
 
 export function listTeacherApplications() {
-  if (isSpark) return spark.listTeacherApplications();
+  if (isSpark) return loadSpark().then(spark => spark.listTeacherApplications());
   return callable('listTeacherApplications', {});
 }
 
 export function approveTeacher(uid) {
-  if (isSpark) return spark.approveTeacher(uid);
+  if (isSpark) return loadSpark().then(spark => spark.approveTeacher(uid));
   return callable('approveTeacher', { uid });
 }
 
 export function rejectTeacher(uid, reason = '') {
-  if (isSpark) return spark.rejectTeacher(uid, reason);
+  if (isSpark) return loadSpark().then(spark => spark.rejectTeacher(uid, reason));
   return callable('rejectTeacher', { uid, reason });
 }
 
 export function linkParentToStudent(code) {
-  if (isSpark) return spark.linkParentToStudent(code);
+  if (isSpark) return loadSpark().then(spark => spark.linkParentToStudent(code));
   return callable('linkParentToStudent', { code });
 }
 
 export function issueParentCode() {
-  if (isSpark) return spark.issueParentCode();
+  if (isSpark) return loadSpark().then(spark => spark.issueParentCode());
   return callable('issueParentCode', {});
 }
 
 export function listLinkedStudents() {
-  if (isSpark) return spark.listLinkedStudents();
+  if (isSpark) return loadSpark().then(spark => spark.listLinkedStudents());
   return callable('listLinkedStudents', {});
 }
 
 export function unlinkParentFromStudent(studentUid) {
-  if (isSpark) return spark.unlinkParentFromStudent(studentUid);
+  if (isSpark) return loadSpark().then(spark => spark.unlinkParentFromStudent(studentUid));
   return callable('unlinkParentFromStudent', { studentUid });
 }
 
 export function revokeParentLink(linkId) {
-  if (isSpark) return spark.revokeParentLink(linkId);
+  if (isSpark) return loadSpark().then(spark => spark.revokeParentLink(linkId));
   return callable('revokeParentLink', { linkId });
 }
 
 export function adminSaveClass(data) {
-  if (isSpark) return spark.adminSaveClass(data);
+  if (isSpark) return loadSpark().then(spark => spark.adminSaveClass(data));
   return callable('adminSaveClass', data);
 }
 
 export function adminDeleteClass(classId) {
-  if (isSpark) return spark.adminDeleteClass(classId);
+  if (isSpark) return loadSpark().then(spark => spark.adminDeleteClass(classId));
   return callable('adminDeleteClass', { classId });
 }
 
 export function adminSaveSubject(name) {
-  if (isSpark) return spark.adminSaveSubject(name);
+  if (isSpark) return loadSpark().then(spark => spark.adminSaveSubject(name));
   return callable('adminSaveSubject', { name });
 }
 
 export function adminDeleteSubject(subjectId) {
-  if (isSpark) return spark.adminDeleteSubject(subjectId);
+  if (isSpark) return loadSpark().then(spark => spark.adminDeleteSubject(subjectId));
   return callable('adminDeleteSubject', { subjectId });
 }
 
 export function adminSeedDefaultSubjects() {
-  if (isSpark) return spark.adminSeedDefaultSubjects();
+  if (isSpark) return loadSpark().then(spark => spark.adminSeedDefaultSubjects());
   return callable('adminSeedDefaultSubjects', {});
 }
 
 export function adminAssignTeacher(teacherUid, subjectId, classId) {
-  if (isSpark) return spark.adminAssignTeacher(teacherUid, subjectId, classId);
+  if (isSpark) return loadSpark().then(spark => spark.adminAssignTeacher(teacherUid, subjectId, classId));
   return callable('adminAssignTeacher', { teacherUid, subjectId, classId });
 }
 
 export function adminRemoveAssignment(assignmentId) {
-  if (isSpark) return spark.adminRemoveAssignment(assignmentId);
+  if (isSpark) return loadSpark().then(spark => spark.adminRemoveAssignment(assignmentId));
   return callable('adminRemoveAssignment', { assignmentId });
 }
 
 export function adminImportRoster(rows) {
-  if (isSpark) return spark.adminImportRoster(rows);
+  if (isSpark) return loadSpark().then(spark => spark.adminImportRoster(rows));
   return callable('adminImportRoster', { rows });
 }
 
 export function listClassStudents(classId, after = '') {
-  if (isSpark) return spark.listClassStudents(classId, after);
+  if (isSpark) return loadSpark().then(spark => spark.listClassStudents(classId, after));
   return callable('listClassStudents', { classId, after });
 }
 
