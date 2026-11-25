@@ -1,5 +1,23 @@
 import {home,subjectsPage,subjectPage,teachersPage,renderTeacherCards,newsPage,schedulePage,resultsPage,contactPage,notFound} from './pages/public-pages.js';
 import {loginPage,teacherApprovalPage} from './pages/auth-pages.js';
+import {createRouteHelpers} from './utils/routes.js';
+
+const moduleScriptUrl=document.querySelector('script[type="module"][src]')?.src;
+const sourceBasePath=moduleScriptUrl?new URL('../',moduleScriptUrl).pathname:'/';
+const routeHelpers=createRouteHelpers(import.meta.env?.BASE_URL||sourceBasePath,location.origin);
+const currentRoutePath=()=>routeHelpers.fromUrlPath(location.pathname)??'/';
+
+function normalizeInternalLinks(root=document){
+  root.querySelectorAll('a[href]').forEach(link=>{
+    const rawHref=link.getAttribute('href');
+    if(!rawHref||rawHref.startsWith('#')||/^(?:mailto|tel|javascript):/iu.test(rawHref))return;
+    const url=new URL(rawHref,location.href);
+    if(url.origin!==location.origin)return;
+    const route=routeHelpers.fromUrlPath(url.pathname);
+    if(route===null)return;
+    link.href=`${routeHelpers.toUrlPath(route)}${url.search}${url.hash}`;
+  });
+}
 
 const routes=[
   [/^\/$/,home],
@@ -34,7 +52,7 @@ function showSignedInMessage(target,message,kind='status'){
   target.append(document.createTextNode(' '),button);
 }
 
-function render(path=location.pathname){
+function render(path=currentRoutePath()){
   pageCleanup();
   pageCleanup=()=>{};
   const generation=++pageGeneration;
@@ -45,6 +63,7 @@ function render(path=location.pathname){
     if(match){html=view(...match.slice(1));break;}
   }
   app.innerHTML=html;
+  normalizeInternalLinks();
   document.title=`${escapeRoute(path)}منصة التناغه الشرقيه الثانويه المشتركه`;
   document.querySelector('#nav')?.classList.remove('open');
   document.querySelector('.menu-toggle')?.setAttribute('aria-expanded','false');
@@ -112,8 +131,8 @@ function initializeAuthPage(generation){
           showSignedInMessage(statusTarget,'طلب المدرس قيد مراجعة الإدارة. لن يظهر الاسم أو التخصص في الدليل قبل الاعتماد وموافقة النشر.');
         }else if(status.status==='rejected'){
           showSignedInMessage(statusTarget,'لم تتم الموافقة على طلب المدرس. تواصل مع إدارة المدرسة للمراجعة.','error');
-        }else if(status.role==='admin'&&location.pathname==='/login/admin'){
-          history.replaceState({},'','/admin/teacher-requests');
+        }else if(status.role==='admin'&&currentRoutePath()==='/login/admin'){
+          history.replaceState({},'',routeHelpers.toUrlPath('/admin/teacher-requests'));
           render('/admin/teacher-requests');
         }else if(status.status==='active'){
           showSignedInMessage(statusTarget,'تم تسجيل الدخول بنجاح. لوحات الحساب تُستكمل في المرحلة التالية.');
@@ -216,7 +235,7 @@ async function handleLogin(form){
     await api.signIn(email,password);
     const status=await api.getMyAccountStatus();
     if(status.role==='admin'){
-      history.pushState({},'', '/admin/teacher-requests');
+      history.pushState({},'',routeHelpers.toUrlPath('/admin/teacher-requests'));
       render('/admin/teacher-requests');
     }else if(status.role==='teacher_applicant'&&status.status==='pending'){
       showMessage(message,'تم الدخول؛ طلب المدرس ما زال بانتظار اعتماد الإدارة.');
@@ -294,12 +313,17 @@ document.addEventListener('click',async event=>{
     return;
   }
 
-  const link=event.target.closest('a[href^="/"]');
+  const link=event.target.closest('a[href]');
   if(!link||event.ctrlKey||event.metaKey||event.shiftKey||link.target==='_blank')return;
-  event.preventDefault();
+  const rawHref=link.getAttribute('href')||'';
+  if(rawHref.startsWith('#')||/^(?:mailto|tel|javascript):/iu.test(rawHref))return;
   const url=new URL(link.href);
-  history.pushState({},'',url.pathname);
-  render(url.pathname);
+  if(url.origin!==location.origin)return;
+  const route=routeHelpers.fromUrlPath(url.pathname);
+  if(route===null)return;
+  event.preventDefault();
+  history.pushState({},'',`${routeHelpers.toUrlPath(route)}${url.search}${url.hash}`);
+  render(route);
   window.scrollTo({top:0,behavior:'smooth'});
 });
 
@@ -327,7 +351,7 @@ document.addEventListener('click',event=>{
   document.querySelectorAll('[data-grade]').forEach(button=>button.classList.toggle('selected',button===gradeButton));
 });
 
-window.addEventListener('popstate',()=>render());
+window.addEventListener('popstate',()=>render(currentRoutePath()));
 document.querySelector('.menu-toggle')?.addEventListener('click',event=>{
   const nav=document.querySelector('#nav');
   const opened=nav.classList.toggle('open');
