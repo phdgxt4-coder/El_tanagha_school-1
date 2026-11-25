@@ -681,3 +681,137 @@ button,input,textarea {
 .parent-code{display:block;direction:ltr;text-align:center;letter-spacing:.15em;font-size:1.45rem;color:var(--gold2);padding:.8rem;border:1px dashed #c9a24b66;border-radius:14px;background:#c9a24b10}
 .dashboard-form [data-kind="error"]{color:#ffb4a9}
 @media(max-width:700px){.dashboard-grid{grid-template-columns:1fr}.dashboard-page{padding-inline:.9rem}.dashboard-actions{display:grid;grid-template-columns:1fr}.dashboard-actions .button{width:100%}}
+
+/* ---- Performance and mobile smoothness polish (same look, lighter on phones) ---- */
+html{-webkit-text-size-adjust:100%;scroll-padding-top:84px}
+a,button,.button,.card{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+/* Animate once: the .stats wrapper no longer fades together with its children. */
+.hero-copy,.stats,.card,.stats>div{opacity:1;animation:none}
+.hero-copy,.stats>div,.card{animation:fadeUp .6s var(--ease-out-premium) both}
+.stats{opacity:1;animation:none}
+.card:nth-child(n+4){animation-delay:.3s}
+@keyframes fadeUp{from{opacity:0;transform:translate3d(0,18px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
+/* Touch screens: no sticky hover states, no hover lift */
+@media(hover:none){
+  .button:hover,.card:hover,.stats>div:hover{transform:none}
+  .button:active{transform:scale(.98)}
+}
+/* Phones and tablets: light glass, no heavy blur, shorter and smaller motion */
+@media(max-width:850px){
+  :root{--duration-fast:.2s;--duration-normal:.28s}
+  .topbar{backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 2px 12px #0003;background:#090d16e6}
+  :root[data-theme="light"] .topbar{background:#fffffff0}
+  .hero-mark,.stats>div{backdrop-filter:none;-webkit-backdrop-filter:none}
+  .hero-copy,.stats>div,.card{animation-duration:.45s}
+  .stats>div:nth-child(n){animation-delay:.05s}
+  .card:nth-child(n){animation-delay:.08s}
+}
+@media(prefers-reduced-motion:reduce){
+  .hero-copy,.stats>div,.card{animation:none;opacity:1;transform:none}
+  html{scroll-behavior:auto}
+}
+
+/* ======== Premium layer: glass, depth, gradients, refined motion ======== */
+:root{--gold-grad:linear-gradient(135deg,#b8892f 0%,#e4bf63 45%,#f3dc9c 70%,#c9a24b 100%);--glass-bg:linear-gradient(145deg,#ffffff14 0%,#ffffff06 100%);--glass-line:#ffffff1f;--glow:0 0 0 1px #c9a24b26,0 18px 50px #00000059,0 0 60px #c9a24b14}
+:root[data-theme="light"]{--glass-bg:linear-gradient(145deg,#ffffffd9 0%,#ffffff99 100%);--glass-line:#ffffffcc;--glow:0 0 0 1px #a77c2024,0 18px 44px #24324a1f,0 0 50px #c9a24b14}
+body{background:var(--bg);background-image:radial-gradient(900px 500px at 85% -5%,#c9a24b14,transparent 60%),radial-gradient(800px 500px at 0% 40%,#3a5bd414,transparent 60%);background-attachment:scroll}
+:root[data-theme="light"] body{background-image:radial-gradient(900px 500px at 85% -5%,#c9a24b1f,transparent 60%),radial-gradient(800px 500px at 0% 40%,#3a5bd40f,transparent 60%)}
+body{letter-spacing:.005em;text-rendering:optimizeLegibility}
+::selection{background:#c9a24b55;color:inherit}
+
+/* Topbar: gold hairline under glass */
+.topbar{border-bottom:1px solid transparent;background-image:linear-gradient(#090d16d9,#090d16d9),linear-gradient(90deg,transparent,#c9a24b66,transparent);background-origin:border-box;background-clip:padding-box,border-box}
+:root[data-theme="light"] .topbar{background-image:linear-gradient(#fffffff2,#fffffff2),linear-gradient(90deg,transparent,#a77c2055,transparent)}
+.brand{transition:transform var(--duration-fast) var(--ease-out-premium)}
+.brand:hover{transform:translateY(-1px)}
+.brand img{box-shadow:0 0 0 2px #c9a24b66,0 6px 18px #0005}
+
+/* Nav: growing gold underline */
+.nav a{position:relative;padding-block:.35rem}
+.nav a::after{content:"";position:absolute;inset-inline:0;bottom:0;height:2px;border-radius:2px;background:var(--gold-grad);transform:scaleX(0);transform-origin:center;transition:transform var(--duration-normal) var(--ease-out-premium)}
+.nav a:hover::after,.nav a[aria-current="page"]::after,.nav a.active::after{transform:scaleX(1)}
+
+/* Buttons: gold metal with sheen */
+.button{position:relative;overflow:hidden;isolation:isolate;background:var(--gold-grad);background-size:160% 100%;box-shadow:0 8px 22px #c9a24b40,inset 0 1px 0 #ffffff66;letter-spacing:.01em}
+.button::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(110deg,transparent 30%,#ffffff55 50%,transparent 70%);transform:translate3d(120%,0,0);transition:transform .7s var(--ease-out-premium)}
+.button.ghost{background:var(--glass-bg),#11182799;border:1px solid var(--glass-line);box-shadow:inset 0 1px 0 #ffffff1f,0 6px 18px #0003}
+:root[data-theme="light"] .button.ghost{background:#fff;box-shadow:0 6px 18px #24324a1a}
+
+/* Hero: depth, glow, gradient headline */
+.hero{min-height:640px}
+.hero::before{content:"";position:absolute;z-index:1;width:520px;height:520px;inset-inline-start:-140px;top:-160px;border-radius:50%;background:radial-gradient(circle,#c9a24b33,transparent 68%);pointer-events:none}
+.hero::after{content:"";position:absolute;z-index:1;inset-inline:0;bottom:0;height:120px;background:linear-gradient(0deg,var(--bg),transparent);pointer-events:none}
+.hero-photo{transform:scale(1.04);filter:saturate(.8) contrast(1.05)}
+.hero h1{background:linear-gradient(180deg,#fff 10%,#f3dc9c 120%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;text-shadow:none;filter:drop-shadow(0 6px 24px #0008)}
+.pill{background:linear-gradient(135deg,#c9a24b26,#c9a24b0d);border-color:#e4bf6366;box-shadow:inset 0 1px 0 #ffffff1a,0 0 24px #c9a24b1f}
+.hero-mark{background:var(--glass-bg),#151b2999;border:1px solid #ffffff2e;box-shadow:0 30px 80px #000a,inset 0 1px 0 #ffffff2e,0 0 70px #c9a24b26;animation:floaty 7s ease-in-out infinite}
+@keyframes floaty{0%,100%{transform:translate3d(0,-50%,0)}50%{transform:translate3d(0,calc(-50% - 10px),0)}}
+
+/* Stats: floating glass bar */
+.stats{filter:drop-shadow(0 20px 30px #0004)}
+.stats>div{background:var(--glass-bg),#111827cc;border:1px solid var(--glass-line);box-shadow:inset 0 1px 0 #ffffff26}
+:root[data-theme="light"] .stats>div{background:var(--glass-bg),#fffc}
+.stats b{background:var(--gold-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;font-size:1.65rem}
+
+/* Sections and headings */
+.section-heading h1,.section-heading h2{letter-spacing:-.01em}
+.section-heading h1::after,.section-heading h2::after{content:"";display:block;width:56px;height:3px;margin-top:.7rem;border-radius:3px;background:var(--gold-grad)}
+.eyebrow{display:inline-flex;align-items:center;gap:.5rem;letter-spacing:.03em}
+.eyebrow::before{content:"";width:18px;height:2px;border-radius:2px;background:var(--gold-grad)}
+
+/* Cards: glass, gold edge light, icon glow */
+.card{background:var(--glass-bg),linear-gradient(145deg,#161d2acc,#101621cc);border:1px solid var(--glass-line);border-radius:22px;box-shadow:inset 0 1px 0 #ffffff1f,0 10px 30px #0003;overflow:hidden}
+:root[data-theme="light"] .card{background:var(--glass-bg),#fff;box-shadow:inset 0 1px 0 #fff,0 10px 30px #24324a14}
+.card::before{content:"";position:absolute;inset-inline:0;top:0;height:2px;background:var(--gold-grad);opacity:.0;transform:scaleX(.3);transition:opacity var(--duration-normal) ease,transform var(--duration-normal) var(--ease-out-premium)}
+.card::after{content:"";position:absolute;width:220px;height:220px;inset-inline-end:-80px;top:-100px;border-radius:50%;background:radial-gradient(circle,#c9a24b26,transparent 70%);opacity:.6;pointer-events:none;transition:opacity var(--duration-normal) ease}
+.card:hover::before{opacity:1;transform:scaleX(1)}
+.card:hover::after{opacity:1}
+.card-icon{background:linear-gradient(135deg,#c9a24b30,#c9a24b0f);border:1px solid #e4bf6340;box-shadow:inset 0 1px 0 #ffffff2e,0 6px 16px #c9a24b26;transition:transform var(--duration-normal) var(--ease-spring)}
+.card:hover .card-icon{transform:scale(1.1) rotate(-4deg)}
+.text-link{position:relative;font-weight:700}
+
+/* Tabs, forms, panels */
+.subject-tabs button,.grade-button{background:var(--glass-bg),#111827aa;border:1px solid var(--glass-line);transition:transform var(--duration-fast) var(--ease-out-premium),background var(--duration-fast) ease,border-color var(--duration-fast) ease}
+.subject-tabs .selected,.grade-button.selected{background:var(--gold-grad);color:#15130d;border-color:transparent;box-shadow:0 8px 20px #c9a24b40}
+.auth-panel,.contact-panel>div,.contact-panel form,.approval-card{background:var(--glass-bg),linear-gradient(150deg,#151c29d9,#0e1420d9);border:1px solid var(--glass-line);box-shadow:var(--glow),inset 0 1px 0 #ffffff1f}
+:root[data-theme="light"] .auth-panel,:root[data-theme="light"] .contact-panel>div,:root[data-theme="light"] .contact-panel form,:root[data-theme="light"] .approval-card{background:var(--glass-bg),#fff}
+.auth-panel input,.auth-panel select,.contact-panel input,.contact-panel textarea{transition:border-color var(--duration-fast) ease,box-shadow var(--duration-fast) ease}
+.auth-panel input:focus,.auth-panel select:focus,.contact-panel input:focus,.contact-panel textarea:focus{outline:none;border-color:var(--gold2);box-shadow:0 0 0 4px #c9a24b26}
+.footer{background-image:linear-gradient(0deg,transparent,#c9a24b0d);border-top:1px solid #c9a24b33}
+
+/* Scroll reveal (no JS): only where supported, replaces load animation for cards */
+@supports(animation-timeline:view()){
+  .card,.section-heading{animation:fadeUp linear both;animation-timeline:view();animation-range:entry 0% entry 55%}
+  .card:nth-child(n){animation-delay:0s}
+}
+
+/* Hover only on devices that can hover; glow shadows upgraded */
+@media(hover:hover){
+  .button:hover{box-shadow:0 16px 40px #c9a24b66,inset 0 1px 0 #ffffff80}
+  .button:hover::after{transform:translate3d(-120%,0,0)}
+  .card:hover{box-shadow:var(--glow),inset 0 1px 0 #ffffff2e}
+  .subject-tabs button:hover,.grade-button:hover{transform:translateY(-2px);border-color:#e4bf6380}
+}
+/* Desktop only: real glass blur on cards/panels */
+@media(min-width:851px){
+  .card,.auth-panel,.contact-panel>div,.contact-panel form{backdrop-filter:blur(14px) saturate(1.25);-webkit-backdrop-filter:blur(14px) saturate(1.25)}
+}
+/* Mobile: keep it light, no blur, no float loop, no sheen */
+@media(max-width:850px){
+  .hero{min-height:560px}
+  .hero::before{width:320px;height:320px}
+  .hero-mark{animation:none;transform:translateY(-4px)}
+  .card::after{display:none}
+  .button::after{display:none}
+  .section-heading h1::after,.section-heading h2::after{width:44px}
+}
+@media(prefers-reduced-motion:reduce){
+  .hero-mark{animation:none}
+  .card,.section-heading{animation:none!important}
+  .button::after,.card::before,.nav a::after{transition:none}
+}
+/* Fixes: keep hero dark in both themes, readable gold on light glass */
+.hero::after{background:linear-gradient(0deg,#090d1699,transparent)}
+:root[data-theme="light"] .hero::after{background:linear-gradient(0deg,#10182766,transparent)}
+:root[data-theme="light"] .hero-mark{background:var(--glass-bg),#151b2999;background:linear-gradient(145deg,#ffffff1f,#ffffff08),#151b29b3}
+:root[data-theme="light"] .stats b{background:linear-gradient(135deg,#7a5710,#a77c20 55%,#c9a24b);-webkit-background-clip:text;background-clip:text}
