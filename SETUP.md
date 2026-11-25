@@ -1,5 +1,7 @@
 # إعداد المنصة وتشغيلها
 
+للنشر خطوة بخطوة بالعربية انظر [DEPLOY.md](DEPLOY.md).
+
 ## تشغيل الواجهة محليًا
 
 ```bash
@@ -18,7 +20,7 @@ pnpm dev
 5. بعد مراجعة المشروع الذي تم تأكيده، انشر الوظائف والقواعد فقط إلى ذلك المشروع من بيئة نشر مخولة:
 
 ```bash
-firebase deploy --only firestore:rules,functions --project "$VITE_FIREBASE_PROJECT_ID"
+firebase deploy --only firestore:rules,firestore:indexes,functions --project "$VITE_FIREBASE_PROJECT_ID"
 ```
 
 هذا الأمر يغير خدمات مشروع Firebase خارجي؛ لا تنفذه قبل موافقة مالك المشروع على المعرّف والأثر والتكلفة. لا يُفعّل Firebase Hosting؛ استضافة الواجهة مستقلة على GitHub Pages.
