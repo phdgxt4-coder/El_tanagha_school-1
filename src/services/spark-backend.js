@@ -68,7 +68,7 @@ export async function submitAccountRequest(profile) {
   const classSnapshot = classId ? await getDoc(doc(database, 'classes', classId)) : null;
   if (!classSnapshot?.exists()) throw fail('invalid-argument', 'الفصل المختار غير موجود.');
   if (classSnapshot.data().grade !== profile.grade) throw fail('invalid-argument', 'الفصل المختار لا يتبع الصف الدراسي المحدد.');
-  if (classSnapshot.data().branch && classSnapshot.data().branch !== (profile.branch ?? '')) throw fail('invalid-argument', 'الفصل المختار لا يتبع المسار الدراسي المحدد.');
+  if ((classSnapshot.data().branch ?? '') !== (profile.branch ?? '')) throw fail('invalid-argument', 'الفصل المختار لا يتبع المسار الدراسي المحدد.');
   const studentId = `STU-${token(10)}`;
   const record = {
     ...base, role: 'student', status: 'active', studentId, grade: profile.grade, branch: profile.branch ?? '',
@@ -420,7 +420,7 @@ export async function adminMoveStudent(uid, classId) {
   if (!student.exists() || student.data().role !== 'student') throw fail('not-found', 'الطالب غير موجود.');
   if (!target.exists()) throw fail('not-found', 'الفصل غير موجود.');
   const batch = writeBatch(database);
-  batch.update(doc(database, 'profiles', uid), { classId: target.id, className: target.data().name, grade: target.data().grade, ...(target.data().branch ? { branch: target.data().branch } : {}), updatedBy: me().uid, updatedAt: serverTimestamp() });
+  batch.update(doc(database, 'profiles', uid), { classId: target.id, className: target.data().name, grade: target.data().grade, branch: target.data().branch ?? '', updatedBy: me().uid, updatedAt: serverTimestamp() });
   audit(batch, 'student_moved', { targetUid: uid, fromClassId: student.data().classId ?? '', toClassId: target.id });
   await batch.commit();
   return { classId: target.id };

@@ -151,3 +151,17 @@ test('guidelines doc exists and is referenced from AGENTS.md',()=>{
   assert.ok(read('../STUDY_CREW_GUIDELINES.md').includes('كيف تضيف شخصية'));
   assert.ok(read('../AGENTS.md').includes('STUDY_CREW_GUIDELINES.md'));
 });
+test('starting in a one-shot state ends once and returns to Idle, never loops',()=>{
+  for(const initial of ['Success','Error','Celebrate']){
+    const timers=[];const seen=[];
+    const m=createStateMachine({initial,onChange:(n)=>seen.push(n),setTimer:(f,ms)=>{timers.push({f,ms});return timers.length;},clearTimer:()=>{}});
+    assert.equal(m.state,initial);assert.equal(timers.length,1,'timer set at start');
+    timers.shift().f();
+    assert.equal(m.state,'Idle');assert.deepEqual(seen,['Idle']);assert.equal(timers.length,0,'no second timer');
+  }
+});
+test('one-shot after a one-shot start still returns to Idle',()=>{
+  const timers=[];
+  const m=createStateMachine({initial:'Success',setTimer:(f)=>{timers.push(f);return timers.length;},clearTimer:()=>{}});
+  assert.equal(m.request('Error',{force:true}),true);timers.pop()();assert.equal(m.state,'Idle');
+});
