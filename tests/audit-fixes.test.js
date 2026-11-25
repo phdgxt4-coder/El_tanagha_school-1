@@ -8,7 +8,7 @@ test('move-student always writes branch; rules require class branch equal to pro
   assert.doesNotMatch(spark,/\.\.\.\(target\.data\(\)\.branch \?/);
   const rules=read('../firestore.rules');
   assert.doesNotMatch(rules,/classes\/\$\(.*\)\)\.data\.get\('branch', ''\) in \[''/);
-  assert.match(rules,/request\.resource\.data\.grade == '1' && request\.resource\.data\.get\('branch', ''\) == ''/);
+  assert.match(rules,/data\.grade == '1' && data\.branch == ''/);
 });
 test('registration in Spark rejects a class whose branch differs, including branchless class with a branch',()=>{
   assert.match(read('../src/services/spark-backend.js'),/\(classSnapshot\.data\(\)\.branch \?\? ''\) !== \(profile\.branch \?\? ''\)/);
