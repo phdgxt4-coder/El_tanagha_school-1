@@ -87,6 +87,10 @@ export function rejectTeacher(uid, reason = '') {
   return callable('rejectTeacher', { uid, reason });
 }
 
+export function linkParentToStudent(code) {
+  return callable('linkParentToStudent', { code });
+}
+
 export function friendlyAuthError(error) {
   if (error?.message === 'firebase/not-configured') {
     return 'لم تُضبط إعدادات Firebase لهذا التطبيق بعد. لم يُرسل طلب الدخول.';

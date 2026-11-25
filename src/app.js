@@ -1,5 +1,6 @@
 import {home,subjectsPage,subjectPage,teachersPage,renderTeacherCards,newsPage,schedulePage,resultsPage,contactPage,notFound} from './pages/public-pages.js';
 import {loginPage,teacherApprovalPage} from './pages/auth-pages.js';
+import {dashboardPage,initializeDashboard} from './pages/dashboard-pages.js';
 import {createRouteHelpers,resolveAppLink} from './utils/routes.js';
 
 const moduleScriptUrl=document.querySelector('script[type="module"][src]')?.src;
@@ -27,6 +28,7 @@ const routes=[
   [/^\/results\/?$/,resultsPage],
   [/^\/contact\/?$/,contactPage],
   [/^\/login(?:\/(student|parent|teacher|admin))?\/?$/,loginPage],
+  [/^\/dashboard\/?$/,dashboardPage],
   [/^\/admin\/teacher-requests\/?$/,teacherApprovalPage]
 ];
 
@@ -89,6 +91,7 @@ function render(path=currentRoutePath()){
   if(/^\/teachers\/?$/.test(path)) initializeTeacherDirectory(generation);
   if(/^\/login(?:\/|$)/.test(path)) initializeAuthPage(generation);
   if(/^\/admin\/teacher-requests\/?$/.test(path)) initializeTeacherApprovals(generation);
+  if(/^\/dashboard\/?$/.test(path)) initializeDashboard();
 }
 
 function initializeTeacherDirectory(generation){
@@ -242,7 +245,14 @@ function initializeTeacherApprovals(generation){
   }).catch(()=>showMessage(document.querySelector('[data-admin-message]'),'تعذر تهيئة خدمة الإدارة.','error'));
 }
 
-function formValues(form){return Object.fromEntries(new FormData(form).entries());}
+function formValues(form){
+  const values={};
+  for(const [key,value] of new FormData(form).entries()){
+    if(Object.hasOwn(values,key))values[key]=Array.isArray(values[key])?[...values[key],value]:[values[key],value];
+    else values[key]=value;
+  }
+  return values;
+}
 
 async function handleLogin(form){
   const message=document.querySelector('[data-auth-message]');
@@ -264,7 +274,8 @@ async function handleLogin(form){
       showMessage(message,'تم تسجيل الدخول. أكمل نموذج إنشاء الحساب لإرسال طلبك.');
       setAuthMode('register');
     }else{
-      showMessage(message,'تم تسجيل الدخول بنجاح. لوحات الحساب تُستكمل في المرحلة التالية.');
+      history.pushState({},'',routeHelpers.toUrlPath('/dashboard'));
+      render('/dashboard');
     }
   }catch(error){
     const api=await import('./auth/auth-service.js').catch(()=>null);

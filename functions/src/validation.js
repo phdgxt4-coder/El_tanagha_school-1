@@ -15,6 +15,7 @@ export const SUBJECTS = Object.freeze({
 const NAME_RE = /^[\p{L}\p{M}][\p{L}\p{M}\s.'’\-]{1,78}[\p{L}\p{M}]$/u;
 const PHONE_RE = /^\+?[0-9][0-9()\s.-]{5,18}[0-9]$/;
 const GRADES = new Set(['1', '2', '3']);
+const BRANCHES = new Set(['science', 'math', 'literary']);
 const ROLES = new Set(['student', 'parent', 'teacher']);
 
 export class InputValidationError extends Error {
@@ -53,6 +54,13 @@ export function validateAccountRequest(input) {
     const grade = String(input.grade ?? '');
     if (!GRADES.has(grade)) throw new InputValidationError('اختر الصف الدراسي الصحيح.');
     result.grade = grade;
+    const branch = String(input.branch ?? '');
+    if (!BRANCHES.has(branch)) throw new InputValidationError('اختر الشعبة الدراسية الصحيحة.');
+    result.branch = branch;
+    result.className = requiredString(input.className, 'الفصل', 40);
+    const birthDate = String(input.birthDate ?? '');
+    if (!/^\d{4}-\d{2}-\d{2}$/u.test(birthDate)) throw new InputValidationError('أدخل تاريخ الميلاد الصحيح.');
+    result.birthDate = birthDate;
   }
 
   if (input.role === 'teacher') {
@@ -60,6 +68,9 @@ export function validateAccountRequest(input) {
     if (!Object.hasOwn(SUBJECTS, subjectId)) throw new InputValidationError('اختر تخصصًا من القائمة.');
     result.subjectId = subjectId;
     result.subjectName = SUBJECTS[subjectId];
+    const grades = Array.isArray(input.grades) ? input.grades.map(String).filter(value => GRADES.has(value)) : [];
+    if (!grades.length || new Set(grades).size !== grades.length) throw new InputValidationError('اختر صفًا واحدًا على الأقل يدرّسه المدرس.');
+    result.grades = grades;
     result.publishConsent = input.publishConsent === true;
   }
 

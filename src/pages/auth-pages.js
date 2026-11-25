@@ -10,9 +10,9 @@ const ROLE_LABELS = Object.freeze({
 
 function registrationFields(role) {
   const roleFields = role === 'student'
-    ? `<label>الصف الدراسي<select name="grade" required><option value="">اختر الصف</option><option value="1">الأول الثانوي</option><option value="2">الثاني الثانوي</option><option value="3">الثالث الثانوي</option></select></label>`
+    ? `<label>الصف الدراسي<select name="grade" required><option value="">اختر الصف</option><option value="1">الأول الثانوي</option><option value="2">الثاني الثانوي</option><option value="3">الثالث الثانوي</option></select></label><label>الشعبة<select name="branch" required><option value="">اختر الشعبة</option><option value="science">علمي علوم</option><option value="math">علمي رياضة</option><option value="literary">أدبي</option></select></label><label>الفصل<input name="className" required maxlength="40" placeholder="مثال: 1/أ"></label><label>تاريخ الميلاد<input name="birthDate" type="date" required></label>`
     : role === 'teacher'
-      ? `<label>التخصص<select name="subjectId" required><option value="">اختر التخصص</option>${Object.entries(SUBJECTS).map(([id,label])=>`<option value="${id}">${label}</option>`).join('')}</select></label><label class="consent-row"><input type="checkbox" name="publishConsent" value="yes"><span>أوافق على نشر اسمي وتخصصي في دليل المدرسين بعد اعتماد الإدارة. لن يُنشر بريدي أو هاتفي.</span></label>`
+      ? `<label>التخصص<select name="subjectId" required><option value="">اختر التخصص</option>${Object.entries(SUBJECTS).map(([id,label])=>`<option value="${id}">${label}</option>`).join('')}</select></label><label>الصفوف التي يدرسها<select name="grades" multiple required size="3"><option value="1">الأول الثانوي</option><option value="2">الثاني الثانوي</option><option value="3">الثالث الثانوي</option></select></label><label class="consent-row"><input type="checkbox" name="publishConsent" value="yes"><span>أوافق على نشر اسمي وتخصصي في دليل المدرسين بعد اعتماد الإدارة. لن يُنشر بريدي أو هاتفي.</span></label>`
       : '';
 
   return `<label>الاسم الكامل<input name="displayName" autocomplete="name" required minlength="2" maxlength="80"></label>${roleFields}<label>رقم الهاتف (اختياري)<input name="phone" type="tel" autocomplete="tel" maxlength="24"></label>`;

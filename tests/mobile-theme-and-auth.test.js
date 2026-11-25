@@ -12,6 +12,9 @@ test('التسجيل يبقي الهاتف اختياريًا والبريد و�
   assert.match(html, /name="phone" type="tel"[^>]*maxlength/u);
   assert.doesNotMatch(html, /name="phone"[^>]*required/u);
   assert.match(html, /data-password-reset/u);
+  assert.match(html, /name="branch"/u);
+  assert.match(html, /name="className"/u);
+  assert.match(html, /name="birthDate"/u);
 });
 
 test('دخول الإدارة يمر عبر صفحة المدرس ولا يتيح التسجيل الإداري', () => {
@@ -36,5 +39,13 @@ test('عامل الخدمة يزيل مخازن النسخة القديمة ال
   assert.match(worker, /tn-v1/u);
   assert.match(worker, /tanagha-v1/u);
   assert.match(worker, /self\.registration\.unregister\(\)/u);
-  assert.match(worker, /filter\(name => legacyCaches\.has\(name\)\)/u);
+  assert.match(worker, /filter\(name => legacyCaches\.has\(name\)/u);
+});
+
+test('لوحة الحساب تتضمن ربط ولي الأمر بكود خادمي', () => {
+  const dashboard = read('../src/pages/dashboard-pages.js');
+  const app = read('../src/app.js');
+  assert.match(dashboard, /data-parent-link/u);
+  assert.match(dashboard, /linkParentToStudent/u);
+  assert.match(app, /dashboardPage/u);
 });

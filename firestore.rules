@@ -11,10 +11,53 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.active == true;
     }
 
+    function profile(uid) {
+      return get(/databases/$(database)/documents/profiles/$(uid)).data;
+    }
+
+    function hasRole(role) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/profiles/$(request.auth.uid))
+        && profile(request.auth.uid).role == role
+        && profile(request.auth.uid).status == 'active';
+    }
+
+    function isActiveTeacher() {
+      return hasRole('teacher');
+    }
+
+    function isActiveParent() {
+      return hasRole('parent');
+    }
+
+    function isActiveStudent() {
+      return hasRole('student');
+    }
+
+    function linkedParentTo(studentUid) {
+      return isActiveParent()
+        && exists(/databases/$(database)/documents/parentLinks/$(request.auth.uid + '_' + studentUid))
+        && get(/databases/$(database)/documents/parentLinks/$(request.auth.uid + '_' + studentUid)).data.active == true;
+    }
+
+    function ownsTeacherRecord(data) {
+      return isActiveTeacher() && data.teacherUid == request.auth.uid;
+    }
+
+    function teachesGrade(grade) {
+      return isActiveTeacher()
+        && profile(request.auth.uid).grades.hasAny([grade]);
+    }
+
     match /profiles/{userId} {
       allow get: if signedIn() && (request.auth.uid == userId || isActiveAdmin());
       allow list: if isActiveAdmin();
-      allow create, update, delete: if false;
+      allow update: if signedIn() && request.auth.uid == userId
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.status == resource.data.status
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'phone']);
+      allow create, delete: if false;
     }
 
     match /teacherApplications/{userId} {
@@ -33,6 +76,97 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
-    // No other collection is accessible unless a later, reviewed phase adds explicit rules.
+    match /parentCodes/{code} {
+      allow read: if false;
+      allow create, update, delete: if false;
+    }
+
+    match /parentLinks/{linkId} {
+      allow get: if signedIn()
+        && (resource.data.parentUid == request.auth.uid || resource.data.studentUid == request.auth.uid || isActiveAdmin());
+      allow list: if isActiveAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /content/{contentId} {
+      allow get, list: if signedIn() && (
+        isActiveAdmin() || ownsTeacherRecord(resource.data)
+        || (isActiveStudent() && resource.data.grade == profile(request.auth.uid).grade)
+        || (linkedParentTo(resource.data.studentUid) && resource.data.grade == profile(resource.data.studentUid).grade)
+      );
+      allow create: if ownsTeacherRecord(request.resource.data)
+        && teachesGrade(request.resource.data.grade)
+        && request.resource.data.title is string
+        && request.resource.data.type in ['lesson', 'file', 'video', 'assignment'];
+      allow update, delete: if ownsTeacherRecord(resource.data)
+        && teachesGrade(resource.data.grade);
+    }
+
+    match /exams/{examId} {
+      allow get, list: if signedIn() && (
+        isActiveAdmin() || ownsTeacherRecord(resource.data)
+        || (isActiveStudent() && resource.data.grade == profile(request.auth.uid).grade)
+        || linkedParentTo(resource.data.studentUid)
+      );
+      allow create: if ownsTeacherRecord(request.resource.data);
+      allow update, delete: if ownsTeacherRecord(resource.data) || isActiveAdmin();
+    }
+
+    match /submissions/{submissionId} {
+      allow get: if signedIn() && (
+        isActiveAdmin() || resource.data.studentUid == request.auth.uid
+        || ownsTeacherRecord(resource.data) || linkedParentTo(resource.data.studentUid)
+      );
+      allow list: if isActiveAdmin()
+        || (isActiveStudent() && resource.data.studentUid == request.auth.uid)
+        || ownsTeacherRecord(resource.data)
+        || linkedParentTo(resource.data.studentUid);
+      allow create: if isActiveStudent() && request.resource.data.studentUid == request.auth.uid;
+      allow update: if ownsTeacherRecord(resource.data) || isActiveAdmin();
+      allow delete: if false;
+    }
+
+    match /grades/{gradeId} {
+      allow get, list: if signedIn() && (
+        isActiveAdmin() || resource.data.studentUid == request.auth.uid
+        || ownsTeacherRecord(resource.data) || linkedParentTo(resource.data.studentUid)
+      );
+      allow create, update: if ownsTeacherRecord(request.resource.data) || isActiveAdmin();
+      allow delete: if isActiveAdmin();
+    }
+
+    match /attendance/{attendanceId} {
+      allow get, list: if signedIn() && (
+        isActiveAdmin() || resource.data.studentUid == request.auth.uid
+        || ownsTeacherRecord(resource.data) || linkedParentTo(resource.data.studentUid)
+      );
+      allow create, update: if ownsTeacherRecord(request.resource.data) || isActiveAdmin();
+      allow delete: if isActiveAdmin();
+    }
+
+    match /schedules/{scheduleId} {
+      allow get, list: if signedIn();
+      allow create, update, delete: if isActiveAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow get, list: if signedIn() && (
+        isActiveAdmin() || resource.data.audience == 'all'
+        || resource.data.uid == request.auth.uid
+      );
+      allow create, update, delete: if isActiveAdmin() || isActiveTeacher();
+    }
+
+    match /messages/{messageId} {
+      allow get, list: if signedIn() && (
+        isActiveAdmin() || resource.data.fromUid == request.auth.uid
+        || resource.data.toUid == request.auth.uid
+        || linkedParentTo(resource.data.studentUid)
+      );
+      allow create: if signedIn() && (isActiveAdmin() || isActiveTeacher() || isActiveParent());
+      allow update, delete: if isActiveAdmin() || resource.data.fromUid == request.auth.uid;
+    }
+
+    // لا توجد سماحات افتراضية لأي مجموعة أخرى.
   }
 }

@@ -1,6 +1,7 @@
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import { randomInt } from 'node:crypto';
 import { setGlobalOptions } from 'firebase-functions/v2';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { InputValidationError, validateAccountRequest, validateRejectionReason } from './validation.js';
@@ -12,6 +13,8 @@ const ADMIN_COLLECTION = 'admins';
 const PROFILE_COLLECTION = 'profiles';
 const APPLICATION_COLLECTION = 'teacherApplications';
 const PUBLIC_TEACHER_COLLECTION = 'publicTeachers';
+const PARENT_CODE_COLLECTION = 'parentCodes';
+const PARENT_LINK_COLLECTION = 'parentLinks';
 const REGION = 'us-central1';
 
 setGlobalOptions({ region: REGION, maxInstances: 10 });
@@ -86,6 +89,7 @@ export const submitAccountRequest = onCall(async request => {
           displayName: profile.displayName,
           subjectId: profile.subjectId,
           subjectName: profile.subjectName,
+          grades: profile.grades,
           phone: profile.phone ?? null,
           publishConsent: profile.publishConsent,
           status: 'pending',
@@ -97,6 +101,8 @@ export const submitAccountRequest = onCall(async request => {
           displayName: profile.displayName,
           role: 'teacher_applicant',
           status: 'pending',
+          phone: profile.phone ?? null,
+          grades: profile.grades,
           createdAt: FieldValue.serverTimestamp()
         });
         return { role: 'teacher_applicant', status: 'pending', created: true };
@@ -111,7 +117,25 @@ export const submitAccountRequest = onCall(async request => {
         phone: profile.phone ?? null,
         createdAt: FieldValue.serverTimestamp()
       };
-      if (profile.role === 'student') userProfile.grade = profile.grade;
+      if (profile.role === 'student') {
+        userProfile.grade = profile.grade;
+        userProfile.branch = profile.branch;
+        userProfile.className = profile.className;
+        userProfile.birthDate = profile.birthDate;
+        let parentCode;
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          const candidate = `TNG-${String(randomInt(100000, 1000000))}`;
+          const codeRef = db.collection(PARENT_CODE_COLLECTION).doc(candidate);
+          const codeSnapshot = await transaction.get(codeRef);
+          if (!codeSnapshot.exists) {
+            parentCode = candidate;
+            transaction.create(codeRef, { studentUid: uid, active: true, createdAt: FieldValue.serverTimestamp() });
+            break;
+          }
+        }
+        if (!parentCode) throw new HttpsError('aborted', 'تعذر إنشاء كود ولي الأمر.');
+        userProfile.parentCode = parentCode;
+      }
       transaction.create(profileRef, userProfile);
       return { role: profile.role, status: 'active', created: true };
     });
@@ -138,6 +162,32 @@ export const getMyAccountStatus = onCall(async request => {
     displayName: profile.displayName ?? '',
     emailVerified: auth.token.email_verified === true
   };
+});
+
+export const linkParentToStudent = onCall(async request => {
+  const auth = requireAuth(request);
+  const parentProfile = await db.collection(PROFILE_COLLECTION).doc(auth.uid).get();
+  if (!parentProfile.exists || parentProfile.data()?.role !== 'parent' || parentProfile.data()?.status !== 'active') {
+    throw new HttpsError('permission-denied', 'ربط الأبناء متاح لحساب ولي الأمر النشط فقط.');
+  }
+  const code = String(request.data?.code ?? '').trim().toUpperCase();
+  if (!/^TNG-\d{6}$/u.test(code)) throw new HttpsError('invalid-argument', 'كود الربط غير صالح.');
+  const codeSnapshot = await db.collection(PARENT_CODE_COLLECTION).doc(code).get();
+  if (!codeSnapshot.exists || codeSnapshot.data()?.active !== true) throw new HttpsError('not-found', 'كود الربط غير موجود أو غير فعال.');
+  const studentUid = requireUid(codeSnapshot.data().studentUid);
+  if (studentUid === auth.uid) throw new HttpsError('invalid-argument', 'لا يمكن ربط الحساب بنفسه.');
+  const studentProfile = await db.collection(PROFILE_COLLECTION).doc(studentUid).get();
+  if (!studentProfile.exists || studentProfile.data()?.role !== 'student' || studentProfile.data()?.status !== 'active') {
+    throw new HttpsError('failed-precondition', 'حساب الطالب غير متاح للربط.');
+  }
+  await db.collection(PARENT_LINK_COLLECTION).doc(`${auth.uid}_${studentUid}`).set({
+    parentUid: auth.uid,
+    studentUid,
+    code,
+    active: true,
+    createdAt: FieldValue.serverTimestamp()
+  }, { merge: true });
+  return { linked: true, studentUid, displayName: studentProfile.data()?.displayName ?? '' };
 });
 
 export const listTeacherApplications = onCall(async request => {
@@ -209,6 +259,9 @@ export const approveTeacher = onCall(async request => {
       transaction.update(profileRef, {
         role: 'teacher',
         status: 'active',
+        subjectId: application.subjectId,
+        subjectName: application.subjectName,
+        grades: application.grades,
         reviewedAt: FieldValue.serverTimestamp(),
         reviewedBy: auth.uid
       });
