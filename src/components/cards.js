@@ -21,3 +21,7 @@ export function sectionHeading(kicker,title,copy='') {
 export function emptyState(message='لا يوجد محتوى منشور حاليًا') {
   return `<div class="empty-state"><span aria-hidden="true">✦</span><p>${escapeHTML(message)}</p></div>`;
 }
+
+export function skeletonCards(count=3) {
+  return Array.from({length:count},()=>'<div class="skeleton-card"><span class="skeleton skeleton-icon"></span><span class="skeleton skeleton-line short"></span><span class="skeleton skeleton-line title"></span><span class="skeleton skeleton-line"></span></div>').join('');
+}

@@ -28,7 +28,7 @@ const routes=[
   [/^\/results\/?$/,resultsPage],
   [/^\/contact\/?$/,contactPage],
   [/^\/login(?:\/(student|parent|teacher|admin))?\/?$/,loginPage],
-  [/^\/dashboard\/?$/,()=>'<section class="section page dashboard-page"><div class="dashboard-shell"><div class="empty-state" role="status"><span aria-hidden="true">◷</span><p>جارٍ تحميل لوحة الحساب…</p></div></div></section>'],
+  [/^\/dashboard\/?$/,()=>'<section class="section page dashboard-page"><div class="dashboard-shell"><div class="empty-state" role="status"><div class="skeleton-grid" aria-hidden="true"><div class="skeleton-card"><span class="skeleton skeleton-icon"></span><span class="skeleton skeleton-line title"></span><span class="skeleton skeleton-line"></span></div></div><p>جارٍ تحميل لوحة الحساب…</p></div></div></section>'],
   [/^\/admin\/teacher-requests\/?$/,teacherApprovalPage]
 ];
 
@@ -60,7 +60,8 @@ function initializeTheme(){
 function showMessage(target,message,kind='status'){
   if(!target)return;
   target.textContent=message;
-  target.dataset.kind=kind;
+  target.dataset.kind=kind==='status'&&/^تم /u.test(message)?'success':kind;
+  if(message&&target.matches?.('.directory-note'))target.closest('[data-teacher-directory]')?.classList.add('is-settled');
 }
 
 function showSignedInMessage(target,message,kind='status'){
