@@ -1,0 +1,61 @@
+/* ==========================================================================
+   States layer (stage 3): skeleton loading, empty, error and success states.
+   Shimmer moves with transform only.
+   ========================================================================== */
+.skeleton-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem;width:100%;max-width:var(--container,1100px);margin:0 auto}
+.empty-state .skeleton-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));margin-bottom:.5rem}
+.skeleton-card{position:relative;overflow:hidden;display:grid;gap:.7rem;align-content:start;min-height:150px;padding:1.2rem;border:1px solid var(--surface-glass-line);border-radius:var(--radius-l);background:var(--surface-glass);box-shadow:var(--elev-1)}
+.skeleton{position:relative;display:block;overflow:hidden;border-radius:10px;background:#ffffff10}
+:root[data-theme="light"] .skeleton{background:#1b243314}
+.skeleton-icon{width:44px;height:44px;border-radius:14px}
+.skeleton-line{height:.8rem;width:100%}
+.skeleton-line.short{width:35%}
+.skeleton-line.title{height:1.1rem;width:60%}
+.skeleton::after,.skeleton-card::after{content:"";position:absolute;inset:0;transform:translate3d(-100%,0,0);background:linear-gradient(90deg,transparent,#ffffff1f,transparent);animation:shimmer 1.6s var(--ease-in-out,ease-in-out) infinite}
+:root[data-theme="light"] .skeleton::after,:root[data-theme="light"] .skeleton-card::after{background:linear-gradient(90deg,transparent,#ffffffcc,transparent)}
+.skeleton-card::after{display:none}
+[dir="rtl"] .skeleton::after{animation-name:shimmer-rtl}
+@keyframes shimmer{to{transform:translate3d(100%,0,0)}}
+@keyframes shimmer-rtl{from{transform:translate3d(100%,0,0)}to{transform:translate3d(-100%,0,0)}}
+.directory-note{text-align:center;color:var(--muted-strong);margin:1rem 0 0}
+/* Loaded or failed: hide skeletons, show the message as a state card */
+.is-settled>.skeleton-grid{display:none}
+.teacher-directory.is-settled .directory-note,.empty-state.is-settled>p{margin:0}
+.teacher-directory.is-settled .directory-note{padding:2rem 1.5rem;border:1px dashed var(--surface-glass-line);border-radius:var(--radius-l);background:#ffffff05}
+.empty-state.is-settled{padding-block:2.2rem}
+.empty-state.is-settled[data-kind="error"]{border-color:#ffb4a966;background:#ff6a5412}
+.empty-state.is-settled[data-kind="error"]::before{content:"!";display:grid;place-items:center;width:52px;height:52px;border-radius:16px;font-weight:800;font-size:1.5rem;color:var(--danger);background:#ff6a541f;border:1px solid #ffb4a955}
+:root[data-theme="light"] .empty-state.is-settled[data-kind="error"]{background:#fff1ef;border-color:#a3281a55}
+:root[data-theme="light"] .empty-state.is-settled[data-kind="error"]::before{background:#ffe3df}
+
+/* Status messages as small callouts */
+.auth-status:not(:empty),.form-note:not(:empty),.dashboard-status [data-kind]{animation:none}
+.auth-status[data-kind],.form-note[data-kind]{display:flex;align-items:flex-start;gap:.55rem;padding:.7rem .9rem;border-radius:var(--radius-s);border:1px solid var(--surface-glass-line);background:#ffffff08;line-height:1.6}
+.auth-status[data-kind]:empty{display:none}
+.auth-status[data-kind="error"],.form-note[data-kind="error"]{border-color:#ffb4a955;background:#ff6a5414}
+.auth-status[data-kind="success"],.form-note[data-kind="success"]{border-color:#8fe3b055;background:#3ecf8e14}
+.auth-status[data-kind]:not(:empty)::before,.form-note[data-kind]:not(:empty)::before{flex:none;display:grid;place-items:center;width:1.4rem;height:1.4rem;margin-top:.1rem;border-radius:50%;font-size:.8rem;font-weight:800;line-height:1}
+.auth-status[data-kind="status"]::before,.form-note[data-kind="status"]::before{content:"i";background:#c9a24b2e;color:var(--gold-ink)}
+.auth-status[data-kind="error"]::before,.form-note[data-kind="error"]::before{content:"!";background:#ff6a5430;color:var(--danger)}
+.auth-status[data-kind="success"]::before,.form-note[data-kind="success"]::before{content:"✓";background:#3ecf8e30;color:var(--success)}
+:root[data-theme="light"] .auth-status[data-kind="error"],:root[data-theme="light"] .form-note[data-kind="error"]{background:#fff1ef;border-color:#a3281a55}
+:root[data-theme="light"] .auth-status[data-kind="success"],:root[data-theme="light"] .form-note[data-kind="success"]{background:#eafaf1;border-color:#16683a55}
+:root[data-theme="light"] .auth-status[data-kind="status"],:root[data-theme="light"] .form-note[data-kind="status"]{background:#f7f1e3;border-color:#a77c2055}
+.has-motion .auth-status[data-kind]:not(:empty),.has-motion .form-note[data-kind]:not(:empty){animation:stateIn .38s var(--spring,ease) both}
+@keyframes stateIn{from{opacity:0;transform:translate3d(0,6px,0) scale(.97)}to{opacity:1;transform:none}}
+.has-motion .auth-status[data-kind="error"]:not(:empty){animation:stateIn .38s var(--spring,ease) both,nudge .4s ease .05s}
+@keyframes nudge{20%{transform:translate3d(-5px,0,0)}40%{transform:translate3d(5px,0,0)}60%{transform:translate3d(-3px,0,0)}80%{transform:translate3d(3px,0,0)}}
+
+/* Buttons that are working */
+.button:disabled:not([hidden]){position:relative}
+.sign-out-button{margin-inline-start:.5rem}
+
+/* Empty state action spacing */
+.empty-state .button{margin-top:.6rem}
+
+@media(max-width:850px){.skeleton-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.skeleton-grid{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){
+  .skeleton::after{animation:none;display:none}
+  .has-motion .auth-status[data-kind],.has-motion .form-note[data-kind]{animation:none!important}
+}

@@ -1,6 +1,7 @@
 import {home,subjectsPage,subjectPage,teachersPage,renderTeacherCards,newsPage,schedulePage,resultsPage,contactPage,notFound} from './pages/public-pages.js';
 import {loginPage,teacherApprovalPage} from './pages/auth-pages.js';
 import {createRouteHelpers,resolveAppLink} from './utils/routes.js';
+import {initMotion,routeStart,routeEnd,withThemeTransition} from './ui/motion.js';
 
 const moduleScriptUrl=document.querySelector('script[type="module"][src]')?.src;
 const sourceBasePath=moduleScriptUrl?new URL('../',moduleScriptUrl).pathname:'/';
@@ -27,7 +28,7 @@ const routes=[
   [/^\/results\/?$/,resultsPage],
   [/^\/contact\/?$/,contactPage],
   [/^\/login(?:\/(student|parent|teacher|admin))?\/?$/,loginPage],
-  [/^\/dashboard\/?$/,()=>'<section class="section page dashboard-page"><div class="dashboard-shell"><div class="empty-state" role="status"><span aria-hidden="true">◷</span><p>جارٍ تحميل لوحة الحساب…</p></div></div></section>'],
+  [/^\/dashboard\/?$/,()=>'<section class="section page dashboard-page"><div class="dashboard-shell"><div class="empty-state" role="status"><div class="skeleton-grid" aria-hidden="true"><div class="skeleton-card"><span class="skeleton skeleton-icon"></span><span class="skeleton skeleton-line title"></span><span class="skeleton skeleton-line"></span></div></div><p>جارٍ تحميل لوحة الحساب…</p></div></div></section>'],
   [/^\/admin\/teacher-requests\/?$/,teacherApprovalPage]
 ];
 
@@ -59,7 +60,8 @@ function initializeTheme(){
 function showMessage(target,message,kind='status'){
   if(!target)return;
   target.textContent=message;
-  target.dataset.kind=kind;
+  target.dataset.kind=kind==='status'&&/^تم /u.test(message)?'success':kind;
+  if(message&&target.matches?.('.directory-note'))target.closest('[data-teacher-directory]')?.classList.add('is-settled');
 }
 
 function showSignedInMessage(target,message,kind='status'){
@@ -77,12 +79,14 @@ function render(path=currentRoutePath()){
   pageCleanup=()=>{};
   const generation=++pageGeneration;
   const app=document.querySelector('#app');
+  routeStart();
   let html=notFound();
   for(const [pattern,view] of routes){
     const match=path.match(pattern);
     if(match){html=view(...match.slice(1));break;}
   }
   app.innerHTML=html;
+  routeEnd(app);
   normalizeInternalLinks();
   document.title=`${escapeRoute(path)}منصة التناغه الشرقيه الثانويه المشتركه`;
   document.querySelector('#nav')?.classList.remove('open');
@@ -327,7 +331,7 @@ async function handleRegistration(form){
 
 document.addEventListener('click',async event=>{
   const themeButton=event.target.closest('[data-theme-toggle]');
-  if(themeButton){applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');return;}
+  if(themeButton){const next=document.documentElement.dataset.theme==='dark'?'light':'dark';withThemeTransition(()=>applyTheme(next));return;}
 
   const dashboardSignOut=event.target.closest('[data-dashboard-sign-out]');
   if(dashboardSignOut){
@@ -431,8 +435,8 @@ document.addEventListener('click',async event=>{
   if(!resolved)return;
   event.preventDefault();
   history.pushState({},'',`${routeHelpers.toUrlPath(resolved.route)}${resolved.search}${resolved.hash}`);
+  window.scrollTo({top:0,behavior:'instant'});
   render(resolved.route);
-  window.scrollTo({top:0,behavior:'smooth'});
 });
 
 document.addEventListener('submit',event=>{
@@ -460,4 +464,5 @@ document.querySelector('.menu-toggle')?.addEventListener('click',event=>{
   const opened=nav.classList.toggle('open');
   event.currentTarget.setAttribute('aria-expanded',String(opened));
 });
+initMotion();
 render();
