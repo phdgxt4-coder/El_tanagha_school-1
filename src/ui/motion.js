@@ -111,6 +111,26 @@ export function withThemeTransition(change){
   transition.finished.finally(()=>document.documentElement.classList.remove('theme-switching'));
 }
 
+/* ---------- Route content crossfade (no flicker: header and footer stay put) ---------- */
+export function withPageTransition(update){
+  if(reducedMotion()||typeof document.startViewTransition!=='function'||document.documentElement.classList.contains('theme-switching')){update();return;}
+  try{document.startViewTransition(update);}catch{update();}
+}
+
+/* ---------- Dashboard panels: animate the panel a tab reveals ---------- */
+function watchPanels(app){
+  new MutationObserver(records=>{
+    if(reducedMotion())return;
+    for(const r of records){
+      const el=r.target;
+      if(r.attributeName!=='hidden'||el.hidden||!el.matches?.('[data-panel]'))continue;
+      el.classList.remove('panel-enter');
+      void el.offsetWidth;
+      el.classList.add('panel-enter');
+    }
+  }).observe(app,{attributes:true,attributeFilter:['hidden'],subtree:true});
+}
+
 /* ---------- Prefetch the lazy chunks before the tap ---------- */
 const prefetchers={
   dashboard:()=>import('../pages/dashboard-pages.js'),
@@ -183,6 +203,7 @@ export function initMotion(){
   idlePrefetch();
   const app=document.querySelector('#app');
   if(app){
+    watchPanels(app);
     new MutationObserver(()=>raf(()=>reveal(app))).observe(app,{childList:true,subtree:true});
     reveal(app);
   }

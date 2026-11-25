@@ -7,6 +7,10 @@
   --ease-in-out:cubic-bezier(.65,0,.35,1);
   --spring:cubic-bezier(.34,1.4,.64,1);
   --t-fast:.18s;--t-base:.32s;--t-slow:.6s;
+  /* Stage 1 tokens: layers, glass, stagger. Reused by later stages. */
+  --z-base:1;--z-sticky:40;--z-overlay:60;--z-toast:80;
+  --glass-blur:14px;
+  --stagger:70ms;
 }
 @supports (transition-timing-function:linear(0,1)){
   :root{--spring:linear(0,.28 4%,.78 9%,1.06 15%,1.08 19%,1.02 27%,.99 36%,1.003 55%,1)}
@@ -81,6 +85,40 @@
 /* Hero logo float: transform only, desktop */
 @media(min-width:851px){.hero-mark{animation:floaty 8s ease-in-out infinite}}
 
+/* Dashboard panels and tabs: panel slides in when its tab is chosen */
+.has-motion [data-panel]:not([hidden]).panel-enter{animation:panelEnter .34s var(--ease-out) both}
+@keyframes panelEnter{from{opacity:0;transform:translate3d(0,8px,0)}to{opacity:1;transform:none}}
+.stu-tabs [role="tab"],.adm-side nav button,.tch-side nav button{transition:transform var(--t-base) var(--spring),background var(--t-fast) ease,color var(--t-fast) ease}
+.stu-tabs [role="tab"]:active,.adm-side nav button:active,.tch-side nav button:active{transform:scale(.96);transition-duration:.08s}
+.stu-tabs .is-active,.adm-side nav .is-active,.tch-side nav .is-active{animation:pop .4s var(--spring)}
+
+/* Glass utility. Blur only where the pointer is fine (phones keep a solid fill to save GPU) */
+.glass{background:var(--surface-glass);border:1px solid var(--surface-glass-line);box-shadow:var(--elev-1);border-radius:var(--radius-l)}
+@media(hover:hover) and (pointer:fine){@supports (backdrop-filter:blur(1px)){.glass{backdrop-filter:blur(var(--glass-blur)) saturate(1.2)}}}
+
+/* Tooltip: CSS only, shows on hover and keyboard focus. Usage: data-tip="نص" */
+[data-tip]{position:relative}
+[data-tip]::after{content:attr(data-tip);position:absolute;z-index:var(--z-overlay);inset-inline-start:50%;bottom:calc(100% + 8px);width:max-content;max-width:min(240px,70vw);padding:.4rem .65rem;border-radius:var(--radius-s);background:#0b111c;color:#f0f2f5;border:1px solid var(--surface-glass-line);font-size:.8rem;line-height:1.5;text-align:center;pointer-events:none;opacity:0;transform:translate3d(-50%,4px,0);transition:opacity var(--t-fast) ease,transform var(--t-base) var(--ease-out)}
+[dir="rtl"] [data-tip]::after{transform:translate3d(50%,4px,0)}
+[data-tip]:hover::after,[data-tip]:focus-visible::after{opacity:1;transform:translate3d(-50%,0,0)}
+[dir="rtl"] [data-tip]:hover::after,[dir="rtl"] [data-tip]:focus-visible::after{transform:translate3d(50%,0,0)}
+@media(hover:none){[data-tip]:hover::after{opacity:0}}
+
+/* Animated progress: set --p between 0 and 1. Fill grows with scaleX only */
+.progress{position:relative;overflow:hidden;height:8px;border-radius:99px;background:#ffffff14}
+:root[data-theme="light"] .progress{background:#1b243318}
+.progress>i{position:absolute;inset:0;border-radius:inherit;background:var(--gold-grad);transform-origin:right center;transform:scaleX(var(--p,0));transition:transform .7s var(--ease-out)}
+[dir="ltr"] .progress>i{transform-origin:left center}
+.progress.is-pending>i{transform:scaleX(0)}
+
+/* Page content crossfade between routes (View Transitions, only #app is named so the header never flickers) */
+#app{view-transition-name:app}
+::view-transition-group(app){animation-duration:.3s}
+::view-transition-old(app){animation:vtOut .18s ease both}
+::view-transition-new(app){animation:vtIn .3s var(--ease-out) both}
+@keyframes vtOut{to{opacity:0}}
+@keyframes vtIn{from{opacity:0;transform:translate3d(0,8px,0)}}
+
 @media print{.reveal{opacity:1!important;transform:none!important}}
 
 /* Respect the user's motion settings */
@@ -90,5 +128,7 @@
   .ripple,.route-progress{display:none}
   .card:hover,.button:hover,.button:active,.card:active{transform:none}
   .nav,.nav a{transition:none}
+  .panel-enter,.stu-tabs .is-active,.adm-side nav .is-active,.tch-side nav .is-active{animation:none}
+  [data-tip]::after,.progress>i{transition:none}
   ::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}
 }
