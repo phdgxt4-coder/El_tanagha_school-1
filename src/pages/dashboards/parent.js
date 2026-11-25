@@ -1,5 +1,6 @@
 import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { esc, formatDate, gradeNames, pager, say, shellActions } from './common.js';
+import { mountParentChat, renderParentChat } from '../parent-chat.js';
 
 export function renderParent(profile) {
   return `<div class="dash dash-parent" data-dash="parent">
@@ -17,6 +18,7 @@ export function renderParent(profile) {
       <section class="par-card"><h2>جدول الحصص</h2><div data-par-tt></div></section>
       <section class="par-card"><h2>الحضور والغياب</h2><div data-list="attendance"></div><button class="button ghost" type="button" data-more="attendance" hidden>المزيد</button></section>
     </div>
+    <section class="par-card" data-par-chat-card><h2>رسائل المدرسين</h2>${renderParentChat(true)}</section>
     <section class="par-card par-link"><h2>ربط ابن جديد</h2>
       <p class="dash-muted">اطلب من ابنك كود الربط من لوحته. يعمل مرة واحدة ويصلح 15 دقيقة.</p>
       <form class="dashboard-form" data-parent-link><label>كود الطالب<input name="code" maxlength="12" placeholder="TNG-K7M2P9XQ" autocomplete="off" required></label>
@@ -24,12 +26,13 @@ export function renderParent(profile) {
   </div>`;
 }
 
-export function mountParent(root, { auth, database }) {
+export function mountParent(root, { auth, database, profile }) {
   const childrenBox = root.querySelector('[data-children]');
   const stats = root.querySelector('[data-stats]');
   const detail = root.querySelector('[data-detail]');
   let students = [];
   let current = null;
+  const pchat = mountParentChat(root.querySelector('[data-par-chat-card]'), { profile: { uid: profile.uid, role: 'parent', displayName: profile.displayName || '' }, database });
 
   async function summary(uid) {
     const [gradeSnap, attSnap] = await Promise.all([
@@ -69,6 +72,7 @@ export function mountParent(root, { auth, database }) {
     stats.hidden = false; detail.hidden = false; root.querySelector('[data-report-wrap]').hidden = false;
     summary(uid).catch(() => {});
     void classInfo(uid);
+    { const st = students.find(item => item.uid === uid); void pchat.setChild(st ? { classId: st.classId, studentName: st.displayName } : null); }
     const gradeRow = item => `<div class="par-row"><span>${esc(item.subjectName || item.subjectId || '')} ${esc(item.title || '')}</span><b>${esc(item.score)}${item.max ? '/' + esc(item.max) : ''}</b></div>`;
     const attRow = item => `<div class="par-row"><span>${esc(item.date)}</span><b class="${item.present ? 'ok' : 'bad'}">${item.present ? 'حاضر' : 'غائب'}</b></div>`;
     detail.querySelector('[data-more="grades"]').replaceWith(detail.querySelector('[data-more="grades"]').cloneNode(true));

@@ -146,3 +146,16 @@ export async function mountBell(root, { profile, database }) {
   });
   return stop;
 }
+
+/** يعطي كل حقل بلا تسمية اسمًا يقرؤه قارئ الشاشة (من placeholder أو أول خيار أو عنوان القسم)، ويراقب الحقول المضافة لاحقًا. */
+export function labelOrphans(root) {
+  const fix = scope => {
+    scope.querySelectorAll?.('input:not([type=hidden]):not([type=checkbox]):not([type=radio]), select, textarea').forEach(field => {
+      if (field.getAttribute('aria-label') || field.getAttribute('aria-labelledby') || field.closest('label') || (field.id && root.querySelector(`label[for="${field.id}"]`))) return;
+      const text = field.getAttribute('placeholder') || field.querySelector?.('option')?.textContent || field.getAttribute('title') || field.closest('section')?.querySelector('h1,h2')?.textContent || '';
+      if (text.trim()) field.setAttribute('aria-label', text.trim());
+    });
+  };
+  fix(root);
+  new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(node => { if (node.nodeType === 1) fix(node.matches?.('input,select,textarea') ? node.parentNode : node); }))).observe(root, { childList: true, subtree: true });
+}

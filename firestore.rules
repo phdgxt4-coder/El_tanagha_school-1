@@ -204,6 +204,7 @@ service cloud.firestore {
         isActiveAdmin()
         || resource.data.teacherUid == request.auth.uid
         || (isActiveStudent() && resource.data.classId == profile(request.auth.uid).classId)
+        || parentSeesClass(resource.data.classId)
       );
       allow create, update: if isActiveAdmin()
         && request.resource.data.keys().hasOnly(['teacherUid', 'subjectId', 'classId', 'subjectName', 'className', 'grade', 'year', 'teacherName', 'assignedBy', 'assignedAt'])
@@ -463,6 +464,21 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // رسائل نموذج التواصل: يكتبها أي زائر (بدون حساب) بشكل ثابت، والإدارة فقط تقرأ وتعلّمها مقروءة أو تحذفها.
+    match /contactMessages/{messageId} {
+      allow create: if request.resource.data.keys().hasOnly(['name', 'email', 'message', 'read', 'createdAt'])
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 60
+        && request.resource.data.email is string && request.resource.data.email.size() <= 120
+        && request.resource.data.message is string && request.resource.data.message.size() > 0 && request.resource.data.message.size() <= 800
+        && request.resource.data.read == false
+        && request.resource.data.createdAt == request.time;
+      allow get, list: if isActiveAdmin();
+      allow update: if isActiveAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
+        && request.resource.data.read is bool;
+      allow delete: if isActiveAdmin();
+    }
+
     match /content/{contentId} {
       allow get, list: if signedIn() && (
         isActiveAdmin()
@@ -697,6 +713,14 @@ service cloud.firestore {
         && request.resource.data.lastBy == request.auth.uid
         && request.resource.data.lastAt == request.time
         && request.resource.data.lastText is string && request.resource.data.lastText.size() <= 80;
+      // إيصال القراءة: كل طرف يكتب وقت قراءته هو فقط (studentReadAt للطالب، teacherReadAt للمدرس).
+      allow update: if signedIn()
+        && ((resource.data.studentUid == request.auth.uid
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['studentReadAt'])
+              && request.resource.data.studentReadAt == request.time)
+          || (resource.data.teacherUid == request.auth.uid
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['teacherReadAt'])
+              && request.resource.data.teacherReadAt == request.time));
       allow delete: if false;
 
       match /messages/{messageId} {
@@ -704,6 +728,55 @@ service cloud.firestore {
         allow create: if chatParty(cid) && validChatText(request.resource.data)
           && request.resource.data.senderUid == request.auth.uid
           && getAfter(/databases/$(database)/documents/conversations/$(cid)).data.lastAt == request.time;
+        allow update, delete: if false;
+      }
+    }
+
+    // محادثات ولي الأمر والمدرس: يبدأها ولي الأمر مع مدرس مُسنَد لفصل ابنه المرتبط فقط. المعرّف: parentUid_teacherUid
+    function pcParty(cid) {
+      return signedIn() && (cid.split('_')[0] == request.auth.uid || cid.split('_')[1] == request.auth.uid);
+    }
+    function pcRateOk(cid) {
+      return get(/databases/$(database)/documents/parentConversations/$(cid)).data.lastAt < request.time - duration.value(2, 's');
+    }
+
+    match /parentConversations/{cid} {
+      allow get: if pcParty(cid);
+      allow list: if signedIn()
+        && (resource.data.parentUid == request.auth.uid || resource.data.teacherUid == request.auth.uid);
+      allow create: if isActiveParent()
+        && cid == request.auth.uid + '_' + request.resource.data.teacherUid
+        && request.resource.data.keys().hasOnly(['parentUid', 'teacherUid', 'parentName', 'teacherName', 'studentName', 'classId', 'subjectId', 'lastAt', 'lastText', 'lastBy'])
+        && request.resource.data.parentUid == request.auth.uid
+        && request.resource.data.lastBy == request.auth.uid
+        && request.resource.data.lastAt == request.time
+        && request.resource.data.lastText is string && request.resource.data.lastText.size() <= 80
+        && request.resource.data.parentName is string && request.resource.data.parentName.size() <= 80
+        && request.resource.data.teacherName is string && request.resource.data.teacherName.size() <= 80
+        && request.resource.data.studentName is string && request.resource.data.studentName.size() <= 80
+        && parentSeesClass(request.resource.data.classId)
+        && exists(/databases/$(database)/documents/teacherAssignments/$(request.resource.data.teacherUid + '_' + request.resource.data.subjectId + '_' + request.resource.data.classId))
+        && profile(request.resource.data.teacherUid).status == 'active';
+      allow update: if pcParty(cid) && pcRateOk(cid)
+        && (resource.data.teacherUid == request.auth.uid ? isActiveTeacher() : parentSeesClass(resource.data.classId))
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastAt', 'lastText', 'lastBy'])
+        && request.resource.data.lastBy == request.auth.uid
+        && request.resource.data.lastAt == request.time
+        && request.resource.data.lastText is string && request.resource.data.lastText.size() <= 80;
+      allow update: if signedIn()
+        && ((resource.data.parentUid == request.auth.uid
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['parentReadAt'])
+              && request.resource.data.parentReadAt == request.time)
+          || (resource.data.teacherUid == request.auth.uid
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['teacherReadAt'])
+              && request.resource.data.teacherReadAt == request.time));
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow get, list: if pcParty(cid);
+        allow create: if pcParty(cid) && validChatText(request.resource.data)
+          && request.resource.data.senderUid == request.auth.uid
+          && getAfter(/databases/$(database)/documents/parentConversations/$(cid)).data.lastAt == request.time;
         allow update, delete: if false;
       }
     }

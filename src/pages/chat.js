@@ -1,5 +1,5 @@
 import {
-  addDoc, collection, doc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, where, writeBatch
+  addDoc, collection, doc, getDocs, updateDoc, limit, onSnapshot, orderBy, query, serverTimestamp, where, writeBatch
 } from 'firebase/firestore';
 import { esc, formatDate } from './dashboards/common.js';
 
@@ -43,13 +43,37 @@ export function mountChat(root, { profile, database }) {
     active = { studentUid, teacherUid, studentName, teacherName, isNew };
     $('[data-chat-title]').textContent = isStudent ? teacherName : studentName;
     listBox.hidden = true; thread.hidden = false; msgs.innerHTML = ''; note.textContent = '';
-    const q = query(collection(database, 'conversations', conversationId(studentUid, teacherUid), 'messages'), orderBy('createdAt', 'desc'), limit(50));
-    stopThread = onSnapshot(q, snapshot => {
-      active.isNew = false;
-      const items = snapshot.docs.map(item => item.data()).reverse();
-      msgs.innerHTML = items.map(item => `<p class="chat-msg ${item.senderUid === profile.uid ? 'mine' : 'theirs'}">${esc(item.text)}<time>${formatDate(item.createdAt)}</time></p>`).join('');
+    const cid = conversationId(studentUid, teacherUid);
+    const myField = isStudent ? 'studentReadAt' : 'teacherReadAt', otherField = isStudent ? 'teacherReadAt' : 'studentReadAt';
+    let items = [], conv = {}, marking = false;
+    const millis = value => value?.toMillis?.() ?? 0;
+    const paint = () => {
+      const otherRead = millis(conv[otherField]);
+      msgs.innerHTML = items.map(item => {
+        const mine = item.senderUid === profile.uid;
+        const tick = mine ? `<span class="chat-tick" aria-label="${otherRead && otherRead >= millis(item.createdAt) ? 'تمت القراءة' : 'تم الإرسال'}">${otherRead && otherRead >= millis(item.createdAt) ? '✓✓' : '✓'}</span>` : '';
+        return `<p class="chat-msg ${mine ? 'mine' : 'theirs'}">${esc(item.text)}<time>${formatDate(item.createdAt)}</time>${tick}</p>`;
+      }).join('');
       msgs.scrollTop = msgs.scrollHeight;
+    };
+    const markRead = () => {
+      const latest = items[items.length - 1];
+      if (marking || !latest || latest.senderUid === profile.uid || active?.isNew) return;
+      if (millis(conv[myField]) >= millis(latest.createdAt) && conv[myField]) return;
+      marking = true;
+      updateDoc(doc(database, 'conversations', cid), { [myField]: serverTimestamp() }).catch(() => {}).finally(() => { marking = false; });
+    };
+    const q = query(collection(database, 'conversations', cid, 'messages'), orderBy('createdAt', 'desc'), limit(50));
+    const stopMsgs = onSnapshot(q, snapshot => {
+      active.isNew = false;
+      items = snapshot.docs.map(item => item.data()).reverse();
+      paint(); markRead();
     }, () => { if (!active.isNew) note.textContent = 'تعذر تحميل الرسائل.'; });
+    const stopConv = onSnapshot(doc(database, 'conversations', cid), snapshot => {
+      conv = snapshot.data() ?? {};
+      paint(); markRead();
+    }, () => {});
+    stopThread = () => { stopMsgs(); stopConv(); };
   };
 
   $('[data-chat-back]').addEventListener('click', () => { stopThread(); thread.hidden = true; listBox.hidden = false; });
@@ -66,7 +90,7 @@ export function mountChat(root, { profile, database }) {
   const convs = new Map();
   const renderConvs = () => {
     const rows = [...convs.values()].sort((a, b) => (b.lastAt?.toMillis?.() ?? 0) - (a.lastAt?.toMillis?.() ?? 0));
-    convBox.innerHTML = rows.length ? rows.map(item => `<button type="button" class="stu-row chat-conv" data-conv="${esc(item.id)}"><b>${esc(isStudent ? item.teacherName : item.studentName)}</b><span>${esc(item.lastText)}</span></button>`).join('') : '<p class="dash-empty">لا توجد محادثات بعد.</p>';
+    convBox.innerHTML = rows.length ? rows.map(item => `<button type="button" class="stu-row chat-conv" data-conv="${esc(item.id)}"><b>${esc(isStudent ? item.teacherName : item.studentName)}</b><span>${esc(item.lastText)}</span>${item.lastBy !== profile.uid && (item[isStudent ? 'studentReadAt' : 'teacherReadAt']?.toMillis?.() ?? 0) < (item.lastAt?.toMillis?.() ?? 0) ? '<mark>جديدة</mark>' : ''}</button>`).join('') : '<p class="dash-empty">لا توجد محادثات بعد.</p>';
   };
   const field = isStudent ? 'studentUid' : 'teacherUid';
   stopList = onSnapshot(query(collection(database, 'conversations'), where(field, '==', profile.uid), orderBy('lastAt', 'desc'), limit(30)), snapshot => {

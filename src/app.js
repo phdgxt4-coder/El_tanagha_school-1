@@ -521,7 +521,13 @@ document.addEventListener('submit',event=>{
   if(form.dataset?.adminJoin){event.preventDefault();handleAdminJoin(form);return;}
   if(form.id==='contact-form'){
     event.preventDefault();
-    form.querySelector('.form-note').textContent='لم يتم إرسال رسالتك أو حفظها؛ خدمة الإرسال ستُفعّل لاحقًا.';
+    const note=form.querySelector('.form-note');
+    const button=form.querySelector('button[type=submit]');
+    button.disabled=true;note.textContent='جارٍ الإرسال...';
+    import('./services/spark-backend.js').then(api=>api.sendContactMessage({name:form.elements.name.value,email:form.elements.email.value,message:form.elements.message.value}))
+      .then(()=>{form.reset();note.textContent='وصلت رسالتك للإدارة. شكرًا لك.';})
+      .catch(()=>{note.textContent='تعذر الإرسال الآن. حاول لاحقًا أو اتصل بالمدرسة.';})
+      .finally(()=>{button.disabled=false;});
     return;
   }
   if(form.id==='login-form'){
@@ -538,6 +544,15 @@ document.addEventListener('submit',event=>{
 window.addEventListener('popstate',()=>render(currentRoutePath()));
 initializeTheme();
 initErrorReporter();
+if(import.meta.env?.PROD&&'serviceWorker' in navigator){
+  addEventListener('load',()=>navigator.serviceWorker.register(`${import.meta.env.BASE_URL||'/'}sw.js`,{scope:import.meta.env.BASE_URL||'/'}).catch(()=>{}));
+}
+function syncOnlineBanner(){
+  let bar=document.getElementById('offline-bar');
+  if(navigator.onLine){bar?.remove();return;}
+  if(!bar){bar=document.createElement('div');bar.id='offline-bar';bar.setAttribute('role','status');bar.textContent='لا يوجد اتصال بالإنترنت. البيانات الحية لن تعمل حتى يعود الاتصال.';bar.style.cssText='position:fixed;inset:auto 0 0 0;z-index:9999;padding:.6rem 1rem;text-align:center;background:#b45309;color:#fff;font-weight:700';document.body.append(bar);}
+}
+addEventListener('online',syncOnlineBanner);addEventListener('offline',syncOnlineBanner);syncOnlineBanner();
 document.querySelector('.menu-toggle')?.addEventListener('click',event=>{
   const nav=document.querySelector('#nav');
   const opened=nav.classList.toggle('open');

@@ -149,3 +149,4 @@
 .rc-table{width:100%;border-collapse:collapse;margin:1rem 0}.rc-table th,.rc-table td{border:1px solid #999;padding:.35rem .6rem;text-align:right}
 .rc-note{font-size:.8rem;color:#444}
 @media print{body.rc-open>*:not(.report-overlay){display:none!important}.report-overlay{position:static;padding:0}.report-overlay .rc-bar{display:none}}
+.chat-tick{margin-inline-start:.5rem;font-size:.8rem;opacity:.8}

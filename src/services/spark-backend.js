@@ -1,7 +1,7 @@
 // تنفيذ عمليات الحسابات والإدارة مباشرة على Firestore بدون Cloud Functions.
 // كل ثابت أمني تفرضه قواعد Firestore (firestore.rules)، وهذا الملف يطابق أشكال بيانات وظائف Blaze.
 import {
-  collection, deleteDoc, doc, getDoc, getDocs, getFirestore, limit, orderBy, query, serverTimestamp, startAfter, Timestamp, where, writeBatch
+  collection, deleteDoc, doc, getDoc, getDocs, getFirestore, limit, orderBy, query, serverTimestamp, setDoc, startAfter, Timestamp, updateDoc, where, writeBatch
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getFirebaseApp } from '../config/firebase-app.js';
@@ -567,4 +567,23 @@ export async function claimAdminInvite(displayName) {
   batch.set(doc(database, 'admins', user.uid), { active: true, email, displayName: name, createdBy: invite.data().createdBy, createdAt: serverTimestamp() });
   await batch.commit();
   return { admin: true };
+}
+
+export async function sendContactMessage({ name, email, message }) {
+  const clean = { name: String(name ?? '').trim().slice(0, 60), email: String(email ?? '').trim().slice(0, 120), message: String(message ?? '').trim().slice(0, 800) };
+  if (!clean.name || !clean.message) throw fail('invalid-argument', 'الاسم والرسالة مطلوبان.');
+  await setDoc(doc(collection(db(), 'contactMessages')), { ...clean, read: false, createdAt: serverTimestamp() });
+}
+
+export async function adminListContactMessages() {
+  const snapshot = await getDocs(query(collection(db(), 'contactMessages'), orderBy('createdAt', 'desc'), limit(50)));
+  return snapshot.docs.map(item => ({ id: item.id, ...item.data(), createdAt: item.data().createdAt?.toDate?.() ?? null }));
+}
+
+export async function adminSetContactRead(id, read) {
+  await updateDoc(doc(db(), 'contactMessages', id), { read: read === true });
+}
+
+export async function adminDeleteContactMessage(id) {
+  await deleteDoc(doc(db(), 'contactMessages', id));
 }

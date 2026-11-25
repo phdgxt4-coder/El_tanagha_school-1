@@ -14,9 +14,10 @@ self.addEventListener('push', event => {
 });
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  const target = new URL(self.registration.scope).pathname + 'dashboard';
+  const root = new URL('../', self.registration.scope);
+  const target = root.pathname + 'dashboard';
   event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-    const open = list.find(client => client.url.includes(self.registration.scope));
+    const open = list.find(client => client.url.startsWith(root.href));
     return open ? open.focus() : self.clients.openWindow(target);
   }));
 });
