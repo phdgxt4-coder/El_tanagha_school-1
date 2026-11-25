@@ -40,6 +40,7 @@ export function loginPage(role = 'student') {
         ${registerAvailable?'<button type="button" class="auth-tab" role="tab" data-auth-mode="register" aria-selected="false">إنشاء حساب</button>':''}
       </div>
       <form id="login-form" data-auth-form="login">
+        <div class="mascot-slot" data-mascot aria-hidden="true"></div>
         <label>البريد الإلكتروني<input name="email" type="email" autocomplete="username" required maxlength="254"></label>
         <label>كلمة المرور<input name="password" type="password" autocomplete="current-password" required minlength="8" maxlength="128"></label>
         <button class="button" type="submit">دخول آمن</button>

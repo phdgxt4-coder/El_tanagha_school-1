@@ -81,6 +81,14 @@
 /* Hero logo float: transform only, desktop */
 @media(min-width:851px){.hero-mark{animation:floaty 8s ease-in-out infinite}}
 
+/* Password field with plain eye */
+.pw-field{position:relative;display:block}
+.pw-field input{width:100%;padding-inline-end:2.9rem}
+.pw-toggle{position:absolute;inset-block:0;inset-inline-end:.35rem;display:grid;place-items:center;width:2.4rem;padding:0;border:0;border-radius:var(--radius-s,12px);background:transparent;color:var(--muted);cursor:pointer}
+.pw-toggle:hover,.pw-toggle:focus-visible{color:var(--gold2)}
+.pw-toggle .pw-slash{opacity:1;transition:opacity .15s ease}
+.pw-toggle.is-shown .pw-slash{opacity:0}
+
 @media print{.reveal{opacity:1!important;transform:none!important}}
 
 /* Respect the user's motion settings */

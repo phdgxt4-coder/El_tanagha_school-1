@@ -1,0 +1,63 @@
+/* Mascot. Only transform and opacity change. Colours come from variables for light and dark. */
+.mascot-slot{display:grid;place-items:center;height:132px;margin-bottom:.4rem}
+.mascot{width:132px;height:auto;overflow:visible;--m-body:#e4bf63;--m-belly:#f7e7b4;--m-ink:#241a06;--m-cap:#1b2437;--m-cap2:#2a3652;--m-cheek:#f08a7a;--m-eye:#fff;--m-fx:#e4bf63}
+:root[data-theme="light"] .mascot{--m-body:#d9a93b;--m-belly:#f6e3a8;--m-cap:#27324a;--m-cap2:#3a4968;--m-fx:#a77c20}
+.mascot .m-shadow{fill:#0000004d}
+.mascot .m-body{fill:var(--m-body)}.mascot .m-belly{fill:var(--m-belly)}
+.mascot .m-cap-top{fill:var(--m-cap)}.mascot .m-cap-base{fill:var(--m-cap2)}
+.mascot .m-tassel{stroke:var(--m-fx);stroke-width:3;fill:none;stroke-linecap:round}.mascot .m-tassel-end{fill:var(--m-fx)}
+.mascot .m-eye-bg{fill:var(--m-eye)}.mascot .m-pupil{fill:var(--m-ink)}.mascot .m-glint{fill:#fff}
+.mascot .m-arcs path,.mascot .m-lids path,.mascot .m-brows path,.mascot .m-mouth,.mascot .m-flat{fill:none;stroke:var(--m-ink);stroke-width:4;stroke-linecap:round;stroke-linejoin:round}
+.mascot .m-open,.mascot .m-o{fill:var(--m-ink)}
+.mascot .m-cheeks ellipse{fill:var(--m-cheek);opacity:.55}
+.mascot .m-hand{fill:var(--m-body);stroke:var(--m-ink);stroke-width:3}
+.mascot .m-dots circle,.mascot .m-spark path{fill:var(--m-fx)}
+.mascot .m-tear path{fill:#7cc4ff}
+
+/* Parts hidden by default, shown per mood with opacity */
+.mascot .m-arcs,.mascot .m-lids,.mascot .m-brows,.mascot .m-mouth,.mascot .m-fx>g{opacity:0;transition:opacity .2s ease}
+.mascot .m-eyes,.mascot .m-pupils{transition:opacity .15s ease,transform .3s var(--ease-out,ease-out)}
+.mascot .m-arm{transform-box:fill-box;transform-origin:50% 100%;transition:transform .45s var(--spring,cubic-bezier(.34,1.4,.64,1))}
+.mascot .m-body-g,.mascot .m-all{transform-box:fill-box;transform-origin:50% 100%}
+
+/* moods */
+.mascot[data-mood="happy"] .m-smile,.mascot[data-mood="happy"] .m-brows{opacity:1}
+.mascot[data-mood="waving"] .m-smile,.mascot[data-mood="waving"] .m-brows{opacity:1}
+.mascot[data-mood="waving"] .m-arm-r{animation:mWave .9s ease-in-out infinite;transform-origin:50% 90%}
+.mascot[data-mood="thinking"] .m-flat,.mascot[data-mood="thinking"] .m-brows,.mascot[data-mood="thinking"] .m-dots{opacity:1}
+.mascot[data-mood="thinking"] .m-pupils{transform:translate3d(5px,-4px,0)}
+.mascot[data-mood="thinking"] .m-brow-r{transform:translate3d(0,-5px,0)}
+.mascot[data-mood="waiting"] .m-o,.mascot[data-mood="waiting"] .m-brows,.mascot[data-mood="waiting"] .m-dots{opacity:1}
+.mascot[data-mood="waiting"] .m-dots circle{animation:mDots 1.2s ease-in-out infinite}
+.mascot[data-mood="waiting"] .m-dots circle:nth-child(2){animation-delay:.2s}
+.mascot[data-mood="waiting"] .m-dots circle:nth-child(3){animation-delay:.4s}
+.mascot[data-mood="celebrating"] .m-arcs,.mascot[data-mood="celebrating"] .m-open,.mascot[data-mood="celebrating"] .m-spark{opacity:1}
+.mascot[data-mood="celebrating"] .m-eyes{opacity:0}
+.mascot[data-mood="celebrating"] .m-arm-l{transform:translate3d(-4px,-34px,0) rotate(-20deg)}
+.mascot[data-mood="celebrating"] .m-arm-r{transform:translate3d(4px,-34px,0) rotate(20deg)}
+.mascot[data-mood="celebrating"] .m-body-g{animation:mHop .6s var(--ease-out,ease-out) 2}
+.mascot[data-mood="celebrating"] .m-spark{animation:mTwinkle .8s ease-in-out infinite alternate}
+.mascot[data-mood="sad"] .m-frown,.mascot[data-mood="sad"] .m-brows,.mascot[data-mood="sad"] .m-tear{opacity:1}
+.mascot[data-mood="sad"] .m-pupils{transform:translate3d(0,4px,0)}
+.mascot[data-mood="sad"] .m-brow-l{transform:rotate(14deg);transform-box:fill-box;transform-origin:center}
+.mascot[data-mood="sad"] .m-brow-r{transform:rotate(-14deg);transform-box:fill-box;transform-origin:center}
+.mascot[data-mood="sad"] .m-body-g{transform:translate3d(0,3px,0) scaleY(.97)}
+
+/* Password behaviour: covering wins over the mood */
+.mascot.is-covering .m-arm-l{transform:translate3d(30px,-34px,0)}
+.mascot.is-covering .m-arm-r{transform:translate3d(-30px,-34px,0)}
+.mascot.is-covering .m-arm{animation:none}
+.mascot.is-covering .m-eyes{opacity:0}
+.mascot.is-covering .m-lids{opacity:1}
+.mascot.is-peeking .m-pupils{transform:translate3d(-4px,2px,0)}
+@keyframes mWave{0%,100%{transform:rotate(0)}50%{transform:translate3d(0,-16px,0) rotate(-22deg)}}
+@keyframes mHop{50%{transform:translate3d(0,-14px,0)}}
+@keyframes mDots{0%,100%{opacity:.25}50%{opacity:1}}
+@keyframes mTwinkle{to{transform:scale(1.12);opacity:.6}}
+/* Blink */
+@keyframes mBlink{0%,94%,100%{transform:scaleY(1)}97%{transform:scaleY(.1)}}
+.mascot .m-eyes{transform-box:fill-box;transform-origin:50% 50%;animation:mBlink 5s infinite}
+
+@media(prefers-reduced-motion:reduce){
+  .mascot *,.mascot{animation:none!important;transition:none!important}
+}

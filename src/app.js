@@ -3,6 +3,7 @@ import {loginPage,teacherApprovalPage,adminJoinPage} from './pages/auth-pages.js
 import {createRouteHelpers,resolveAppLink} from './utils/routes.js';
 import {initErrorReporter} from './services/error-reporter.js';
 import {TRACKS} from '../functions/src/validation.js';
+import {enhancePasswordFields} from './ui/password-toggle.js';
 import {initMotion,routeStart,routeEnd,withThemeTransition} from './ui/motion.js';
 
 const moduleScriptUrl=document.querySelector('script[type="module"][src]')?.src;
@@ -97,7 +98,12 @@ function render(path=currentRoutePath()){
   document.querySelector('#nav')?.classList.remove('open');
   document.querySelector('.menu-toggle')?.setAttribute('aria-expanded','false');
   if(/^\/teachers\/?$/.test(path)) initializeTeacherDirectory(generation);
-  if(/^\/login(?:\/|$)/.test(path)) initializeAuthPage(generation);
+  if(/^\/login(?:\/|$)/.test(path)||/^\/admin\/join\/?$/.test(path))enhancePasswordFields(app);
+  if(/^\/login(?:\/|$)/.test(path)){
+    const slot=app.querySelector('[data-mascot]');
+    if(slot)import('./ui/mascot.js').then(({mountLoginMascot})=>{if(slot.isConnected)mountLoginMascot(slot);}).catch(()=>{});
+    initializeAuthPage(generation);
+  }
   if(/^\/admin\/teacher-requests\/?$/.test(path)) initializeTeacherApprovals(generation);
   if(/^\/dashboard\/?$/.test(path)) initializeDashboard(generation);
 }
