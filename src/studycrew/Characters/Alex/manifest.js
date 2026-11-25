@@ -2,10 +2,11 @@ const art=n=>new URL(`./art/${n}.webp`,import.meta.url).href;
 const FR={happy:art('happy'),thinking:art('thinking'),success:art('success'),error:art('error'),hidden:art('hidden')};
 const ST={Idle:'happy',Wave:'happy',Wake:'happy',Sleep:'happy',Reading:'thinking',Typing:'thinking',Searching:'thinking',Thinking:'thinking',Loading:'thinking',Success:'success',Celebrate:'success',Error:'error',HiddenPassword:'hidden',VisiblePassword:'happy'};
 const pa=n=>new URL(`./art/puppet/${n}.webp`,import.meta.url).href;
-const PUPPET={size:640,src:1254,parts:Object.fromEntries(['tail','body','earL','earR','head','irisL','irisR','lidL','lidR'].map(n=>[n,pa(n)])),
-  meta:{"tail": [210, 649, 426, 432], "body": [431, 555, 437, 648], "earL": [220, 25, 382, 481], "earR": [685, 22, 379, 483], "head": [387, 117, 516, 510], "irisL": [504, 420, 106, 106], "lidL": [470, 400, 160, 140], "irisR": [697, 406, 106, 106], "lidR": [690, 385, 160, 145]},
-  geo:{spine:{n:6,P:[650,1190],theta:-90,len:640},tail:{n:5,P:[610,985],theta:-143.6,len:470},earL:{n:4,P:[520,470],theta:-122.7,len:500},earR:{n:4,P:[740,470],theta:-54.5,len:516},
-    hipStrip:1,neck:[640,600],shadow:[650,1196,190],eye:{L:[548,473,56,43],R:[762,460,54,46]},gaze:[9,5]}};
+const PUPPET={size:640,src:1254,parts:Object.fromEntries(['tail','torso','armL','armR','earL','earR','head','irisL','irisR','lidL','lidR'].map(n=>[n,pa(n)])),
+  meta:{"tail": [211, 651, 418, 429], "torso": [432, 564, 436, 639], "armL": [435, 608, 167, 376], "armR": [731, 632, 139, 351], "earL": [221, 24, 376, 493], "earR": [683, 22, 381, 491], "head": [396, 114, 501, 499], "scroll": [612, 620, 249, 347], "irisL": [504, 411, 98, 98], "lidL": [479, 400, 136, 116], "irisR": [698, 404, 100, 100], "lidR": [691, 391, 138, 120], "eye": {"L": [547, 458, 54, 44], "R": [760, 451, 55, 46]}},
+  geo:{spine:{n:6,P:[650,1190],theta:-90,len:570},tail:{n:5,P:[610,985],theta:-143.6,len:470},earL:{n:4,P:[520,470],theta:-122.7,len:500},earR:{n:4,P:[740,470],theta:-54.5,len:516},
+    armL:{n:6,P:[500,650],theta:96,len:340},armR:{n:6,P:[800,660],theta:84,len:320},
+    hipStrip:1,shoulderStrip:5,neck:[650,600],shadow:[650,1196,190],gaze:[11,7]}};
 export default {
   id:'alex',name:'Alex',ar:'أليكس',role:'Lead. Home, search, AI assistant, student dashboard, 404.',shape:'fennec',
   palette:{main:'#f0b868',accent:'#fbe3b8',ink:'#3a2418',extra:{light:'#f9d79a',earIn:'#f4a9a3',cap:'#1d2a6b',gold:'#e4bf63'}},speed:0.95,

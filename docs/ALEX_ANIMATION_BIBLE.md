@@ -48,13 +48,14 @@ Extra pieces: torso (shoulders and arms, warped with scale, skew and rotation ar
 ## What flat-image layers cannot do
 No real deformation (bending a limb, turning the head in 3D, squashing the face), no revealed art behind moving parts (seams and thin ghosting during a pose crossfade, one visible frame on the Error swap), no eyelids that match the fur, no cloth or fur simulation. The last mile is an artist-rigged Rive (or Spine) file with separate layers and bones, driven by the same state names.
 
-## Motion v4: puppet (Alex only)
-Alex is no longer a set of swapped pose pictures. `src/studycrew/Shared/puppet-renderer.js` draws separated parts
-(body clean plate, tail, two ears, head, irises, closed-eye lids) on Canvas 2D.
-- Spine: 6 strips bent joint by joint (lean, crouch, breathing, weight shift). Tail attaches at the hip, head at the neck.
-- Tail: 5 strips, each following the previous one with lag. Ears: 4 strips each, driven by head and body acceleration.
-- Gaze: irises slide inside the eye opening. Order: eyes first, head 90 ms later, body 180 ms later.
-- Clips: Idle (random glance, ear flick, posture change, blinks), Curious, Happy, Thinking, plus Success, Error, HiddenPassword, Sleep, Wake.
-Limits (honest): parts come from AI-generated pictures, so bends stay moderate. Face has no eyebrow or mouth change. The cap
-does not swing on its own. Nothing is tested on a real phone. Weak devices and reduced motion use the simple image renderer.
-Next level needs a hand-rigged Rive or Spine file from layered artwork.
+## Motion v5: puppet with arms (Alex only)
+`src/studycrew/Shared/puppet-renderer.js` (Canvas 2D). Parts: torso clean plate (no head, tail or arms), two arms, tail, two ears, head,
+irises, closed-eye lids. All came from one AI-generated base picture (arms hanging) split with the image tool and fitted by hand.
+- Spine: 6 strips (breathing, lean, crouch, weight shift). Tail on the hip, arms on the shoulders, head on the neck.
+- Arms: 6 strips each (shoulder lift, elbow curl, wrist), joints lag toward the hand. Wave comes from the shoulder.
+- Tail: 5 strips following each other. Ears: 4 strips each, pushed by head and body acceleration.
+- Eyes: irises slide inside the eye opening and the lid sweeps down. Eyes first, head 90 ms later, body 180 ms later.
+- Clips: Idle, Curious, Happy, Thinking, Wave, HiddenPassword (look at screen, shrug, hands to eyes, hands come down on exit), Success, Error, Sleep, Wake.
+Limits (honest): parts are cut from AI pictures, so bends stay moderate and arms look soft ("noodle") at big bends. No eyebrow or
+mouth change, no finger poses, no leg movement, the cap and the scroll are not separate parts (the scroll was dropped with the new rest pose).
+Weak devices and reduced motion use the simple image renderer. Not tested on a real phone. A real rig needs a Rive or Spine file.
