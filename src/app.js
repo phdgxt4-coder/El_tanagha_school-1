@@ -1,4 +1,4 @@
-import {home,subjectsPage,subjectPage,teachersPage,renderTeacherCards,newsPage,schedulePage,resultsPage,contactPage,notFound} from './pages/public-pages.js';
+import {home,subjectsPage,subjectPage,teachersPage,renderTeacherCards,newsPage,schedulePage,resultsPage,contactPage,privacyPage,notFound} from './pages/public-pages.js';
 import {loginPage,teacherApprovalPage} from './pages/auth-pages.js';
 import {createRouteHelpers,resolveAppLink} from './utils/routes.js';
 import {initMotion,routeStart,routeEnd,withThemeTransition} from './ui/motion.js';
@@ -27,6 +27,7 @@ const routes=[
   [/^\/schedule\/?$/,schedulePage],
   [/^\/results\/?$/,resultsPage],
   [/^\/contact\/?$/,contactPage],
+  [/^\/privacy\/?$/,privacyPage],
   [/^\/login(?:\/(student|parent|teacher|admin))?\/?$/,loginPage],
   [/^\/dashboard\/?$/,()=>'<section class="section page dashboard-page"><div class="dashboard-shell"><div class="empty-state" role="status"><div class="skeleton-grid" aria-hidden="true"><div class="skeleton-card"><span class="skeleton skeleton-icon"></span><span class="skeleton skeleton-line title"></span><span class="skeleton skeleton-line"></span></div></div><p>جارٍ تحميل لوحة الحساب…</p></div></div></section>'],
   [/^\/admin\/teacher-requests\/?$/,teacherApprovalPage]
@@ -350,7 +351,8 @@ async function handleRegistration(form){
   const message=document.querySelector('[data-auth-message]');
   const button=form.querySelector('[type="submit"]');
   const values=formValues(form);
-  const {password,confirmPassword,email,...rest}=values;
+  const {password,confirmPassword,email,acceptPrivacy,...rest}=values;
+  if(values.acceptPrivacy!=='yes'){showMessage(message,'لازم توافق على سياسة الخصوصية لإنشاء الحساب.','error');return;}
   if(password!==confirmPassword){showMessage(message,'كلمتا المرور غير متطابقتين.','error');return;}
   const role=document.querySelector('.auth-shell')?.dataset.role;
   const profile={...rest,role,publishConsent:values.publishConsent==='yes'};
