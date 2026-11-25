@@ -277,9 +277,11 @@ service cloud.firestore {
         && request.resource.data.email == resource.data.email
         && request.resource.data.status in ['active', 'disabled', 'graduated']
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
-          ['status', 'displayName', 'phone', 'classId', 'className', 'grade', 'updatedBy', 'updatedAt'])
+          ['status', 'displayName', 'phone', 'classId', 'className', 'grade', 'branch', 'updatedBy', 'updatedAt'])
+        && request.resource.data.get('branch', '') in ['', 'bac_med', 'bac_eng', 'bac_biz', 'bac_arts', 'science', 'math', 'literary']
         && (request.resource.data.get('classId', '') == resource.data.get('classId', '')
-          || get(/databases/$(database)/documents/classes/$(request.resource.data.classId)).data.grade == request.resource.data.grade);
+          || (get(/databases/$(database)/documents/classes/$(request.resource.data.classId)).data.grade == request.resource.data.grade
+            && get(/databases/$(database)/documents/classes/$(request.resource.data.classId)).data.get('branch', '') in ['', request.resource.data.get('branch', '')]));
       allow delete: if false;
     }
 
@@ -644,7 +646,8 @@ service cloud.firestore {
         || (isActiveParent() && resource.data.studentUid is string
           && linkedParentTo(resource.data.studentUid))
       );
-      allow create: if signedIn() && (isActiveAdmin() || isActiveTeacher() || isActiveParent());
+      // مجموعة قديمة غير مستخدمة في التطبيق: كانت تسمح بإنشاء أي مستند بلا تحقق. أُغلق الإنشاء.
+      allow create: if false;
       allow update, delete: if isActiveAdmin() || resource.data.fromUid == request.auth.uid;
     }
 
