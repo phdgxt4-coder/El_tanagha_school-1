@@ -68,6 +68,7 @@ export async function submitAccountRequest(profile) {
   const classSnapshot = classId ? await getDoc(doc(database, 'classes', classId)) : null;
   if (!classSnapshot?.exists()) throw fail('invalid-argument', 'الفصل المختار غير موجود.');
   if (classSnapshot.data().grade !== profile.grade) throw fail('invalid-argument', 'الفصل المختار لا يتبع الصف الدراسي المحدد.');
+  if (classSnapshot.data().branch && classSnapshot.data().branch !== (profile.branch ?? '')) throw fail('invalid-argument', 'الفصل المختار لا يتبع المسار الدراسي المحدد.');
   const studentId = `STU-${token(10)}`;
   const record = {
     ...base, role: 'student', status: 'active', studentId, grade: profile.grade, branch: profile.branch ?? '',
@@ -240,7 +241,7 @@ function invalidate() { cacheInvalidate('structure:classes'); cacheInvalidate('s
 export async function adminSaveClass(input) {
   let value;
   try { value = validateClassInput(input); } catch (error) { throw fail('invalid-argument', error.message); }
-  const classId = await stableId('c', value.year, value.grade, value.section.toLowerCase());
+  const classId = await stableId('c', value.year, value.grade, value.section.toLowerCase() + (value.branch ? '|' + value.branch : ''));
   const batch = writeBatch(db());
   batch.set(doc(db(), 'classes', classId), { ...value, updatedAt: serverTimestamp() }, { merge: true });
   await batch.commit();
@@ -262,9 +263,9 @@ export async function adminDeleteClass(classId) {
   return { deleted: true };
 }
 
-export async function adminSaveSubject(name) {
+export async function adminSaveSubject(name, branches = []) {
   let value;
-  try { value = validateSubjectInput({ name }); } catch (error) { throw fail('invalid-argument', error.message); }
+  try { value = validateSubjectInput({ name, branches }); } catch (error) { throw fail('invalid-argument', error.message); }
   const subjectId = await stableId('s', value.name.toLowerCase());
   const batch = writeBatch(db());
   batch.set(doc(db(), 'subjects', subjectId), { ...value, updatedAt: serverTimestamp() }, { merge: true });
@@ -381,7 +382,7 @@ export async function adminSearchUsers(role, prefix = '') {
   const snapshot = await getDocs(query(collection(db(), 'profiles'), ...parts, limit(30)));
   return snapshot.docs.map(item => {
     const data = item.data();
-    return { uid: item.id, role: data.role, status: data.status, displayName: data.displayName ?? '', phone: data.phone ?? '', classId: data.classId ?? '', className: data.className ?? '', grade: data.grade ?? '' };
+    return { uid: item.id, role: data.role, status: data.status, displayName: data.displayName ?? '', phone: data.phone ?? '', classId: data.classId ?? '', className: data.className ?? '', grade: data.grade ?? '', branch: data.branch ?? '' };
   });
 }
 
@@ -419,7 +420,7 @@ export async function adminMoveStudent(uid, classId) {
   if (!student.exists() || student.data().role !== 'student') throw fail('not-found', 'الطالب غير موجود.');
   if (!target.exists()) throw fail('not-found', 'الفصل غير موجود.');
   const batch = writeBatch(database);
-  batch.update(doc(database, 'profiles', uid), { classId: target.id, className: target.data().name, grade: target.data().grade, updatedBy: me().uid, updatedAt: serverTimestamp() });
+  batch.update(doc(database, 'profiles', uid), { classId: target.id, className: target.data().name, grade: target.data().grade, ...(target.data().branch ? { branch: target.data().branch } : {}), updatedBy: me().uid, updatedAt: serverTimestamp() });
   audit(batch, 'student_moved', { targetUid: uid, fromClassId: student.data().classId ?? '', toClassId: target.id });
   await batch.commit();
   return { classId: target.id };
@@ -469,7 +470,7 @@ export async function adminPromoteClass(fromClassId, toClassId) {
   if (students.empty) throw fail('failed-precondition', 'لا يوجد طلاب في هذا الفصل.');
   const batch = writeBatch(database);
   const stamp = { updatedBy: me().uid, updatedAt: serverTimestamp() };
-  students.docs.forEach(item => batch.update(item.ref, toClassId ? { classId: to.id, className: to.data().name, grade: to.data().grade, ...stamp } : { status: 'graduated', ...stamp }));
+  students.docs.forEach(item => batch.update(item.ref, toClassId ? { classId: to.id, className: to.data().name, grade: to.data().grade, branch: to.data().branch ?? '', ...stamp } : { status: 'graduated', ...stamp }));
   audit(batch, toClassId ? 'class_promoted' : 'class_graduated', { fromClassId: from.id, toClassId: toClassId || '', count: students.size });
   await batch.commit();
   return { count: students.size, more: students.size === BATCH_LIMIT };

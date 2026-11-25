@@ -1,6 +1,7 @@
 import { collection, getCountFromServer, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import * as spark from '../../services/spark-backend.js';
 import { invalidateStructure, loadClasses, loadSubjects, loadClassAssignments } from '../../services/structure-service.js';
+import { ALL_TRACKS, TRACKS, trackLabel } from '../../../functions/src/validation.js';
 import { esc, gradeNames, say, shellActions, skeletonRows } from './common.js';
 
 const SECTIONS = [['overview', 'نظرة عامة', '▦'], ['classes', 'الصفوف والفصول', '▤'], ['subjects', 'المواد', '✎'], ['teachers', 'المدرسون والإسناد', '☺'], ['students', 'استيراد الطلاب', '⇪'], ['links', 'ربط أولياء الأمور', '⚭'], ['users', 'إدارة الحسابات', '⚙'], ['timetable', 'جدول الحصص', '▦'], ['ops', 'النسخ والأخطاء', '⛁'], ['admins', 'المدراء', '♛'], ['contact', 'رسائل التواصل', '✉']];
@@ -12,10 +13,10 @@ export function renderAdmin(profile) {
     <main class="adm-main">
       <section data-panel="overview"><h1>نظرة عامة</h1><div class="adm-kpis" data-kpis>${skeletonRows(2)}</div></section>
       <section data-panel="classes" hidden><h1>الصفوف والفصول</h1>
-        <form class="adm-inline" data-class-form><select name="grade" required><option value="">الصف</option>${Object.entries(gradeNames).map(([id, name]) => `<option value="${id}">${name}</option>`).join('')}</select><input name="section" required maxlength="20" placeholder="الفصل مثل: أ" style="direction:rtl"><input name="year" maxlength="9" value="2026-2027" dir="ltr"><button class="button" type="submit">إضافة فصل</button></form>
+        <form class="adm-inline" data-class-form><select name="grade" required><option value="">الصف</option>${Object.entries(gradeNames).map(([id, name]) => `<option value="${id}">${name}</option>`).join('')}</select><select name="branch" data-class-branch aria-label="المسار"><option value="">المسار (للصف الثاني والثالث)</option></select><input name="section" required maxlength="20" placeholder="الفصل مثل: أ" style="direction:rtl"><input name="year" maxlength="9" value="2026-2027" dir="ltr"><button class="button" type="submit">إضافة فصل</button></form>
         <p class="form-note" data-msg="class" role="status"></p><table class="adm-table"><tbody data-classes></tbody></table></section>
       <section data-panel="subjects" hidden><h1>المواد</h1>
-        <form class="adm-inline" data-subject-form><input name="name" required maxlength="60" placeholder="اسم المادة" style="direction:rtl"><button class="button" type="submit">إضافة مادة</button><button class="button ghost" type="button" data-seed-subjects>إضافة المواد الافتراضية</button></form>
+        <form class="adm-inline" data-subject-form><input name="name" required maxlength="60" placeholder="اسم المادة" style="direction:rtl"><select name="branches" multiple size="3" aria-label="المسارات التي تدرس المادة (بدون اختيار = كل المسارات)" title="المسارات التي تدرس المادة (بدون اختيار = كل المسارات)">${Object.entries(ALL_TRACKS).map(([id, label]) => `<option value="${id}">${label}</option>`).join('')}</select><button class="button" type="submit">إضافة مادة</button><button class="button ghost" type="button" data-seed-subjects>إضافة المواد الافتراضية</button></form>
         <p class="form-note" data-msg="subject" role="status"></p><table class="adm-table"><tbody data-subjects></tbody></table></section>
       <section data-panel="teachers" hidden><h1>المدرسون والإسناد</h1>
         <h2>طلبات تنتظر الاعتماد</h2><div data-applications></div>
@@ -76,14 +77,21 @@ export function mountAdmin(root, { auth, database }) {
   async function classes() {
     invalidateStructure();
     const list = await loadClasses();
-    root.querySelector('[data-classes]').innerHTML = list.length ? list.map(item => `<tr><td>${esc(item.name)}</td><td dir="ltr">${esc(item.year)}</td><td><button class="text-link" data-del-class="${esc(item.id)}" type="button">حذف</button></td></tr>`).join('') : '<tr><td>لم تُنشأ فصول بعد.</td></tr>';
-    const options = list.map(item => ({ value: item.id, text: item.name }));
+    root.querySelector('[data-classes]').innerHTML = list.length ? list.map(item => `<tr><td>${esc(item.name)}${item.branch ? ` · ${esc(trackLabel(item.branch))}` : ''}</td><td dir="ltr">${esc(item.year)}</td><td><button class="text-link" data-del-class="${esc(item.id)}" type="button">حذف</button></td></tr>`).join('') : '<tr><td>لم تُنشأ فصول بعد.</td></tr>';
+    root.__classBranch = Object.fromEntries(list.map(item => [item.id, item.branch || '']));
+    const options = list.map(item => ({ value: item.id, text: item.name + (item.branch ? ' · ' + trackLabel(item.branch) : '') }));
     ['[data-assign-class]', '[data-import-class]', '[data-view-class]'].forEach(selector => fill(root.querySelector(selector), options, 'الفصل'));
   }
   async function subjects() {
     invalidateStructure();
     const list = await loadSubjects();
-    root.querySelector('[data-subjects]').innerHTML = list.map(item => `<tr><td>${esc(item.name)}</td><td><button class="text-link" data-del-subject="${esc(item.id)}" type="button">حذف</button></td></tr>`).join('');
+    root.querySelector('[data-subjects]').innerHTML = list.map(item => `<tr><td>${esc(item.name)}${item.branches?.length ? ` <small>(${item.branches.map(trackLabel).map(esc).join('، ')})</small>` : ''}</td><td><button class="text-link" data-del-subject="${esc(item.id)}" type="button">حذف</button></td></tr>`).join('');
+    root.__subjects = list;
+    refreshAssignSubjects();
+  }
+  function refreshAssignSubjects() {
+    const branch = (root.__classBranch || {})[root.querySelector('[data-assign-class]')?.value] || '';
+    const list = (root.__subjects || []).filter(item => !branch || !item.branches?.length || item.branches.includes(branch));
     fill(root.querySelector('[data-assign-subject]'), list.map(item => ({ value: item.id, text: item.name })), 'المادة');
   }
   async function teachers() {
@@ -128,7 +136,7 @@ export function mountAdmin(root, { auth, database }) {
     box.innerHTML = '<tr><td>جارٍ البحث…</td></tr>';
     const list = await spark.adminSearchUsers(form.elements.role.value, form.elements.q.value);
     const options = JSON.parse(root.dataset.classOptions || '[]');
-    box.innerHTML = list.length ? list.map(user => `<tr data-user="${esc(user.uid)}"><td><b>${esc(user.displayName)}</b><br><small dir="ltr">${esc(user.phone)}</small>${user.className ? `<br><small>${esc(user.className)}</small>` : ''}</td><td>${user.status === 'active' ? 'نشط' : user.status === 'disabled' ? 'موقوف' : esc(user.status)}</td><td>
+    box.innerHTML = list.length ? list.map(user => `<tr data-user="${esc(user.uid)}"><td><b>${esc(user.displayName)}</b><br><small dir="ltr">${esc(user.phone)}</small>${user.className ? `<br><small>${esc(user.className)}${user.branch ? ' · ' + esc(trackLabel(user.branch)) : ''}</small>` : ''}</td><td>${user.status === 'active' ? 'نشط' : user.status === 'disabled' ? 'موقوف' : esc(user.status)}</td><td>
       <button class="text-link" type="button" data-toggle-status="${user.status === 'active' ? 'disabled' : 'active'}">${user.status === 'active' ? 'إيقاف' : 'تفعيل'}</button>
       ${user.role !== 'teacher' ? '<button class="text-link" type="button" data-edit-user>تعديل</button>' : ''}
       ${user.role === 'student' ? `<select data-move-class><option value="">نقل إلى…</option>${options.map(item => `<option value="${esc(item.value)}">${esc(item.text)}</option>`).join('')}</select>` : ''}</td></tr>`).join('') : '<tr><td>لا توجد نتائج.</td></tr>';
@@ -288,6 +296,12 @@ export function mountAdmin(root, { auth, database }) {
   loaded.add('overview'); void overview();
   root.querySelector('[data-more-links]').addEventListener('click', () => links(false));
 
+  root.querySelector('[data-assign-class]').addEventListener('change', refreshAssignSubjects);
+  const classForm = root.querySelector('[data-class-form]');
+  classForm.elements.grade.addEventListener('change', () => {
+    const tracks = Object.entries(TRACKS[classForm.elements.grade.value] || {});
+    classForm.elements.branch.innerHTML = '<option value="">' + (tracks.length ? 'كل المسارات' : 'بدون مسار') + '</option>' + tracks.map(([id, label]) => `<option value="${id}">${label}</option>`).join('');
+  });
   root.querySelector('[data-class-form]').addEventListener('submit', async event => {
     event.preventDefault();
     const form = event.currentTarget;
@@ -296,7 +310,7 @@ export function mountAdmin(root, { auth, database }) {
   root.querySelector('[data-subject-form]').addEventListener('submit', async event => {
     event.preventDefault();
     const form = event.currentTarget;
-    await guard(async () => { await auth.adminSaveSubject(form.elements.name.value); form.reset(); await subjects(); }, m('subject'), 'تمت إضافة المادة.', true);
+    await guard(async () => { await auth.adminSaveSubject(form.elements.name.value, [...form.elements.branches.selectedOptions].map(option => option.value)); form.reset(); await subjects(); }, m('subject'), 'تمت إضافة المادة.', true);
   });
   root.querySelector('[data-seed-subjects]').addEventListener('click', () => guard(async () => { await auth.adminSeedDefaultSubjects(); await subjects(); }, m('subject'), 'أُضيفت المواد الافتراضية.', true));
   root.querySelector('[data-assign-form]').addEventListener('submit', async event => {

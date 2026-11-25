@@ -15,7 +15,19 @@ export const SUBJECTS = Object.freeze({
 const NAME_RE = /^[\p{L}\p{M}][\p{L}\p{M}\s.'’\-]{1,78}[\p{L}\p{M}]$/u;
 const PHONE_RE = /^\+?[0-9][0-9()\s.-]{5,18}[0-9]$/;
 const GRADES = new Set(['1', '2', '3']);
-const BRANCHES = new Set(['science', 'math', 'literary']);
+// المسارات: الصف الأول بلا مسار، الثاني بنظام البكالوريا (4 مسارات)، الثالث بالنظام القديم (علمي علوم/رياضة، أدبي).
+export const TRACKS = Object.freeze({
+  '1': Object.freeze({}),
+  '2': Object.freeze({ bac_med: 'الطب وعلوم الحياة', bac_eng: 'الهندسة وعلوم الحاسب', bac_biz: 'الأعمال', bac_arts: 'الآداب والفنون' }),
+  '3': Object.freeze({ science: 'علمي علوم', math: 'علمي رياضة', literary: 'أدبي' })
+});
+export const ALL_TRACKS = Object.freeze({ ...TRACKS['2'], ...TRACKS['3'] });
+export const trackLabel = value => ALL_TRACKS[value] ?? '';
+const BRANCHES = new Set(Object.keys(ALL_TRACKS));
+function validTrackForGrade(grade, branch) {
+  const allowed = Object.keys(TRACKS[grade] ?? {});
+  return allowed.length ? allowed.includes(branch) : branch === '';
+}
 const ROLES = new Set(['student', 'parent', 'teacher']);
 const GRADE_LABELS = Object.freeze({ '1': 'الأول الثانوي', '2': 'الثاني الثانوي', '3': 'الثالث الثانوي' });
 
@@ -88,7 +100,7 @@ export function validateAccountRequest(input) {
     result.grade = grade;
     if (input.classId != null && input.classId !== '') result.classId = validId(input.classId, 'الفصل');
     const branch = String(input.branch ?? '');
-    if (branch && !BRANCHES.has(branch)) throw new InputValidationError('اختر الشعبة الدراسية الصحيحة.');
+    if (!validTrackForGrade(grade, branch)) throw new InputValidationError(grade === '1' ? 'الصف الأول بلا مسار.' : 'اختر المسار الدراسي الصحيح لهذا الصف.');
     result.branch = branch;
     if (input.className != null && input.className !== '') result.className = requiredString(input.className, 'الفصل', 40);
     if (!result.classId && !result.className) throw new InputValidationError('اختر الفصل.');
@@ -124,14 +136,18 @@ export function validateClassInput(input) {
   if (/[<>]/u.test(section)) throw new InputValidationError('اسم الفصل يحتوي على محارف غير مسموحة.');
   const year = requiredString(input.year ?? '2026-2027', 'العام الدراسي', 9);
   if (!/^\d{4}-\d{4}$/u.test(year)) throw new InputValidationError('العام الدراسي غير صالح.');
-  return { grade, section, year, name: `${GRADE_LABELS[grade]} - ${section}` };
+  const branch = String(input.branch ?? '');
+  if (branch && !validTrackForGrade(grade, branch)) throw new InputValidationError('المسار لا يتبع هذا الصف.');
+  return { grade, section, year, branch, name: `${GRADE_LABELS[grade]} - ${section}` };
 }
 
 export function validateSubjectInput(input) {
   if (!input || typeof input !== 'object') throw new InputValidationError('بيانات المادة غير صالحة.');
   const name = requiredString(input.name, 'اسم المادة', 60);
   if (/[<>]/u.test(name)) throw new InputValidationError('اسم المادة يحتوي على محارف غير مسموحة.');
-  return { name };
+  const list = Array.isArray(input.branches) ? input.branches.map(String) : [];
+  if (list.length > 7 || list.some(item => !BRANCHES.has(item))) throw new InputValidationError('مسار غير صالح للمادة.');
+  return { name, branches: [...new Set(list)] };
 }
 
 export function validateRosterRows(rows) {
