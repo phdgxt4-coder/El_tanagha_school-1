@@ -1,0 +1,55 @@
+name: Build and deploy to Firebase Hosting
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: firebase-hosting
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check deploy secret
+        id: gate
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$SA" ]; then echo "ready=false" >> "$GITHUB_OUTPUT"; echo "FIREBASE_SERVICE_ACCOUNT secret is not set yet. Skipping deploy."; else echo "ready=true" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.ready == 'true'
+      - uses: pnpm/action-setup@v4
+        if: steps.gate.outputs.ready == 'true'
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.ready == 'true'
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        if: steps.gate.outputs.ready == 'true'
+        run: pnpm install --frozen-lockfile
+      - name: Test functions and web application
+        if: steps.gate.outputs.ready == 'true'
+        run: pnpm test:rules && node --check functions/src/index.js
+      - name: Build
+        if: steps.gate.outputs.ready == 'true'
+        run: pnpm build
+        env:
+          VITE_BASE_PATH: /
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_FUNCTIONS_REGION: ${{ vars.VITE_FIREBASE_FUNCTIONS_REGION }}
+      - name: Deploy to Firebase Hosting
+        if: steps.gate.outputs.ready == 'true'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+          channelId: live
