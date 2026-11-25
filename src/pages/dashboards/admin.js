@@ -24,9 +24,9 @@ export function renderAdmin(profile) {
         <p class="form-note" data-msg="assign" role="status"></p>
         <h2>إسنادات الفصل</h2><div class="adm-inline"><select data-view-class><option value="">اختر فصلًا لعرض إسناداته</option></select></div><table class="adm-table"><tbody data-assignments></tbody></table></section>
       <section data-panel="students" hidden><h1>استيراد الطلاب</h1>
-        <p class="dash-muted">الصق سطرًا لكل طالب: الاسم الرباعي، ثم رقم الهاتف. أو ارفع ملف CSV (من Excel: حفظ باسم CSV). الحد 300 طالب في المرة.</p>
+        <p class="dash-muted">الصق سطرًا لكل طالب: الاسم الرباعي، ثم رقم الهاتف. أو ارفع ملف Excel (.xlsx) أو CSV: العمود الأول الاسم والثاني الهاتف (أول ورقة فقط). الحد 300 طالب في المرة.</p>
         <form class="dashboard-form" data-import-form><label>الفصل<select name="classId" required data-import-class><option value="">اختر الفصل</option></select></label>
-        <label>الطلاب<textarea name="rows" rows="8" required placeholder="محمد أحمد علي حسن, 01012345678" style="direction:rtl"></textarea></label><label>أو ملف CSV<input type="file" accept=".csv,text/csv" data-csv></label>
+        <label>الطلاب<textarea name="rows" rows="8" required placeholder="محمد أحمد علي حسن, 01012345678" style="direction:rtl"></textarea></label><label>أو ملف Excel / CSV<input type="file" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-csv></label>
         <button class="button" type="submit">استيراد</button><p class="form-note" data-msg="import" role="status"></p></form></section>
       <section data-panel="links" hidden><h1>ربط أولياء الأمور</h1><p class="dash-muted">الربط يتم بكود الطالب بدون موافقة. هنا تقدر تلغي أي ربط نشط.</p><table class="adm-table"><tbody data-links></tbody></table><button class="button ghost" type="button" data-more-links hidden>تحميل المزيد</button></section>
       <section data-panel="users" hidden><h1>إدارة الحسابات</h1>
@@ -314,7 +314,16 @@ export function mountAdmin(root, { auth, database }) {
   });
   root.querySelector('[data-csv]').addEventListener('change', async event => {
     const file = event.target.files?.[0];
-    if (file && file.size < 200000) root.querySelector('[data-import-form] textarea').value = await file.text();
+    const box = root.querySelector('[data-import-form] textarea');
+    if (!file) return;
+    if (/\.xlsx$/iu.test(file.name)) {
+      try {
+        const { readXlsxRows, rosterLinesFromRows } = await import('../../utils/xlsx-reader.js');
+        const lines = rosterLinesFromRows(await readXlsxRows(await file.arrayBuffer()));
+        box.value = lines.join('\n');
+        say(m('import'), lines.length ? `تمت قراءة ${lines.length} طالب. راجعهم في الصندوق ثم اضغط استيراد.` : 'لم أجد صفوفًا صالحة. العمود الأول الاسم والثاني الهاتف.');
+      } catch (error) { say(m('import'), error?.message || 'تعذرت قراءة الملف. جرّب حفظه كـ CSV.'); }
+    } else if (file.size < 200000) box.value = await file.text();
   });
   root.querySelector('[data-import-form]').addEventListener('submit', async event => {
     event.preventDefault();
