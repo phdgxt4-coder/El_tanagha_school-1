@@ -62,3 +62,10 @@ firebase deploy --only firestore:rules,firestore:indexes,functions
 - "failed-precondition: index": الفهرس لم يكتمل بعد، انتظر.
 - "permission-denied" للإدارة: تأكد أن مستند `admins/{uid}` موجود و `active` true.
 - وظيفة تفشل بخطأ 403: تأكد من خطة Blaze.
+
+## وضع Spark (الخطة المجانية، بدون كارت)
+
+- النشر بدون Functions: `firebase deploy --only firestore:rules,firestore:indexes`
+- لا تحتاج Blaze. الإشعارات داخل الموقع فقط (الجرس) بدون إشعارات الجهاز.
+- للترقية لاحقًا لـ Blaze: ضع `VITE_BACKEND_MODE=blaze` وانشر الـ functions.
+- حدود الخطة المجانية: 50 ألف قراءة يوميًا. الأمان أضعف قليلًا لأن بعض العمليات تتم من المتصفح.
