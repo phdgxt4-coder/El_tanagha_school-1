@@ -60,7 +60,7 @@ export async function enablePush(database, uid) {
   if (permission !== 'granted') return { ok: false, reason: 'denied' };
   const { getMessaging, getToken } = await import('firebase/messaging');
   const base = import.meta.env.BASE_URL || '/';
-  const registration = await navigator.serviceWorker.register(`${base}push-sw.js`, { scope: base });
+  const registration = await navigator.serviceWorker.register(`${base}push-sw.js`, { scope: `${base}push/` });
   const token = await getToken(getMessaging(getFirebaseApp()), { vapidKey, serviceWorkerRegistration: registration });
   if (!token) return { ok: false, reason: 'no-token' };
   await setDoc(doc(database, 'pushDevices', await tokenId(token)), { uid, token, createdAt: serverTimestamp() });

@@ -34,12 +34,12 @@ test('يحتوي التطبيق على تبديل ثيم محفوظ ودعم و�
   assert.match(css, /@media\(max-width:560px\)/u);
 });
 
-test('عامل الخدمة يزيل مخازن النسخة القديمة المعروفة فقط ويلغي تسجيل نفسه', () => {
+test('عامل الخدمة يخزّن الملفات الثابتة من نفس النطاق فقط ولا يخزّن بيانات', () => {
   const worker = read('../public/sw.js');
   assert.match(worker, /tn-v1/u);
-  assert.match(worker, /tanagha-v1/u);
-  assert.match(worker, /self\.registration\.unregister\(\)/u);
-  assert.match(worker, /filter\(name => legacyCaches\.has\(name\)/u);
+  assert.match(worker, /url\.origin !== SCOPE\.origin/u);
+  assert.match(worker, /request\.method !== 'GET'/u);
+  assert.match(read('../index.html'), /rel="manifest"/u);
 });
 
 test('لوحة الحساب تتضمن ربط ولي الأمر بكود خادمي', () => {
