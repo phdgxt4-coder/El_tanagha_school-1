@@ -17,7 +17,7 @@ export function renderStudent(profile) {
       <article class="stu-tile tone-c"><h2>نسبة حضوري</h2><strong class="stu-big" data-attendance-rate>—</strong><p class="dash-muted">من آخر 20 يوم مسجل</p></article>
     </section>
     <section data-panel="lessons" hidden class="stu-feed"><div class="stu-list" data-list="lessons"></div><button class="button ghost" type="button" data-more="lessons" hidden>تحميل المزيد</button></section>
-    <section data-panel="grades" hidden class="stu-feed"><div class="stu-list" data-list="grades"></div><button class="button ghost" type="button" data-more="grades" hidden>تحميل المزيد</button></section>
+    <section data-panel="grades" hidden class="stu-feed"><button class="button ghost" type="button" data-report-card>شهادة الدرجات والحضور (PDF)</button><p class="form-note" data-report-note role="status"></p><div class="stu-list" data-list="grades"></div><button class="button ghost" type="button" data-more="grades" hidden>تحميل المزيد</button></section>
     <section data-panel="attendance" hidden class="stu-feed"><div class="stu-list" data-list="attendance"></div><button class="button ghost" type="button" data-more="attendance" hidden>تحميل المزيد</button></section>
     <section data-panel="teachers" hidden class="stu-feed"><div class="stu-list" data-list="teachers"></div></section>
     <section data-panel="timetable" hidden class="stu-feed"><div data-tt></div></section>
@@ -72,6 +72,13 @@ export function mountStudent(root, { profile, auth, database }) {
   });
   tabs.onFirstShow('images', () => images?.load());
   tabs.onFirstShow('grades', () => grades.load());
+  root.querySelector('[data-report-card]').addEventListener('click', async event => {
+    const button = event.currentTarget, note = root.querySelector('[data-report-note]');
+    button.disabled = true; note.textContent = 'جارٍ تجهيز الشهادة...';
+    try { const { openReportCard } = await import('../report-card.js'); await openReportCard(database, { uid: profile.uid, name: profile.displayName, className: profile.className, gradeLabel: gradeNames[profile.grade] || '' }); note.textContent = ''; }
+    catch { note.textContent = 'تعذر تجهيز الشهادة الآن.'; }
+    finally { button.disabled = false; }
+  });
   tabs.onFirstShow('attendance', () => attendance.load());
   tabs.onFirstShow('teachers', async () => {
     const target = q('teachers');

@@ -142,4 +142,11 @@
 .chat-msg{max-width:80%;margin:0;padding:.55rem .8rem;border-radius:16px;background:rgba(255,255,255,.08);overflow-wrap:anywhere;white-space:pre-wrap}
 .chat-msg.mine{align-self:flex-start;background:rgba(212,175,55,.22)}.chat-msg.theirs{align-self:flex-end}
 .chat-msg time{display:block;font-size:.7rem;opacity:.6}.chat form{display:flex;gap:.5rem;align-items:flex-end}
+.report-overlay{position:fixed;inset:0;z-index:9000;overflow:auto;background:#fff;color:#111;padding:1rem}
+.report-overlay .rc-bar{display:flex;gap:.5rem;margin-bottom:1rem}
+.rc-sheet{max-width:760px;margin:auto;font-family:Cairo,sans-serif;line-height:1.8}
+.rc-sheet h1{font-size:1.4rem;margin:0}.rc-sheet h2{font-size:1.1rem;margin:0 0 .6rem}
+.rc-table{width:100%;border-collapse:collapse;margin:1rem 0}.rc-table th,.rc-table td{border:1px solid #999;padding:.35rem .6rem;text-align:right}
+.rc-note{font-size:.8rem;color:#444}
+@media print{body.rc-open>*:not(.report-overlay){display:none!important}.report-overlay{position:static;padding:0}.report-overlay .rc-bar{display:none}}
 .chat-tick{margin-inline-start:.5rem;font-size:.8rem;opacity:.8}
