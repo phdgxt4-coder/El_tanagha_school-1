@@ -2,8 +2,9 @@ import { addDoc, collection, doc, getDoc, getDocs, getFirestore, query, serverTi
 import { getFirebaseApp } from '../config/firebase-app.js';
 import { firebaseConfigured } from '../config/firebase-env.js';
 import { subjects } from '../data/catalog.js';
-import { sectionHeading } from '../components/cards.js';
+import { sectionHeading, skeletonCards } from '../components/cards.js';
 
+function settle(status,message){status.classList.add('is-settled');status.dataset.kind='error';const text=status.querySelector('p');if(text)text.textContent=message;}
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const roleNames={student:'الطالب',parent:'ولي الأمر',teacher:'المدرس',admin:'الإدارة',teacher_applicant:'طلب مدرس'};
 const branchNames={science:'علمي علوم',math:'علمي رياضة',literary:'أدبي'};
@@ -14,7 +15,7 @@ export function dashboardPage(){
     <div class="dashboard-shell">
       <div class="dashboard-toolbar"><button class="button ghost" type="button" data-dashboard-sign-out hidden>تسجيل الخروج</button></div>
       ${sectionHeading('لوحة الحساب','جاري تحميل الحساب…','تظهر هنا بيانات الدور المسموح بها فقط، وتُحسم الصلاحيات في Firebase وليس في الواجهة.')}
-      <div class="dashboard-status empty-state" data-dashboard-status role="status"><span aria-hidden="true">◷</span><p>جارٍ التحقق من الحساب…</p></div>
+      <div class="dashboard-status empty-state" data-dashboard-status role="status"><div class="skeleton-grid" aria-hidden="true">${skeletonCards(2)}</div><p>جارٍ التحقق من الحساب…</p></div>
       <div class="dashboard-grid" data-dashboard-grid hidden></div>
     </div>
   </section>`;
@@ -32,7 +33,7 @@ export async function initializeDashboard(){
   const grid=document.querySelector('[data-dashboard-grid]');
   const signOut=document.querySelector('[data-dashboard-sign-out]');
   if(!status||!grid)return;
-  if(!firebaseConfigured){status.querySelector('p').textContent='إعداد Firebase غير مكتمل؛ لم تُعرض بيانات الحساب.';return;}
+  if(!firebaseConfigured){settle(status,'إعداد Firebase غير مكتمل؛ لم تُعرض بيانات الحساب.');return;}
   try{
     const auth=await import('../auth/auth-service.js');
     let authTimeout;
@@ -41,11 +42,11 @@ export async function initializeDashboard(){
       new Promise((_,reject)=>{authTimeout=setTimeout(()=>reject(new Error('auth/timeout')),10000);})
     ]).finally(()=>clearTimeout(authTimeout));
     if(!status.isConnected)return;
-    if(!user){status.querySelector('p').textContent='يجب تسجيل الدخول للوصول إلى اللوحة.';return;}
+    if(!user){settle(status,'يجب تسجيل الدخول للوصول إلى اللوحة.');return;}
     const account=await auth.getMyAccountStatus();
     if(!status.isConnected)return;
     if(account.status!=='active'){
-      status.querySelector('p').textContent=`حالة الحساب: ${esc(account.status||'غير متاح')}.`;
+      settle(status,`حالة الحساب: ${account.status||'غير متاح'}.`);
       return;
     }
     const database=getFirestore(getFirebaseApp());
@@ -59,9 +60,9 @@ export async function initializeDashboard(){
     bindRoleActions(grid,auth,profile,database);
     await loadAcademicContent(grid,profile,database);
   }catch(error){
-    if(status.isConnected)status.querySelector('p').textContent=error?.message==='auth/timeout'
+    if(status.isConnected)settle(status,error?.message==='auth/timeout'
       ?'تأخر التحقق من جلسة الدخول. تحقق من الاتصال ثم أعد المحاولة.'
-      :'تعذر تحميل لوحة الحساب. تحقق من إعداد Firebase ثم حاول مجددًا.';
+      :'تعذر تحميل لوحة الحساب. تحقق من إعداد Firebase ثم حاول مجددًا.');
   }
 }
 
