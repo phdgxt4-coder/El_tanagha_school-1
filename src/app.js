@@ -521,7 +521,13 @@ document.addEventListener('submit',event=>{
   if(form.dataset?.adminJoin){event.preventDefault();handleAdminJoin(form);return;}
   if(form.id==='contact-form'){
     event.preventDefault();
-    form.querySelector('.form-note').textContent='لم يتم إرسال رسالتك أو حفظها؛ خدمة الإرسال ستُفعّل لاحقًا.';
+    const note=form.querySelector('.form-note');
+    const button=form.querySelector('button[type=submit]');
+    button.disabled=true;note.textContent='جارٍ الإرسال...';
+    import('./services/spark-backend.js').then(api=>api.sendContactMessage({name:form.elements.name.value,email:form.elements.email.value,message:form.elements.message.value}))
+      .then(()=>{form.reset();note.textContent='وصلت رسالتك للإدارة. شكرًا لك.';})
+      .catch(()=>{note.textContent='تعذر الإرسال الآن. حاول لاحقًا أو اتصل بالمدرسة.';})
+      .finally(()=>{button.disabled=false;});
     return;
   }
   if(form.id==='login-form'){
