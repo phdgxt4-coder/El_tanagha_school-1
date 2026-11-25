@@ -1,0 +1,94 @@
+/* ==========================================================================
+   Motion layer (stage 2). Only transform and opacity are animated.
+   Everything is disabled under prefers-reduced-motion at the bottom.
+   ========================================================================== */
+:root{
+  --ease-out:cubic-bezier(.22,1,.36,1);
+  --ease-in-out:cubic-bezier(.65,0,.35,1);
+  --spring:cubic-bezier(.34,1.4,.64,1);
+  --t-fast:.18s;--t-base:.32s;--t-slow:.6s;
+}
+@supports (transition-timing-function:linear(0,1)){
+  :root{--spring:linear(0,.28 4%,.78 9%,1.06 15%,1.08 19%,1.02 27%,.99 36%,1.003 55%,1)}
+}
+
+/* Replace the old one-shot load animations with the observer-driven reveal */
+.hero-copy,.stats>div,.card,.stats,.section-heading{animation:none}
+.has-motion .reveal{opacity:0;transform:translate3d(0,22px,0) scale(.985);transition:opacity var(--t-slow) var(--ease-out),transform var(--t-slow) var(--ease-out);transition-delay:calc(var(--i,0) * 70ms);will-change:opacity,transform}
+.has-motion .reveal.is-in{opacity:1;transform:none;will-change:auto}
+/* After the reveal finishes, hover transitions take over without delay */
+.has-motion .card.reveal.is-in,.has-motion .stats>div.reveal.is-in{transition:opacity var(--t-slow) var(--ease-out),transform var(--t-base) var(--spring),border-color var(--t-base) ease,box-shadow var(--t-base) var(--ease-out),background var(--t-base) ease;transition-delay:0s}
+
+/* Press feedback with a spring release */
+.button,.subject-tabs button,.grade-button,.auth-tab,.role-link,.theme-toggle,.menu-toggle{transition:transform var(--t-base) var(--spring),box-shadow var(--t-base) var(--ease-out),background var(--t-fast) ease,border-color var(--t-fast) ease,color var(--t-fast) ease}
+.button:active,.subject-tabs button:active,.grade-button:active,.auth-tab:active,.role-link:active,.theme-toggle:active,.menu-toggle:active{transform:scale(.96);transition-duration:.08s}
+.card:active{transform:scale(.985);transition-duration:.08s}
+
+/* Ripple */
+.ripple-host{position:relative;overflow:hidden;isolation:isolate}
+.ripple{position:absolute;z-index:0;border-radius:50%;background:radial-gradient(circle,#ffffff59 0%,#e4bf6340 45%,transparent 70%);transform:scale(0);opacity:.9;pointer-events:none;animation:ripple .65s var(--ease-out) forwards}
+:root[data-theme="light"] .card .ripple,:root[data-theme="light"] .ghost .ripple,:root[data-theme="light"] .subject-tabs .ripple,:root[data-theme="light"] .theme-toggle .ripple,:root[data-theme="light"] .menu-toggle .ripple{background:radial-gradient(circle,#a77c2038 0%,#a77c201f 45%,transparent 70%)}
+@keyframes ripple{to{transform:scale(1);opacity:0}}
+
+/* Cards: pointer light and soft tilt (desktop pointers only) */
+.card{--mx:50%;--my:0%;--tilt-x:0deg;--tilt-y:0deg}
+.card::after{inset:0;width:auto;height:auto;border-radius:inherit;background:radial-gradient(260px circle at var(--mx) var(--my),#e4bf6328,transparent 70%);opacity:0;transition:opacity var(--t-base) ease}
+.card:hover::after{opacity:1}
+@media(hover:hover) and (pointer:fine){
+  .card:hover{transform:perspective(900px) translate3d(0,-6px,0) rotateX(var(--tilt-x)) rotateY(var(--tilt-y))}
+  .has-motion .card.reveal.is-in:hover{transform:perspective(900px) translate3d(0,-6px,0) rotateX(var(--tilt-x)) rotateY(var(--tilt-y));transition:transform .14s linear,box-shadow var(--t-base) var(--ease-out),border-color var(--t-base) ease}
+  .teacher-card:hover,.has-motion .teacher-card.reveal.is-in:hover{transform:none}
+}
+
+/* Header: depth appears once the page scrolls */
+.topbar{transition:box-shadow var(--t-base) ease,background-color var(--t-base) ease}
+.topbar.is-scrolled{box-shadow:0 8px 30px #0006}
+:root[data-theme="light"] .topbar.is-scrolled{box-shadow:0 8px 30px #24324a26}
+
+/* Page enter after a route change */
+.page-enter{animation:pageEnter .38s var(--ease-out) both}
+@keyframes pageEnter{from{opacity:0;transform:translate3d(0,10px,0)}to{opacity:1;transform:none}}
+
+/* Route progress bar: scaleX only */
+.route-progress{position:fixed;z-index:60;top:0;inset-inline:0;height:3px;background:var(--gold-grad);transform:scaleX(0);transform-origin:right center;opacity:0;pointer-events:none}
+.route-progress.is-running{opacity:1;transform:scaleX(.72);transition:transform .5s var(--ease-out),opacity .1s}
+.route-progress.is-done{opacity:0;transform:scaleX(1);transition:transform .2s ease,opacity .3s ease .15s}
+
+/* Mobile menu: sheet drops in, links stagger */
+@media(max-width:850px){
+  .nav{transform:translate3d(0,-12px,0) scale(.98);transform-origin:top center;transition:opacity var(--t-base) var(--ease-out),transform var(--t-base) var(--ease-out),visibility var(--t-base)}
+  .nav.open{transform:none}
+  .nav a{opacity:0;transform:translate3d(0,8px,0);transition:opacity var(--t-base) var(--ease-out),transform var(--t-base) var(--ease-out),background var(--t-fast) ease,color var(--t-fast) ease}
+  .nav.open a{opacity:1;transform:none;transition-delay:calc(var(--i,0) * 40ms + 60ms)}
+}
+
+/* Theme switch crossfade */
+::view-transition-old(root),::view-transition-new(root){animation-duration:.35s;animation-timing-function:ease}
+.theme-switching .topbar{view-transition-name:topbar}
+.theme-switching ::view-transition-group(topbar){animation-duration:0s}
+
+/* Focus ring grows in */
+:focus-visible{transition:box-shadow .15s ease}
+
+/* Form fields: label lift feel via border glow */
+.auth-panel input,.auth-panel select,.contact-panel input,.contact-panel textarea,.dashboard-form input{transition:border-color var(--t-fast) ease,box-shadow var(--t-base) var(--ease-out),transform var(--t-base) var(--spring)}
+.auth-panel input:focus,.contact-panel input:focus,.contact-panel textarea:focus,.dashboard-form input:focus{transform:translate3d(0,-1px,0)}
+
+/* Tab selection pops with spring */
+.subject-tabs .selected,.grade-button.selected,.auth-tab.selected,.role-link.selected{animation:pop .42s var(--spring)}
+@keyframes pop{from{transform:scale(.92)}to{transform:scale(1)}}
+
+/* Hero logo float: transform only, desktop */
+@media(min-width:851px){.hero-mark{animation:floaty 8s ease-in-out infinite}}
+
+@media print{.reveal{opacity:1!important;transform:none!important}}
+
+/* Respect the user's motion settings */
+@media(prefers-reduced-motion:reduce){
+  .has-motion .reveal,.has-motion .reveal.is-in{opacity:1;transform:none;transition:none}
+  .page-enter,.subject-tabs .selected,.grade-button.selected,.auth-tab.selected,.role-link.selected,.hero-mark{animation:none}
+  .ripple,.route-progress{display:none}
+  .card:hover,.button:hover,.button:active,.card:active{transform:none}
+  .nav,.nav a{transition:none}
+  ::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}
+}
