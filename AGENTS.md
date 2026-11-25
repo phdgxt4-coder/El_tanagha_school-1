@@ -53,6 +53,9 @@
 - `archive/legacy/`: كود المنصة القديمة (js/، script.js، style.css، firebase-config.js، index.html القديم). لا يُبنى ولا يستورده أي ملف. للرجوع فقط، ويمكن حذفه.
 - ملفات الجذر الأخرى (`deliverables/`, `plan.md`, `TODO.md`, ملفات ذات أسماء تالفة) توثيق قديم وليست جزءًا من التطبيق.
 
+## نظام الشخصيات (Study Crew)
+- قبل أي عمل على الشخصيات أو الحركة أو الأصوات اقرأ `STUDY_CREW_GUIDELINES.md`. كل قيمة بصرية في `src/studycrew/Themes/tokens.js` وكل حد تشغيلي في `src/studycrew/Shared/config.js`؛ لا قيم مكررة. شخصية جديدة = مجلد في `Characters/` + سطر في `registry.js` فقط.
+
 ## تشغيل الاختبارات
 - `pnpm test`: اختبارات Node فقط. **اختبارات قواعد Firestore تُتخطى (skip) بدون المحاكي**، فلا تعتمد على هذا الأمر وحده.
 - `pnpm test:rules`: يشغّل المحاكي (يحتاج Java 21) ثم كل الاختبارات بما فيها القواعد. الأمر المكافئ المجرَّب: `npx firebase emulators:exec --config firebase.local.json --project demo-nibras-rules --only firestore "node --test tests/*.test.js functions/test/*.test.js"`. النتيجة المعتمدة الآن: كل الاختبارات تنجح بدون تخطي.

@@ -1,0 +1,40 @@
+/* Study Crew styles. Reads only --sc-* variables from Themes/tokens.js (applyTokens). Motion: transform/opacity only. */
+.sc-host{inline-size:var(--sc-size-character,132px);block-size:var(--sc-size-character,132px);display:block;contain:layout paint}
+.sc-mini .sc-host{inline-size:var(--sc-size-character-small,72px);block-size:var(--sc-size-character-small,72px)}
+.sc-char{inline-size:100%;block-size:100%;display:block;overflow:visible}
+.sc-char [data-part]{transform-box:fill-box;transform-origin:center;will-change:transform}
+.sc-char [data-part="cover"]{opacity:0;transition:opacity var(--sc-motion-character,400ms) var(--sc-easing-out)}
+.sc-char[data-state="HiddenPassword"] [data-part="cover"]{opacity:1}
+.sc-char[data-state="Sleep"] [data-part="eyes"]{transform:scaleY(.1)}
+.sc-char[data-state="Error"] [data-part="body"]{transform:translateY(3px) rotate(-3deg);transition:transform var(--sc-motion-character) var(--sc-easing-out)}
+.sc-char[data-state="Error"] [data-part="mouth"]{transform:scaleY(-1);transform-box:fill-box;transform-origin:center}
+.sc-scene{display:flex;align-items:center;gap:var(--sc-space-3,12px);padding:var(--sc-space-3,12px) var(--sc-space-4,16px);border-radius:var(--sc-radius-lg,22px);background:var(--sc-color-surface-raised,#151c29);color:var(--sc-color-text,#f0f2f5);box-shadow:var(--sc-shadow-card);font-family:var(--sc-font-family,inherit);animation:scIn var(--sc-motion-card,210ms) var(--sc-easing-out) both}
+.sc-scene[data-tone="success"]{box-shadow:var(--sc-shadow-card),var(--sc-light-glow)}
+.sc-scene[data-tone="error"]{box-shadow:var(--sc-shadow-card),0 0 0 1px color-mix(in srgb,var(--sc-color-warn) 55%,transparent)}
+.sc-scene[data-hidden="true"]{display:none}
+.sc-body{display:grid;gap:var(--sc-space-2,8px);min-inline-size:0}
+.sc-title{margin:0;font-weight:var(--sc-font-weight,600);font-size:var(--sc-font-size-lg,18px)}
+.sc-text{margin:0;color:var(--sc-color-muted,#9aa3b2);font-size:var(--sc-font-size-md,15px);line-height:1.6}
+.sc-btn{min-block-size:var(--sc-size-hit,44px);padding:0 var(--sc-space-4,16px);border:0;border-radius:var(--sc-radius-pill,999px);background:var(--sc-color-gold,#c9a24b);color:var(--sc-color-navy,#090d16);font:inherit;font-weight:var(--sc-font-weight,600);cursor:pointer}
+.sc-btn:focus-visible{outline:2px solid var(--sc-color-gold2,#e4bf63);outline-offset:3px}
+.sc-bubble{position:absolute;inset-block-end:var(--sc-space-3,12px);inset-inline-end:var(--sc-space-3,12px);max-inline-size:min(320px,90vw);pointer-events:none;z-index:30}
+.sc-bubble[data-corner="start"]{inset-inline-end:auto;inset-inline-start:var(--sc-space-3,12px)}
+.sc-bubble .sc-host{inline-size:var(--sc-size-character-small,72px);block-size:var(--sc-size-character-small,72px)}
+.sc-bubble[data-type]{box-shadow:var(--sc-shadow-float),0 0 24px color-mix(in srgb,var(--sc-note,#818cf8) 55%,transparent)}
+.sc-banner{justify-content:space-between;flex-wrap:wrap}
+.sc-mini{padding:0;background:transparent;box-shadow:none}
+.sc-overlay{position:fixed;inset:0;z-index:95;display:grid;place-items:center;align-content:center;gap:var(--sc-space-4,16px);background:color-mix(in srgb,var(--sc-color-navy,#090d16) 72%,transparent);animation:scFade var(--sc-motion-dialog,270ms) var(--sc-easing-out) both}
+.sc-row{display:flex;gap:var(--sc-space-2,8px);flex-wrap:wrap;justify-content:center}
+.sc-overlay-text{font-size:var(--sc-font-size-lg,18px);color:var(--sc-color-text,#f0f2f5)}
+@keyframes scIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes scFade{from{opacity:0}to{opacity:1}}
+@media (max-width:600px){
+  .sc-host{inline-size:var(--sc-size-character-small,72px);block-size:var(--sc-size-character-small,72px)}
+  .sc-scene{padding:var(--sc-space-2,8px) var(--sc-space-3,12px)}
+}
+@media (prefers-reduced-motion:reduce){
+  .sc-scene,.sc-overlay{animation:none}
+  .sc-char [data-part]{transition:none;will-change:auto}
+}
+:root[data-sc-motion="off"] .sc-scene,:root[data-sc-motion="off"] .sc-overlay{animation:none}
+.sc-bubble[data-type="warn"] .sc-host,.sc-bubble[data-type="error"] .sc-host{opacity:.65;transition:opacity var(--sc-motion-character,400ms) var(--sc-easing-out)}
