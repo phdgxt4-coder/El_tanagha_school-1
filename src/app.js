@@ -3,6 +3,7 @@ import {loginPage,teacherApprovalPage,adminJoinPage} from './pages/auth-pages.js
 import {createRouteHelpers,resolveAppLink} from './utils/routes.js';
 import {initErrorReporter} from './services/error-reporter.js';
 import {TRACKS} from '../functions/src/validation.js';
+import {livingEnabled} from './config/features.js';
 import {initMotion,routeStart,routeEnd,withThemeTransition,withPageTransition} from './ui/motion.js';
 
 const moduleScriptUrl=document.querySelector('script[type="module"][src]')?.src;
@@ -620,3 +621,5 @@ document.querySelector('.menu-toggle')?.addEventListener('click',event=>{
 });
 initMotion();
 render();
+/* Living layer: OFF unless the feature flag is on (src/config/features.js). Lazy, never blocks the app. */
+if(livingEnabled())import('./studycrew/Living/wire.js').then(m=>m.startLiving()).catch(()=>{});

@@ -1,0 +1,22 @@
+/* Living layer visuals. Colours only through variables, motion only transform/opacity, off for reduced motion and low quality. */
+:root{--sc-ambient-a:transparent;--sc-ambient-b:transparent}
+[data-sc-daypart=night]{--sc-ambient-a:rgba(60,70,140,.10);--sc-ambient-b:rgba(10,12,30,.0)}
+[data-sc-daypart=morning]{--sc-ambient-a:rgba(255,214,140,.08);--sc-ambient-b:transparent}
+[data-sc-season=ramadan]{--sc-ambient-a:rgba(212,175,55,.10)}
+[data-sc-season=eid]{--sc-ambient-a:rgba(212,175,55,.14)}
+.sc-ambient{position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(60% 40% at 50% 0,var(--sc-ambient-a),var(--sc-ambient-b));opacity:1;transition:opacity .6s}
+[data-sc-quality=low] .sc-ambient{display:none}
+.sc-glow{animation:sc-glow .9s ease-out 1}
+@keyframes sc-glow{0%{opacity:.6;transform:scale(1)}40%{opacity:1;transform:scale(1.03)}100%{opacity:1;transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){.sc-glow{animation:none}.sc-ambient{transition:none}}
+.sc-living-layer{position:fixed;inset-inline:12px;inset-block-start:84px;z-index:80;pointer-events:none;display:flex;justify-content:flex-end}
+.sc-living-layer .sc-bubble{position:static}
+/* Soft light sweep on primary buttons (hover, fine pointer). transform only. */
+@media (hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference){
+  [data-sc-living=on][data-sc-quality=high] .button:not(.ghost):not(:disabled){position:relative;overflow:hidden}
+  [data-sc-living=on][data-sc-quality=high] .button:not(.ghost):not(:disabled)::after{content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,.18) 50%,transparent 60%);transform:translate3d(-120%,0,0);transition:transform .7s ease;pointer-events:none}
+  [data-sc-living=on][data-sc-quality=high] .button:not(.ghost):not(:disabled):hover::after{transform:translate3d(120%,0,0)}
+}
+/* Exam: total silence. No motion, no crew, no ambient. */
+[data-sc-focus=exam] .sc-ambient,[data-sc-focus=exam] .sc-living-layer,[data-sc-focus=exam] .sc-scene{display:none!important}
+[data-sc-focus=exam] *,[data-sc-focus=exam] *::before,[data-sc-focus=exam] *::after{animation:none!important;transition:none!important}
