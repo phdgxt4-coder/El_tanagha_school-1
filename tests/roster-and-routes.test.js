@@ -31,4 +31,5 @@ test('ملف المسارات يتضمن تسجيل الإدارة وسير اع
   const routes=JSON.parse(fs.readFileSync(new URL('../public/manus-routes.json',import.meta.url),'utf8')).routes;
   assert.ok(routes.some(route=>route.path==='/login/admin'));
   assert.ok(routes.some(route=>route.path==='/admin/teacher-requests'));
+  assert.ok(routes.some(route=>route.path==='/dashboard'));
 });
