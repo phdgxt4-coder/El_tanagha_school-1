@@ -189,7 +189,7 @@ test('الفصول والمواد تُقرأ علنًا لنموذج التسج�
   await assertFails(setDoc(doc(publicDb,'classes/evil'),{grade:'1'}));
   const adminDb=environment.authenticatedContext('admin-uid').firestore();
   await assertFails(setDoc(doc(adminDb,'classes/evil'),{grade:'1'}));
-  for(const path of ['parentCodes/TNG-AAAAAAAA','rosterStudents/01000000000','linkAttempts/parent-a']){
+  for(const path of ['parentCodes/TNG-AAAAAAAA','linkAttempts/parent-a']){
     await assertFails(getDoc(doc(adminDb,path)));
     await assertFails(getDoc(doc(environment.authenticatedContext('parent-a').firestore(),path)));
   }

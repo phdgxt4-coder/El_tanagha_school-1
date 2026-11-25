@@ -127,14 +127,73 @@ service cloud.firestore {
         && (!('createdAt' in data) || data.createdAt is timestamp);
     }
 
+    // ===== وضع Spark: بدون Cloud Functions. كل ثابت يُفرض هنا في القواعد. =====
+    function emailOf() {
+      return request.auth.token.email.lower();
+    }
+
+    function validPhone(value) {
+      return value is string && value.matches('^[+]?[0-9]{8,15}$');
+    }
+
+    function validSelfProfile(userId, data) {
+      return data.uid == userId
+        && data.email == emailOf()
+        && data.displayName is string && data.displayName.size() >= 3 && data.displayName.size() <= 80
+        && validPhone(data.phone)
+        && data.createdAt == request.time
+        && (
+          (data.role == 'parent' && data.status == 'active'
+            && data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'status', 'phone', 'createdAt']))
+          || (data.role == 'teacher_applicant' && data.status == 'pending'
+            && request.auth.token.email_verified == true
+            && data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'status', 'phone', 'createdAt']))
+          || (data.role == 'student' && data.status == 'active'
+            && data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'status', 'phone', 'createdAt',
+              'studentId', 'grade', 'branch', 'classId', 'className', 'rosterVerified', 'birthDate'])
+            && data.displayName.split(' ').size() >= 4
+            && data.grade in ['1', '2', '3']
+            && data.classId is string
+            && get(/databases/$(database)/documents/classes/$(data.classId)).data.grade == data.grade
+            && data.studentId is string && data.studentId.matches('^STU-[0-9A-Z]{8,12}$')
+            && !exists(/databases/$(database)/documents/studentIds/$(data.studentId))
+            && getAfter(/databases/$(database)/documents/studentIds/$(data.studentId)).data.uid == userId
+            && data.rosterVerified == false)
+        );
+    }
+
+    function validCodeLink(linkData, linkId) {
+      return linkData.keys().hasOnly(['parentUid', 'studentUid', 'studentId', 'status', 'active', 'createdAt', 'code'])
+        && linkData.parentUid == request.auth.uid
+        && linkId == request.auth.uid + '_' + linkData.studentUid
+        && linkData.active == true && linkData.status == 'active'
+        && linkData.createdAt == request.time
+        && linkData.code is string && linkData.code.matches('^TNG-[A-Z0-9]{8,12}$')
+        && isActiveParent()
+        && get(/databases/$(database)/documents/parentCodes/$(linkData.code)).data.studentUid == linkData.studentUid
+        && get(/databases/$(database)/documents/parentCodes/$(linkData.code)).data.active == true
+        && get(/databases/$(database)/documents/parentCodes/$(linkData.code)).data.expiresAt > request.time
+        && getAfter(/databases/$(database)/documents/parentCodes/$(linkData.code)).data.active == false
+        && getAfter(/databases/$(database)/documents/parentCodes/$(linkData.code)).data.usedBy == request.auth.uid
+        && profile(linkData.studentUid).role == 'student'
+        && profile(linkData.studentUid).studentId == linkData.studentId;
+    }
+
     match /classes/{classId} {
       allow get, list: if true;
-      allow write: if false;
+      allow create, update: if isActiveAdmin()
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 60
+        && request.resource.data.grade in ['1', '2', '3']
+        && request.resource.data.keys().hasOnly(['name', 'grade', 'branch', 'order', 'createdAt', 'updatedAt']);
+      allow delete: if isActiveAdmin();
     }
 
     match /subjects/{subjectId} {
       allow get, list: if true;
-      allow write: if false;
+      allow create, update: if isActiveAdmin()
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 60
+        && request.resource.data.keys().hasOnly(['name', 'order', 'createdAt', 'updatedAt']);
+      allow delete: if isActiveAdmin();
     }
 
     match /teacherAssignments/{assignmentId} {
@@ -143,11 +202,25 @@ service cloud.firestore {
         || resource.data.teacherUid == request.auth.uid
         || (isActiveStudent() && resource.data.classId == profile(request.auth.uid).classId)
       );
-      allow write: if false;
+      allow create, update: if isActiveAdmin()
+        && request.resource.data.keys().hasOnly(['teacherUid', 'subjectId', 'classId', 'subjectName', 'className', 'grade', 'createdAt'])
+        && assignmentId == request.resource.data.teacherUid + '_' + request.resource.data.subjectId + '_' + request.resource.data.classId
+        && exists(/databases/$(database)/documents/classes/$(request.resource.data.classId))
+        && exists(/databases/$(database)/documents/subjects/$(request.resource.data.subjectId))
+        && profile(request.resource.data.teacherUid).role == 'teacher';
+      allow delete: if isActiveAdmin();
     }
 
     match /rosterStudents/{rosterId} {
-      allow read, write: if false;
+      allow read, create, update, delete: if isActiveAdmin();
+    }
+
+    match /studentIds/{studentId} {
+      allow get, list: if false;
+      allow create: if signedIn() && request.resource.data.keys().hasOnly(['uid'])
+        && request.resource.data.uid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.studentId == studentId;
+      allow update, delete: if false;
     }
 
     match /linkAttempts/{attemptId} {
@@ -167,13 +240,35 @@ service cloud.firestore {
         && request.resource.data.role == resource.data.role
         && request.resource.data.status == resource.data.status
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'phone']);
-      allow create, delete: if false;
+      allow create: if signedIn() && validSelfProfile(userId, request.resource.data);
+      // اعتماد المدرس وربطه بالمواد والفصول: الإدارة فقط وعلى حسابات المدرسين فقط.
+      allow update: if isActiveAdmin()
+        && resource.data.role in ['teacher_applicant', 'teacher']
+        && request.resource.data.role in ['teacher_applicant', 'teacher']
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+          ['role', 'status', 'subjectId', 'subjectName', 'grades', 'assignedClassIds', 'subjectIds', 'approvedAt', 'approvedBy']);
+      allow delete: if false;
     }
 
     match /teacherApplications/{userId} {
       allow get: if signedIn() && (request.auth.uid == userId || isActiveAdmin());
       allow list: if isActiveAdmin();
-      allow create, update, delete: if false;
+      allow create: if signedIn() && request.auth.uid == userId
+        && request.auth.token.email_verified == true
+        && request.resource.data.keys().hasOnly(['uid', 'displayName', 'subjectId', 'subjectName', 'phone', 'publishConsent', 'status', 'submittedAt'])
+        && request.resource.data.uid == userId
+        && request.resource.data.status == 'pending'
+        && request.resource.data.submittedAt == request.time
+        && request.resource.data.publishConsent is bool
+        && validPhone(request.resource.data.phone)
+        && exists(/databases/$(database)/documents/subjects/$(request.resource.data.subjectId))
+        && getAfter(/databases/$(database)/documents/profiles/$(userId)).data.role == 'teacher_applicant';
+      allow update: if isActiveAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt', 'reason'])
+        && request.resource.data.status in ['approved', 'rejected'];
+      allow delete: if false;
     }
 
     match /publicTeachers/{teacherId} {
@@ -187,14 +282,40 @@ service cloud.firestore {
     }
 
     match /parentCodes/{code} {
-      allow read, write: if false;
+      allow get, list: if false;
+      allow create: if isActiveStudent()
+        && code.matches('^TNG-[A-Z0-9]{8,12}$')
+        && request.resource.data.keys().hasOnly(['studentUid', 'active', 'createdAt', 'expiresAt'])
+        && request.resource.data.studentUid == request.auth.uid
+        && request.resource.data.active == true
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.expiresAt == request.time + duration.value(15, 'm');
+      // الطالب يلغي كوده، والولي يستهلكه مرة واحدة مع إنشاء الربط في نفس الدفعة.
+      allow update: if (resource.data.studentUid == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active'])
+          && request.resource.data.active == false)
+        || (isActiveParent() && resource.data.active == true
+          && resource.data.expiresAt > request.time
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active', 'usedBy', 'usedAt'])
+          && request.resource.data.active == false
+          && request.resource.data.usedBy == request.auth.uid
+          && request.resource.data.usedAt == request.time
+          && getAfter(/databases/$(database)/documents/parentLinks/$(request.auth.uid + '_' + resource.data.studentUid)).data.code == code);
+      allow delete: if resource.data.studentUid == request.auth.uid;
     }
 
     match /parentLinks/{linkId} {
       allow get: if signedIn()
         && (resource.data.parentUid == request.auth.uid || resource.data.studentUid == request.auth.uid || isActiveAdmin());
       allow list: if signedIn() && (resource.data.parentUid == request.auth.uid || resource.data.studentUid == request.auth.uid || isActiveAdmin());
-      allow create, update, delete: if false;
+      allow create: if signedIn() && validCodeLink(request.resource.data, linkId);
+      // فك الربط: الولي أو الطالب أو الإدارة. إعادة الربط بكود جديد تمر عبر نفس شروط الإنشاء.
+      allow update: if signedIn()
+        && ((resource.data.parentUid == request.auth.uid || resource.data.studentUid == request.auth.uid || isActiveAdmin())
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active', 'status', 'revokedAt', 'revokedBy'])
+          && request.resource.data.active == false)
+        || (resource.data.active == false && validCodeLink(request.resource.data, linkId));
+      allow delete: if false;
     }
 
     match /content/{contentId} {
