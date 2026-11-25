@@ -3,12 +3,12 @@ import test from 'node:test';
 import {InputValidationError,normalizeArabicName,normalizePhone,validateAccountRequest,validateClassInput,validateRejectionReason,validateRosterRows,validateSubjectInput} from '../functions/src/validation.js';
 
 test('يقبل طلب طالب سليمًا ويطبع الصف',()=>{
-  const result=validateAccountRequest({role:'student',displayName:'  عبد   الرحمن محمود أحمد علي ',phone:'01012345678',grade:'2',branch:'science',classId:'c1'});
+  const result=validateAccountRequest({role:'student',displayName:'  عبد   الرحمن محمود أحمد علي ',phone:'01012345678',grade:'2',branch:'bac_med',classId:'c1'});
   assert.equal(result.displayName,'عبد الرحمن محمود أحمد علي');
   assert.equal(result.phoneKey,'01012345678');
   assert.equal(result.grade,'2');
   assert.equal(result.role,'student');
-  assert.equal(result.branch,'science');
+  assert.equal(result.branch,'bac_med');
 });
 
 test('يرفض دور الإدارة وأي دور غير معلن',()=>{

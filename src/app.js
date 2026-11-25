@@ -2,6 +2,7 @@ import {home,subjectsPage,subjectPage,teachersPage,renderTeacherCards,newsPage,s
 import {loginPage,teacherApprovalPage,adminJoinPage} from './pages/auth-pages.js';
 import {createRouteHelpers,resolveAppLink} from './utils/routes.js';
 import {initErrorReporter} from './services/error-reporter.js';
+import {TRACKS} from '../functions/src/validation.js';
 import {initMotion,routeStart,routeEnd,withThemeTransition} from './ui/motion.js';
 
 const moduleScriptUrl=document.querySelector('script[type="module"][src]')?.src;
@@ -172,9 +173,20 @@ async function populateRegistrationOptions(isStale){
       if(isStale())return;
       const gradeSelect=document.querySelector('[data-grade-select]');
       const fallback=document.querySelector('[data-class-fallback]');
+      const branchSelect=document.querySelector('[data-branch-select]');
+      const branchLabel=document.querySelector('[data-branch-label]');
       const refresh=()=>{
         const grade=gradeSelect?.value||'';
-        const options=classes.filter(item=>item.grade===grade);
+        const tracks=Object.entries(TRACKS[grade]||{});
+        if(branchSelect){
+          const keep=branchSelect.value;
+          branchLabel.hidden=!tracks.length;
+          branchSelect.required=tracks.length>0;
+          branchSelect.innerHTML='<option value="">اختر المسار</option>'+tracks.map(([id,label])=>`<option value="${id}">${label}</option>`).join('');
+          if(tracks.some(([id])=>id===keep))branchSelect.value=keep;
+        }
+        const branch=branchSelect?.value||'';
+        const options=classes.filter(item=>item.grade===grade&&(!item.branch||item.branch===branch));
         if(!classes.length){classSelect.hidden=true;classSelect.closest('label').hidden=true;if(fallback)fallback.hidden=false;return;}
         classSelect.disabled=!grade;
         classSelect.innerHTML=grade
@@ -183,6 +195,7 @@ async function populateRegistrationOptions(isStale){
         classSelect.required=Boolean(grade&&options.length);
       };
       gradeSelect?.addEventListener('change',refresh);
+      branchSelect?.addEventListener('change',refresh);
       refresh();
     }
   }catch{

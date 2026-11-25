@@ -132,9 +132,9 @@ export function adminDeleteClass(classId) {
   return callable('adminDeleteClass', { classId });
 }
 
-export function adminSaveSubject(name) {
-  if (isSpark) return loadSpark().then(spark => spark.adminSaveSubject(name));
-  return callable('adminSaveSubject', { name });
+export function adminSaveSubject(name, branches = []) {
+  if (isSpark) return loadSpark().then(spark => spark.adminSaveSubject(name, branches));
+  return callable('adminSaveSubject', { name, branches });
 }
 
 export function adminDeleteSubject(subjectId) {
