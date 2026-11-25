@@ -18,3 +18,9 @@ export function createRouteHelpers(baseUrl = '/', origin = 'http://localhost') {
 
   return Object.freeze({ basePath, toUrlPath, fromUrlPath });
 }
+
+export function resolveAppRoute(pathname, routeHelpers, routePatterns = []) {
+  const route = routeHelpers.fromUrlPath(pathname);
+  if (route !== null) return route;
+  return routePatterns.some(pattern => pattern.test(pathname)) ? pathname : null;
+}

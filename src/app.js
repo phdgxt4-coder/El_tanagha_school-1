@@ -1,6 +1,6 @@
 import {home,subjectsPage,subjectPage,teachersPage,renderTeacherCards,newsPage,schedulePage,resultsPage,contactPage,notFound} from './pages/public-pages.js';
 import {loginPage,teacherApprovalPage} from './pages/auth-pages.js';
-import {createRouteHelpers} from './utils/routes.js';
+import {createRouteHelpers,resolveAppRoute} from './utils/routes.js';
 
 const moduleScriptUrl=document.querySelector('script[type="module"][src]')?.src;
 const sourceBasePath=moduleScriptUrl?new URL('../',moduleScriptUrl).pathname:'/';
@@ -13,7 +13,7 @@ function normalizeInternalLinks(root=document){
     if(!rawHref||rawHref.startsWith('#')||/^(?:mailto|tel|javascript):/iu.test(rawHref))return;
     const url=new URL(rawHref,location.href);
     if(url.origin!==location.origin)return;
-    const route=routeHelpers.fromUrlPath(url.pathname);
+    const route=routeFromUrlPath(url.pathname);
     if(route===null)return;
     link.href=`${routeHelpers.toUrlPath(route)}${url.search}${url.hash}`;
   });
@@ -31,6 +31,9 @@ const routes=[
   [/^\/login(?:\/(student|parent|teacher|admin))?\/?$/,loginPage],
   [/^\/admin\/teacher-requests\/?$/,teacherApprovalPage]
 ];
+
+const routePatterns=routes.map(([pattern])=>pattern);
+const routeFromUrlPath=pathname=>resolveAppRoute(pathname,routeHelpers,routePatterns);
 
 let pageCleanup=()=>{};
 let pageGeneration=0;
@@ -319,7 +322,7 @@ document.addEventListener('click',async event=>{
   if(rawHref.startsWith('#')||/^(?:mailto|tel|javascript):/iu.test(rawHref))return;
   const url=new URL(link.href);
   if(url.origin!==location.origin)return;
-  const route=routeHelpers.fromUrlPath(url.pathname);
+  const route=routeFromUrlPath(url.pathname);
   if(route===null)return;
   event.preventDefault();
   history.pushState({},'',`${routeHelpers.toUrlPath(route)}${url.search}${url.hash}`);
