@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createRouteHelpers } from '../src/utils/routes.js';
+import { createRouteHelpers, resolveAppRoute } from '../src/utils/routes.js';
 
 test('المسارات المحلية على جذر النطاق لا تتغير', () => {
   const routes = createRouteHelpers('/', 'https://school.example');
@@ -15,6 +15,14 @@ test('المسارات تحت بادئة GitHub Pages تُترجم ذهابًا 
   assert.equal(routes.toUrlPath('/login/student'), '/El_tanagha_school-1/login/student');
   assert.equal(routes.fromUrlPath('/El_tanagha_school-1/login/student'), '/login/student');
   assert.equal(routes.fromUrlPath('/El_tanagha_school-1'), '/');
+});
+
+test('تُحل روابط المسارات الداخلية الأصلية قبل إضافة بادئة GitHub Pages', () => {
+  const routes = createRouteHelpers('/El_tanagha_school-1/', 'https://phdgxt4-coder.github.io');
+  const knownRoutes = [/^\/$/, /^\/login(?:\/(student|parent|teacher|admin))?\/?$/];
+  assert.equal(resolveAppRoute('/login/student', routes, knownRoutes), '/login/student');
+  assert.equal(resolveAppRoute('/El_tanagha_school-1/login/student', routes, knownRoutes), '/login/student');
+  assert.equal(resolveAppRoute('/another-repository/login', routes, knownRoutes), null);
 });
 
 test('لا تُفسَّر مسارات مستودعات أخرى كأنها من التطبيق', () => {
