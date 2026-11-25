@@ -13,6 +13,7 @@ test('التسجيل يطلب الهاتف والبريد وكلمة المرو�
   assert.match(html, /name="phone" type="tel"[^>]*required/u);
   assert.match(html, /data-password-reset/u);
   assert.match(html, /name="branch"/u);
+  assert.equal((html.match(/name="branch"/gu) || []).length, 1);
   assert.match(html, /name="className"/u);
   assert.doesNotMatch(html, /name="birthDate"/u);
 });

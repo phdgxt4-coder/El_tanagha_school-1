@@ -157,10 +157,28 @@ function setAuthMode(mode){
   showMessage(root.querySelector('[data-auth-message]'),'');
 }
 
+function setupTrackSelect(){
+  const gradeSelect=document.querySelector('[data-grade-select]');
+  const branchSelect=document.querySelector('[data-branch-select]');
+  const branchLabel=document.querySelector('[data-branch-label]');
+  if(!gradeSelect||!branchSelect||!branchLabel)return;
+  const render=()=>{
+    const tracks=Object.entries(TRACKS[gradeSelect.value]||{});
+    const keep=branchSelect.value;
+    branchLabel.hidden=!tracks.length;
+    branchSelect.required=tracks.length>0;
+    branchSelect.innerHTML='<option value="">اختر المسار</option>'+tracks.map(([id,label])=>`<option value="${id}">${label}</option>`).join('');
+    if(tracks.some(([id])=>id===keep))branchSelect.value=keep;
+  };
+  gradeSelect.addEventListener('change',render);
+  render();
+}
+
 async function populateRegistrationOptions(isStale){
   const classSelect=document.querySelector('[data-class-select]');
   const subjectSelect=document.querySelector('[data-subject-select]');
   if(!classSelect&&!subjectSelect)return;
+  setupTrackSelect();
   try{
     const structure=await import('./services/structure-service.js');
     if(subjectSelect){
@@ -174,17 +192,8 @@ async function populateRegistrationOptions(isStale){
       const gradeSelect=document.querySelector('[data-grade-select]');
       const fallback=document.querySelector('[data-class-fallback]');
       const branchSelect=document.querySelector('[data-branch-select]');
-      const branchLabel=document.querySelector('[data-branch-label]');
       const refresh=()=>{
         const grade=gradeSelect?.value||'';
-        const tracks=Object.entries(TRACKS[grade]||{});
-        if(branchSelect){
-          const keep=branchSelect.value;
-          branchLabel.hidden=!tracks.length;
-          branchSelect.required=tracks.length>0;
-          branchSelect.innerHTML='<option value="">اختر المسار</option>'+tracks.map(([id,label])=>`<option value="${id}">${label}</option>`).join('');
-          if(tracks.some(([id])=>id===keep))branchSelect.value=keep;
-        }
         const branch=branchSelect?.value||'';
         const options=classes.filter(item=>item.grade===grade&&(!item.branch||item.branch===branch));
         if(!classes.length){classSelect.hidden=true;classSelect.closest('label').hidden=true;if(fallback)fallback.hidden=false;return;}
