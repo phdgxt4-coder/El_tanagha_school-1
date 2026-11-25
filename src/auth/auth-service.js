@@ -91,12 +91,28 @@ export function linkParentToStudent(code) {
   return callable('linkParentToStudent', { code });
 }
 
+export function issueParentCode() {
+  return callable('issueParentCode', {});
+}
+
 export function listLinkedStudents() {
   return callable('listLinkedStudents', {});
 }
 
 export function unlinkParentFromStudent(studentUid) {
   return callable('unlinkParentFromStudent', { studentUid });
+}
+
+export function listParentLinkRequests() {
+  return callable('listParentLinkRequests', {});
+}
+
+export function approveParentLink(linkId) {
+  return callable('approveParentLink', { linkId });
+}
+
+export function rejectParentLink(linkId) {
+  return callable('rejectParentLink', { linkId });
 }
 
 export function waitForInitialAuthState() {

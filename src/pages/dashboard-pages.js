@@ -66,15 +66,15 @@ export async function initializeDashboard(){
 }
 
 function rolePanel(profile){
-  if(profile.role==='student')return card('مساحة الطالب',`<p>يمكنك متابعة محتوى صفك الدراسي من القائمة أدناه.</p><ul class="dashboard-list" data-academic-content><li>جارٍ تحميل المحتوى الدراسي…</li></ul><div class="dashboard-actions"><a class="button" href="/subjects">المواد الدراسية</a><a class="button ghost" href="/results">النتائج</a></div>${profile.parentCode?card('كود ربط ولي الأمر',`<p>شاركه مع ولي أمرك بطريقة آمنة فقط:</p><strong class="parent-code" dir="ltr">${esc(profile.parentCode)}</strong>`):''}`);
-  if(profile.role==='parent')return card('مساحة ولي الأمر',`<p>سيظهر هنا الأبناء المرتبطون بهذا الحساب فقط. استخدم كود الربط الذي يظهر في حساب الطالب.</p><div data-linked-students role="status"><p>جارٍ تحميل روابط الحساب…</p></div><form class="dashboard-form" data-parent-link><label>كود الطالب<input name="code" inputmode="text" maxlength="10" placeholder="TNG-482917" required></label><button class="button" type="submit">ربط الطالب</button><p class="form-note" data-link-message role="status" aria-live="polite"></p></form>`);
+  if(profile.role==='student')return card('مساحة الطالب',`<p>يمكنك متابعة محتوى صفك الدراسي من القائمة أدناه.</p><ul class="dashboard-list" data-academic-content><li>جارٍ تحميل المحتوى الدراسي…</li></ul><div class="dashboard-actions"><a class="button" href="/subjects">المواد الدراسية</a><a class="button ghost" href="/results">النتائج</a></div>${profile.parentCode?card('كود ربط ولي الأمر',`<p>الكود صالح لمدة 15 دقيقة ويُستهلك عند إرسال الطلب. شاركه مع ولي أمرك بطريقة آمنة فقط:</p><strong class="parent-code" dir="ltr" data-parent-code>${esc(profile.parentCode)}</strong><p class="form-note" data-parent-code-message>إذا انتهت صلاحيته، أصدر كودًا جديدًا.</p><button class="button ghost" type="button" data-issue-parent-code>إصدار كود جديد</button>`):''}`);
+  if(profile.role==='parent')return card('مساحة ولي الأمر',`<p>سيظهر هنا الأبناء المرتبطون بهذا الحساب فقط. كل طلب ربط ينتظر اعتماد إدارة المدرسة.</p><div data-linked-students role="status"><p>جارٍ تحميل روابط الحساب…</p></div><form class="dashboard-form" data-parent-link><label>كود الطالب<input name="code" inputmode="text" maxlength="10" placeholder="TNG-482917" required></label><button class="button" type="submit">إرسال طلب الربط</button><p class="form-note" data-link-message role="status" aria-live="polite"></p></form>`);
   if(profile.role==='teacher'){
     const subjectOptions=subjects.map(subject=>`<option value="${esc(subject.id)}" ${profile.subjectId===subject.id?'selected':''}>${esc(subject.name)}</option>`).join('');
     const grades=Array.isArray(profile.grades)?profile.grades.filter(grade=>gradeNames[grade]):[];
     const gradeOptions=grades.map(grade=>`<option value="${esc(grade)}">${esc(gradeNames[grade])}</option>`).join('');
     return card('مساحة المدرس',`<p>أضف رابط درس أو ملف أو فيديو أو واجب إلى صف مُسند إليك. تقبل المنصة الروابط الآمنة التي تبدأ بـ HTTPS.</p>${grades.length?`<form class="dashboard-form" data-content-form><label>نوع المحتوى<select name="type"><option value="lesson">درس</option><option value="file">ملف</option><option value="video">فيديو</option><option value="assignment">واجب</option></select></label><label>المادة<select name="subjectId" required>${subjectOptions}</select></label><label>العنوان<input name="title" maxlength="120" required></label><label>الصف<select name="grade" required>${gradeOptions}</select></label><label>الرابط الآمن<input name="url" type="url" inputmode="url" pattern="https://.*" placeholder="https://" required></label><button class="button" type="submit">نشر المحتوى</button><p class="form-note" data-content-message role="status" aria-live="polite"></p></form>`:'<p class="form-note">لم تُسند إليك صفوف بعد؛ تواصل مع إدارة المدرسة قبل نشر المحتوى.</p>'}`);
   }
-  if(profile.role==='admin')return card('مساحة الإدارة',`<p>صلاحيات الإدارة تُحسم من سجل admins الموثوق في الخادم.</p><div class="dashboard-actions"><a class="button" href="/admin/teacher-requests">طلبات اعتماد المدرسين</a></div>`);
+  if(profile.role==='admin')return card('مساحة الإدارة',`<p>صلاحيات الإدارة تُحسم من سجل admins الموثوق في الخادم.</p><div class="dashboard-actions"><a class="button" href="/admin/teacher-requests">طلبات اعتماد المدرسين</a></div><div class="admin-link-requests" data-parent-link-requests role="status"><p>جارٍ تحميل طلبات ربط أولياء الأمور…</p></div>`);
   return card('الحساب',`<p>لم يكتمل إعداد هذا الدور بعد.</p>`);
 }
 
@@ -112,6 +112,19 @@ async function refreshLinkedStudents(root,auth){
 
 function bindRoleActions(root,auth,profile,database){
   if(profile.role==='parent')void refreshLinkedStudents(root,auth);
+  if(profile.role==='admin')void refreshParentLinkRequests(root,auth);
+  root.querySelector('[data-issue-parent-code]')?.addEventListener('click',async event=>{
+    const button=event.currentTarget;
+    const codeTarget=root.querySelector('[data-parent-code]');
+    const message=root.querySelector('[data-parent-code-message]');
+    button.disabled=true;
+    try{
+      const result=await auth.issueParentCode();
+      if(codeTarget)codeTarget.textContent=result.code;
+      if(message)message.textContent='تم إصدار كود جديد صالح لمدة 15 دقيقة.';
+    }catch{if(message){message.textContent='تعذر إصدار كود جديد الآن.';message.dataset.kind='error';}}
+    finally{button.disabled=false;}
+  });
   root.querySelector('[data-parent-link]')?.addEventListener('submit',async event=>{
     event.preventDefault();
     const form=event.currentTarget;
@@ -120,7 +133,7 @@ function bindRoleActions(root,auth,profile,database){
     button.disabled=true;
     try{
       const result=await auth.linkParentToStudent(new FormData(form).get('code'));
-      message.textContent=`تم ربط حساب الطالب ${result.displayName||''} بنجاح.`;
+      message.textContent=`تم إرسال طلب ربط الطالب ${result.displayName||''} إلى إدارة المدرسة للموافقة.`;
       message.dataset.kind='status';
       form.reset();
       await refreshLinkedStudents(root,auth);
@@ -145,6 +158,16 @@ function bindRoleActions(root,auth,profile,database){
       target?.append(note);
     }
   });
+  root.addEventListener('click',async event=>{
+    const button=event.target.closest('[data-parent-link-review]');
+    if(!button)return;
+    button.disabled=true;
+    try{
+      if(button.dataset.parentLinkReview==='approve')await auth.approveParentLink(button.dataset.linkId);
+      else await auth.rejectParentLink(button.dataset.linkId);
+      await refreshParentLinkRequests(root,auth);
+    }catch{button.disabled=false;}
+  });
   root.querySelector('[data-content-form]')?.addEventListener('submit',async event=>{
     event.preventDefault();
     const form=event.currentTarget,button=form.querySelector('button'),message=form.querySelector('[data-content-message]');
@@ -158,4 +181,15 @@ function bindRoleActions(root,auth,profile,database){
     }catch{message.textContent='تعذر نشر المحتوى أو لا توجد صلاحية لهذا الصف.';message.dataset.kind='error';}
     finally{button.disabled=false;}
   });
+}
+
+async function refreshParentLinkRequests(root,auth){
+  const target=root.querySelector('[data-parent-link-requests]');
+  if(!target)return;
+  try{
+    const result=await auth.listParentLinkRequests();
+    const requests=Array.isArray(result.requests)?result.requests:[];
+    if(!requests.length){target.innerHTML='<p class="form-note">لا توجد طلبات ربط معلقة.</p>';return;}
+    target.innerHTML=`<div class="admin-request-list">${requests.map(request=>`<article class="approval-card"><h3>${esc(request.parentName)} ← ${esc(request.studentName)}</h3><p>طلب ربط ينتظر التحقق الإداري.</p><div class="approval-actions"><button class="button" type="button" data-parent-link-review="approve" data-link-id="${esc(request.linkId)}">اعتماد الربط</button><button class="button ghost" type="button" data-parent-link-review="reject" data-link-id="${esc(request.linkId)}">رفض</button></div></article>`).join('')}</div>`;
+  }catch{target.innerHTML='<p class="form-note" data-kind="error">تعذر تحميل طلبات الربط.</p>';}
 }

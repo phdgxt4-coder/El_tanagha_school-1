@@ -1,6 +1,6 @@
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { randomInt } from 'node:crypto';
 import { setGlobalOptions } from 'firebase-functions/v2';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
@@ -15,7 +15,9 @@ const APPLICATION_COLLECTION = 'teacherApplications';
 const PUBLIC_TEACHER_COLLECTION = 'publicTeachers';
 const PARENT_CODE_COLLECTION = 'parentCodes';
 const PARENT_LINK_COLLECTION = 'parentLinks';
+const AUDIT_LOG_COLLECTION = 'auditLogs';
 const REGION = 'us-central1';
+const PARENT_CODE_TTL_MS = 15 * 60 * 1000;
 
 setGlobalOptions({ region: REGION, maxInstances: 10 });
 
@@ -129,7 +131,12 @@ export const submitAccountRequest = onCall(async request => {
           const codeSnapshot = await transaction.get(codeRef);
           if (!codeSnapshot.exists) {
             parentCode = candidate;
-            transaction.create(codeRef, { studentUid: uid, active: true, createdAt: FieldValue.serverTimestamp() });
+            transaction.create(codeRef, {
+              studentUid: uid,
+              active: true,
+              createdAt: FieldValue.serverTimestamp(),
+              expiresAt: Timestamp.fromMillis(Date.now() + PARENT_CODE_TTL_MS)
+            });
             break;
           }
         }
@@ -172,22 +179,86 @@ export const linkParentToStudent = onCall(async request => {
   }
   const code = String(request.data?.code ?? '').trim().toUpperCase();
   if (!/^TNG-\d{6}$/u.test(code)) throw new HttpsError('invalid-argument', 'كود الربط غير صالح.');
-  const codeSnapshot = await db.collection(PARENT_CODE_COLLECTION).doc(code).get();
-  if (!codeSnapshot.exists || codeSnapshot.data()?.active !== true) throw new HttpsError('not-found', 'كود الربط غير موجود أو غير فعال.');
-  const studentUid = requireUid(codeSnapshot.data().studentUid);
-  if (studentUid === auth.uid) throw new HttpsError('invalid-argument', 'لا يمكن ربط الحساب بنفسه.');
-  const studentProfile = await db.collection(PROFILE_COLLECTION).doc(studentUid).get();
-  if (!studentProfile.exists || studentProfile.data()?.role !== 'student' || studentProfile.data()?.status !== 'active') {
-    throw new HttpsError('failed-precondition', 'حساب الطالب غير متاح للربط.');
+  const codeRef = db.collection(PARENT_CODE_COLLECTION).doc(code);
+  const linkRef = db.collection(PARENT_LINK_COLLECTION);
+  try {
+    return await db.runTransaction(async transaction => {
+      const codeSnapshot = await transaction.get(codeRef);
+      if (!codeSnapshot.exists || codeSnapshot.data()?.active !== true) {
+        throw new HttpsError('not-found', 'كود الربط غير موجود أو منتهي أو استُخدم من قبل.');
+      }
+      const codeData = codeSnapshot.data();
+      if (!codeData.expiresAt?.toMillis || codeData.expiresAt.toMillis() <= Date.now()) {
+        transaction.update(codeRef, { active: false, expiredAt: FieldValue.serverTimestamp() });
+        throw new HttpsError('not-found', 'كود الربط منتهي الصلاحية. اطلب كودًا جديدًا من حساب الطالب.');
+      }
+      const studentUid = requireUid(codeData.studentUid);
+      if (studentUid === auth.uid) throw new HttpsError('invalid-argument', 'لا يمكن ربط الحساب بنفسه.');
+      const studentRef = db.collection(PROFILE_COLLECTION).doc(studentUid);
+      const studentProfile = await transaction.get(studentRef);
+      if (!studentProfile.exists || studentProfile.data()?.role !== 'student' || studentProfile.data()?.status !== 'active') {
+        throw new HttpsError('failed-precondition', 'حساب الطالب غير متاح للربط.');
+      }
+      const parentLinkRef = db.collection(PARENT_LINK_COLLECTION).doc(`${auth.uid}_${studentUid}`);
+      const existingLink = await transaction.get(parentLinkRef);
+      if (existingLink.exists && ['pending', 'active'].includes(existingLink.data()?.status)) {
+        throw new HttpsError('already-exists', 'يوجد طلب ربط قائم لهذا الطالب.');
+      }
+      transaction.update(codeRef, { active: false, usedAt: FieldValue.serverTimestamp(), usedBy: auth.uid });
+      transaction.set(parentLinkRef, {
+        parentUid: auth.uid,
+        studentUid,
+        code,
+        status: 'pending',
+        active: false,
+        createdAt: FieldValue.serverTimestamp()
+      });
+      transaction.create(db.collection(AUDIT_LOG_COLLECTION).doc(), {
+        action: 'parent_link_requested',
+        actorUid: auth.uid,
+        parentUid: auth.uid,
+        studentUid,
+        linkId: parentLinkRef.id,
+        createdAt: FieldValue.serverTimestamp()
+      });
+      return { linked: false, pending: true, studentUid, displayName: studentProfile.data()?.displayName ?? '' };
+    });
+  } catch (error) {
+    throw toCallableInputError(error);
   }
-  await db.collection(PARENT_LINK_COLLECTION).doc(`${auth.uid}_${studentUid}`).set({
-    parentUid: auth.uid,
-    studentUid,
-    code,
-    active: true,
-    createdAt: FieldValue.serverTimestamp()
-  }, { merge: true });
-  return { linked: true, studentUid, displayName: studentProfile.data()?.displayName ?? '' };
+});
+
+export const issueParentCode = onCall(async request => {
+  const auth = requireAuth(request);
+  const profileRef = db.collection(PROFILE_COLLECTION).doc(auth.uid);
+  const profileSnapshot = await profileRef.get();
+  if (!profileSnapshot.exists || profileSnapshot.data()?.role !== 'student' || profileSnapshot.data()?.status !== 'active') {
+    throw new HttpsError('permission-denied', 'إصدار كود الربط متاح للطالب النشط فقط.');
+  }
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const candidate = `TNG-${String(randomInt(100000, 1000000))}`;
+    const codeRef = db.collection(PARENT_CODE_COLLECTION).doc(candidate);
+    const created = await db.runTransaction(async transaction => {
+      const existing = await transaction.get(codeRef);
+      if (existing.exists) return false;
+      const oldCodes = await db.collection(PARENT_CODE_COLLECTION).where('studentUid', '==', auth.uid).where('active', '==', true).limit(20).get();
+      oldCodes.docs.forEach(oldCode => transaction.update(oldCode.ref, { active: false, revokedAt: FieldValue.serverTimestamp(), revokedBy: auth.uid }));
+      transaction.create(codeRef, {
+        studentUid: auth.uid,
+        active: true,
+        createdAt: FieldValue.serverTimestamp(),
+        expiresAt: Timestamp.fromMillis(Date.now() + PARENT_CODE_TTL_MS)
+      });
+      transaction.update(profileRef, { parentCode: candidate, parentCodeExpiresAt: Timestamp.fromMillis(Date.now() + PARENT_CODE_TTL_MS) });
+      transaction.create(db.collection(AUDIT_LOG_COLLECTION).doc(), {
+        action: 'parent_code_issued', actorUid: auth.uid, studentUid: auth.uid,
+        code: candidate, createdAt: FieldValue.serverTimestamp()
+      });
+      return true;
+    });
+    if (created) return { code: candidate, expiresInSeconds: PARENT_CODE_TTL_MS / 1000 };
+  }
+  throw new HttpsError('aborted', 'تعذر إصدار كود ربط جديد. حاول مرة أخرى.');
 });
 
 export const listLinkedStudents = onCall(async request => {
@@ -234,10 +305,87 @@ export const unlinkParentFromStudent = onCall(async request => {
     }
     transaction.update(linkRef, {
       active: false,
+      status: 'unlinked',
       unlinkedAt: FieldValue.serverTimestamp()
+    });
+    transaction.create(db.collection(AUDIT_LOG_COLLECTION).doc(), {
+      action: 'parent_link_unlinked',
+      actorUid: auth.uid,
+      parentUid: auth.uid,
+      studentUid,
+      linkId: linkRef.id,
+      createdAt: FieldValue.serverTimestamp()
     });
   });
   return { unlinked: true };
+});
+
+export const listParentLinkRequests = onCall(async request => {
+  const auth = requireAuth(request);
+  await requireActiveAdmin(auth.uid);
+  const snapshot = await db.collection(PARENT_LINK_COLLECTION)
+    .where('status', '==', 'pending')
+    .orderBy('createdAt', 'asc')
+    .limit(100)
+    .get();
+  const requests = await Promise.all(snapshot.docs.map(async document => {
+    const data = document.data();
+    const [parentSnapshot, studentSnapshot] = await Promise.all([
+      db.collection(PROFILE_COLLECTION).doc(data.parentUid).get(),
+      db.collection(PROFILE_COLLECTION).doc(data.studentUid).get()
+    ]);
+    return {
+      linkId: document.id,
+      parentUid: data.parentUid,
+      studentUid: data.studentUid,
+      parentName: parentSnapshot.data()?.displayName ?? 'ولي أمر',
+      studentName: studentSnapshot.data()?.displayName ?? 'طالب',
+      createdAt: data.createdAt?.toMillis?.() ?? null
+    };
+  }));
+  return { requests };
+});
+
+export const approveParentLink = onCall(async request => {
+  const auth = requireAuth(request);
+  await requireActiveAdmin(auth.uid);
+  const linkId = String(request.data?.linkId ?? '');
+  if (!/^[A-Za-z0-9_-]{1,256}$/u.test(linkId)) throw new HttpsError('invalid-argument', 'معرّف طلب الربط غير صالح.');
+  const linkRef = db.collection(PARENT_LINK_COLLECTION).doc(linkId);
+  await db.runTransaction(async transaction => {
+    const linkSnapshot = await transaction.get(linkRef);
+    if (!linkSnapshot.exists || linkSnapshot.data()?.status !== 'pending') {
+      throw new HttpsError('not-found', 'طلب الربط غير متاح للمراجعة.');
+    }
+    const data = linkSnapshot.data();
+    transaction.update(linkRef, { status: 'active', active: true, approvedAt: FieldValue.serverTimestamp(), approvedBy: auth.uid });
+    transaction.create(db.collection(AUDIT_LOG_COLLECTION).doc(), {
+      action: 'parent_link_approved', actorUid: auth.uid, parentUid: data.parentUid,
+      studentUid: data.studentUid, linkId, createdAt: FieldValue.serverTimestamp()
+    });
+  });
+  return { approved: true };
+});
+
+export const rejectParentLink = onCall(async request => {
+  const auth = requireAuth(request);
+  await requireActiveAdmin(auth.uid);
+  const linkId = String(request.data?.linkId ?? '');
+  if (!/^[A-Za-z0-9_-]{1,256}$/u.test(linkId)) throw new HttpsError('invalid-argument', 'معرّف طلب الربط غير صالح.');
+  const linkRef = db.collection(PARENT_LINK_COLLECTION).doc(linkId);
+  await db.runTransaction(async transaction => {
+    const linkSnapshot = await transaction.get(linkRef);
+    if (!linkSnapshot.exists || linkSnapshot.data()?.status !== 'pending') {
+      throw new HttpsError('not-found', 'طلب الربط غير متاح للمراجعة.');
+    }
+    const data = linkSnapshot.data();
+    transaction.update(linkRef, { status: 'rejected', active: false, rejectedAt: FieldValue.serverTimestamp(), rejectedBy: auth.uid });
+    transaction.create(db.collection(AUDIT_LOG_COLLECTION).doc(), {
+      action: 'parent_link_rejected', actorUid: auth.uid, parentUid: data.parentUid,
+      studentUid: data.studentUid, linkId, createdAt: FieldValue.serverTimestamp()
+    });
+  });
+  return { rejected: true };
 });
 
 export const listTeacherApplications = onCall(async request => {
