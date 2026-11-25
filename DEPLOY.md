@@ -32,6 +32,12 @@ firebase deploy --only firestore:rules,firestore:indexes,functions
 (هذه القيم عامة وليست أسرارًا.) ثم شغّل workflow النشر من Actions أو ادفع أي تعديل إلى main.
 للتشغيل المحلي انسخ `.env.example` إلى `.env.local` واملأه.
 
+## 4ب. الإشعارات اللحظية (اختياري لكن موصى به)
+1. Project settings > Cloud Messaging > Web configuration > Generate key pair. انسخ المفتاح العام.
+2. أضفه كمتغير GitHub باسم `VITE_FIREBASE_VAPID_KEY`، ثم أضف سطرًا واحدًا إلى `.github/workflows/pages.yml` بجانب باقي متغيرات VITE (لا أستطيع تعديل ملفات workflow من حساب المساعد):
+   `VITE_FIREBASE_VAPID_KEY: ${{ vars.VITE_FIREBASE_VAPID_KEY }}`
+3. الإشعارات داخل المنصة (الجرس) تعمل بدونه. على الآيفون: iOS 16.4 أو أحدث، ويجب إضافة الموقع للشاشة الرئيسية وفتحه من الأيقونة ثم تفعيل الإشعارات.
+
 ## 5. أول حساب إدارة
 1. سجّل حسابًا عاديًا بالبريد (كأي طالب) أو أنشئه من Authentication > Users > Add user.
 2. انسخ UID من Authentication > Users.

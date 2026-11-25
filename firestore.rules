@@ -360,6 +360,34 @@ service cloud.firestore {
       allow update, delete: if isActiveAdmin() || resource.data.fromUid == request.auth.uid;
     }
 
+    // صندوق إشعارات المستخدم: تنشئه الوظائف فقط، ويقرأه ويعلّمه صاحبه فقط.
+    match /userNotifications/{notificationId} {
+      allow get, list: if signedIn() && resource.data.uid == request.auth.uid;
+      allow update: if signedIn() && resource.data.uid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+      allow create: if false;
+    }
+
+    // أجهزة الإشعارات اللحظية وتفضيلات كل مستخدم.
+    match /pushDevices/{deviceId} {
+      allow get, list: if signedIn() && resource.data.uid == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid', 'token', 'createdAt'])
+        && request.resource.data.token is string && request.resource.data.token.size() < 400;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+      allow update: if false;
+    }
+
+    match /notificationPrefs/{userId} {
+      allow get: if signedIn() && request.auth.uid == userId;
+      allow create, update: if signedIn() && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['content', 'grade', 'attendance', 'chat'])
+        && request.resource.data.content is bool && request.resource.data.grade is bool
+        && request.resource.data.attendance is bool && request.resource.data.chat is bool;
+      allow list, delete: if false;
+    }
+
     // لا توجد سماحات افتراضية لأي مجموعة أخرى.
   }
 }

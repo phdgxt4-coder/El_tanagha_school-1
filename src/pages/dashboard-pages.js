@@ -56,6 +56,7 @@ export async function initializeDashboard(){
     page.innerHTML=mod[`render${cap}`](profile);
     const root=page.querySelector('.dash');
     root.classList.add('dash-in');
+    import('./dashboards/common.js').then(common=>common.mountBell(root,{profile,database})).catch(()=>{});
     await mod[`mount${cap}`](root,{profile,auth,database});
   }catch(error){
     if(status.isConnected)settle(status,error?.message==='auth/timeout'
