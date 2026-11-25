@@ -97,3 +97,11 @@ firebase deploy --only firestore:rules,firestore:indexes,functions
 6. جرب بحسابات تجريبية (طالب، ولي أمر، مدرس، إدارة): تسجيل، ربط ولي الأمر بكود، نشر محتوى، رصد جماعي، رسائل، صور، جدول، ترقية السنة على فصل تجريبي.
 7. النسخ الاحتياطي: لوحة الإدارة > النسخ والأخطاء > تنزيل نسخة (يدوي، يُحسب من حد القراءات). النسخ التلقائي المجدول من Google يحتاج Blaze.
 8. مراقبة الأخطاء: نفس التبويب يعرض آخر 30 خطأ مسجلًا من متصفحات المستخدمين المسجلين.
+
+## الاستضافة على Firebase Hosting (بديل GitHub Pages، يسمح بريبو Private)
+1. Firebase Console > Build > Hosting > Get started (اضغط التالي حتى النهاية، لا تحتاج تثبيت شيء).
+2. Project settings > Service accounts > Generate new private key (ينزل ملف JSON). لا ترفعه لأي مكان عام ولا ترسله في أي محادثة.
+3. GitHub > Settings > Secrets and variables > Actions > Secrets > New repository secret: الاسم `FIREBASE_SERVICE_ACCOUNT` والقيمة محتوى ملف الـ JSON كامل. بعدها احذف الملف من جهازك.
+4. تأكد أن Variables فيها `VITE_FIREBASE_*` (بما فيها `VITE_FIREBASE_PROJECT_ID`).
+5. بعد دمج الـ PR: في GitHub اضغط Add file > Create new file، اكتب الاسم `.github/workflows/firebase-hosting.yml`، والصق محتوى ملف `deploy/firebase-hosting.workflow.yml`، ثم Commit. (الأداة التي تفتح الـ PR ليست لها صلاحية تعديل ملفات workflows، لذلك تُضاف يدويًا.) بعدها احذف الملف القديم `.github/workflows/pages.yml` بنفس الطريقة (Delete) حتى لا يفشل بعد جعل الريبو Private. شغّل workflow الجديد يدويًا من Actions أو ادفع أي تعديل. الرابط يظهر في Hosting باسم `PROJECT_ID.web.app` (النطاقات `web.app` و`firebaseapp.com` مصرّح بها في Authentication تلقائيًا).
+6. افتح الرابط وتأكد أن الموقع والدخول يعملان، وبعدها فقط اجعل الريبو Private.
