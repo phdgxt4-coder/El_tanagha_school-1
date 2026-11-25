@@ -122,7 +122,7 @@ button,input,textarea {
   inset:0
 }
 .hero-photo {
-  background:url('/assets/images/school-real.jpg') center 42%/cover no-repeat;
+  background:url('../assets/images/school-real.jpg') center 42%/cover no-repeat;
   filter:saturate(.72)
 }
 .hero-shade {

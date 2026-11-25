@@ -5,7 +5,7 @@ export const APP = {
   slogan: 'بالعلم .. نبني المستقبل',
   phone: '01000000000',
   email: 'info@tanagha.edu.eg',
-  address: 'التناغة الشرقية — محافظة سوهاج، مصر',
+  address: 'التناغة الشرقية — محافظة أسيوط، مصر',
   hours: 'الأحد — الخميس · 8 ص — 2 م',
   year: 2026
 };
