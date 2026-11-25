@@ -19,8 +19,8 @@ async function seed(records){
 }
 const user=(uid,extra={})=>environment.authenticatedContext(uid,{email:`${uid}@example.com`,email_verified:true,...extra}).firestore();
 const base=[
-  ['classes/c1',{name:'1/1',grade:'1',branch:'',order:1}],
-  ['subjects/math',{name:'الرياضيات',order:1}],
+  ['classes/c1',{name:'1/1',grade:'1',section:'1',year:'2026-2027'}],
+  ['subjects/math',{name:'الرياضيات'}],
   ['admins/adm',{active:true}]
 ];
 const studentProfile=(uid,over={})=>({uid,email:`${uid}@example.com`,displayName:'أحمد محمد علي حسن',role:'student',status:'active',phone:'01012345678',createdAt:serverTimestamp(),studentId:'STU-ABCDEFGH',grade:'1',branch:'',classId:'c1',className:'1/1',rosterVerified:false,...over});
@@ -81,9 +81,9 @@ test('Spark: اعتماد المدرس وإدارة الهيكل للإدارة 
   await assertSucceeds(updateDoc(doc(admin,'teacherApplications/t1'),{status:'approved',reviewedBy:'adm',reviewedAt:serverTimestamp()}));
   await assertFails(updateDoc(doc(admin,'profiles/s1'),{status:'disabled'}));
   await assertFails(updateDoc(doc(admin,'profiles/t1'),{email:'x@y.z'}));
-  await assertSucceeds(setDoc(doc(admin,'classes/c2'),{name:'1/2',grade:'1',order:2}));
-  await assertSucceeds(setDoc(doc(admin,'teacherAssignments/t1_math_c1'),{teacherUid:'t1',subjectId:'math',classId:'c1',subjectName:'الرياضيات',className:'1/1',grade:'1',createdAt:serverTimestamp()}));
-  await assertFails(setDoc(doc(admin,'teacherAssignments/wrong'),{teacherUid:'t1',subjectId:'math',classId:'c1',subjectName:'x',className:'y',grade:'1',createdAt:serverTimestamp()}));
+  await assertSucceeds(setDoc(doc(admin,'classes/c2'),{name:'1/2',grade:'1',section:'2',year:'2026-2027',updatedAt:serverTimestamp()}));
+  await assertSucceeds(setDoc(doc(admin,'teacherAssignments/t1_math_c1'),{teacherUid:'t1',subjectId:'math',classId:'c1',subjectName:'الرياضيات',className:'1/1',grade:'1',year:'2026-2027',teacherName:'مدرس',assignedBy:'adm',assignedAt:serverTimestamp()}));
+  await assertFails(setDoc(doc(admin,'teacherAssignments/wrong'),{teacherUid:'t1',subjectId:'math',classId:'c1',subjectName:'x',className:'y',grade:'1',assignedAt:serverTimestamp()}));
   const student=user('s1');
   await assertFails(setDoc(doc(student,'classes/c9'),{name:'x',grade:'1'}));
   await assertFails(updateDoc(doc(student,'profiles/t1'),{status:'active'}));

@@ -210,7 +210,8 @@ test('ولي الأمر المرتبط يقرأ درجات ابنه فقط، و�
   assert.equal(own.size,1);
   await assertFails(getDocs(query(collection(parentDb,'grades'),where('studentUid','==','student-two'))));
   await assertFails(getDoc(doc(parentDb,'grades/g2')));
-  await assertFails(getDoc(doc(parentDb,'profiles/student-one')));
+  await assertSucceeds(getDoc(doc(parentDb,'profiles/student-one')));
+  await assertFails(getDoc(doc(parentDb,'profiles/student-two')));
   const otherParentDb=environment.authenticatedContext('parent-other').firestore();
   await assertFails(getDocs(query(collection(otherParentDb,'grades'),where('studentUid','==','student-one'))));
   const peerDb=environment.authenticatedContext('student-two').firestore();

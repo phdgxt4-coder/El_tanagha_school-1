@@ -184,7 +184,7 @@ service cloud.firestore {
       allow create, update: if isActiveAdmin()
         && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 60
         && request.resource.data.grade in ['1', '2', '3']
-        && request.resource.data.keys().hasOnly(['name', 'grade', 'branch', 'order', 'createdAt', 'updatedAt']);
+        && request.resource.data.keys().hasOnly(['name', 'grade', 'section', 'year', 'updatedAt']);
       allow delete: if isActiveAdmin();
     }
 
@@ -192,7 +192,7 @@ service cloud.firestore {
       allow get, list: if true;
       allow create, update: if isActiveAdmin()
         && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 60
-        && request.resource.data.keys().hasOnly(['name', 'order', 'createdAt', 'updatedAt']);
+        && request.resource.data.keys().hasOnly(['name', 'updatedAt']);
       allow delete: if isActiveAdmin();
     }
 
@@ -203,7 +203,7 @@ service cloud.firestore {
         || (isActiveStudent() && resource.data.classId == profile(request.auth.uid).classId)
       );
       allow create, update: if isActiveAdmin()
-        && request.resource.data.keys().hasOnly(['teacherUid', 'subjectId', 'classId', 'subjectName', 'className', 'grade', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['teacherUid', 'subjectId', 'classId', 'subjectName', 'className', 'grade', 'year', 'teacherName', 'assignedBy', 'assignedAt'])
         && assignmentId == request.resource.data.teacherUid + '_' + request.resource.data.subjectId + '_' + request.resource.data.classId
         && exists(/databases/$(database)/documents/classes/$(request.resource.data.classId))
         && exists(/databases/$(database)/documents/subjects/$(request.resource.data.subjectId))
@@ -229,12 +229,20 @@ service cloud.firestore {
 
     match /auditLogs/{logId} {
       allow get, list: if isActiveAdmin();
-      allow write: if false;
+      allow create: if isActiveAdmin() && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
     }
 
     match /profiles/{userId} {
-      allow get: if signedIn() && (request.auth.uid == userId || isActiveAdmin());
-      allow list: if isActiveAdmin();
+      // الأصل: صاحب الحساب أو الإدارة. المدرس المسند يرى طلاب فصله، وولي الأمر يرى ابنه المرتبط.
+      allow get: if signedIn() && (request.auth.uid == userId || isActiveAdmin()
+        || (resource.data.role == 'student' && assignedToClass(resource.data.classId))
+        || (resource.data.role == 'student' && linkedParentTo(userId))
+        || (resource.data.role == 'teacher' && isActiveStudent()));
+      allow list: if isActiveAdmin()
+        || (resource.data.role == 'student' && assignedToClass(resource.data.classId))
+        || (resource.data.role == 'teacher' && isActiveStudent());
       allow update: if signedIn() && request.auth.uid == userId
         && request.resource.data.uid == resource.data.uid
         && request.resource.data.role == resource.data.role
@@ -248,7 +256,7 @@ service cloud.firestore {
         && request.resource.data.uid == resource.data.uid
         && request.resource.data.email == resource.data.email
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
-          ['role', 'status', 'subjectId', 'subjectName', 'grades', 'assignedClassIds', 'subjectIds', 'approvedAt', 'approvedBy']);
+          ['role', 'status', 'subjectId', 'subjectName', 'grades', 'assignedClassIds', 'subjectIds', 'reviewedAt', 'reviewedBy']);
       allow delete: if false;
     }
 
@@ -266,14 +274,16 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/subjects/$(request.resource.data.subjectId))
         && getAfter(/databases/$(database)/documents/profiles/$(userId)).data.role == 'teacher_applicant';
       allow update: if isActiveAdmin()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt', 'reason'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt', 'rejectionReason'])
         && request.resource.data.status in ['approved', 'rejected'];
       allow delete: if false;
     }
 
     match /publicTeachers/{teacherId} {
       allow get, list: if resource.data.published == true;
-      allow create, update, delete: if false;
+      allow create, update: if isActiveAdmin()
+        && request.resource.data.keys().hasOnly(['displayName', 'subjectId', 'subjectName', 'published', 'approvedAt']);
+      allow delete: if isActiveAdmin();
     }
 
     match /admins/{adminId} {
