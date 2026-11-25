@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createRouteHelpers, resolveAppRoute } from '../src/utils/routes.js';
+import { createRouteHelpers, resolveAppLink, resolveAppRoute } from '../src/utils/routes.js';
 
 test('المسارات المحلية على جذر النطاق لا تتغير', () => {
   const routes = createRouteHelpers('/', 'https://school.example');
@@ -23,6 +23,18 @@ test('تُحل روابط المسارات الداخلية الأصلية قب�
   assert.equal(resolveAppRoute('/login/student', routes, knownRoutes), '/login/student');
   assert.equal(resolveAppRoute('/El_tanagha_school-1/login/student', routes, knownRoutes), '/login/student');
   assert.equal(resolveAppRoute('/another-repository/login', routes, knownRoutes), null);
+});
+
+test('تُحل روابط HTML النسبية من جذر التطبيق عند إعادة تحميل مسار عميق', () => {
+  const routes = createRouteHelpers('/El_tanagha_school-1/', 'https://phdgxt4-coder.github.io');
+  const knownRoutes = [/^\/$/, /^\/subjects\/?$/, /^\/login(?:\/(student|parent|teacher|admin))?\/?$/];
+  const currentUrl = 'https://phdgxt4-coder.github.io/El_tanagha_school-1/login/student';
+  assert.deepEqual(resolveAppLink('./subjects', currentUrl, routes, knownRoutes), {
+    route: '/subjects', search: '', hash: ''
+  });
+  assert.deepEqual(resolveAppLink('./', currentUrl, routes, knownRoutes), {
+    route: '/', search: '', hash: ''
+  });
 });
 
 test('لا تُفسَّر مسارات مستودعات أخرى كأنها من التطبيق', () => {

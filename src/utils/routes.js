@@ -24,3 +24,13 @@ export function resolveAppRoute(pathname, routeHelpers, routePatterns = []) {
   if (route !== null) return route;
   return routePatterns.some(pattern => pattern.test(pathname)) ? pathname : null;
 }
+
+export function resolveAppLink(href, currentUrl, routeHelpers, routePatterns = []) {
+  const current = new URL(currentUrl);
+  const appRoot = new URL(routeHelpers.basePath, current.origin);
+  const url = new URL(href, href.startsWith('./') ? appRoot : current);
+  if (url.origin !== current.origin) return null;
+  const route = resolveAppRoute(url.pathname, routeHelpers, routePatterns);
+  if (route === null) return null;
+  return { route, search: url.search, hash: url.hash };
+}

@@ -1,6 +1,6 @@
 import {home,subjectsPage,subjectPage,teachersPage,renderTeacherCards,newsPage,schedulePage,resultsPage,contactPage,notFound} from './pages/public-pages.js';
 import {loginPage,teacherApprovalPage} from './pages/auth-pages.js';
-import {createRouteHelpers,resolveAppRoute} from './utils/routes.js';
+import {createRouteHelpers,resolveAppLink} from './utils/routes.js';
 
 const moduleScriptUrl=document.querySelector('script[type="module"][src]')?.src;
 const sourceBasePath=moduleScriptUrl?new URL('../',moduleScriptUrl).pathname:'/';
@@ -11,11 +11,9 @@ function normalizeInternalLinks(root=document){
   root.querySelectorAll('a[href]').forEach(link=>{
     const rawHref=link.getAttribute('href');
     if(!rawHref||rawHref.startsWith('#')||/^(?:mailto|tel|javascript):/iu.test(rawHref))return;
-    const url=new URL(rawHref,location.href);
-    if(url.origin!==location.origin)return;
-    const route=routeFromUrlPath(url.pathname);
-    if(route===null)return;
-    link.href=`${routeHelpers.toUrlPath(route)}${url.search}${url.hash}`;
+    const resolved=resolveAppLink(rawHref,location.href,routeHelpers,routePatterns);
+    if(!resolved)return;
+    link.href=`${routeHelpers.toUrlPath(resolved.route)}${resolved.search}${resolved.hash}`;
   });
 }
 
@@ -33,7 +31,6 @@ const routes=[
 ];
 
 const routePatterns=routes.map(([pattern])=>pattern);
-const routeFromUrlPath=pathname=>resolveAppRoute(pathname,routeHelpers,routePatterns);
 
 let pageCleanup=()=>{};
 let pageGeneration=0;
@@ -320,13 +317,11 @@ document.addEventListener('click',async event=>{
   if(!link||event.ctrlKey||event.metaKey||event.shiftKey||link.target==='_blank')return;
   const rawHref=link.getAttribute('href')||'';
   if(rawHref.startsWith('#')||/^(?:mailto|tel|javascript):/iu.test(rawHref))return;
-  const url=new URL(link.href);
-  if(url.origin!==location.origin)return;
-  const route=routeFromUrlPath(url.pathname);
-  if(route===null)return;
+  const resolved=resolveAppLink(rawHref,location.href,routeHelpers,routePatterns);
+  if(!resolved)return;
   event.preventDefault();
-  history.pushState({},'',`${routeHelpers.toUrlPath(route)}${url.search}${url.hash}`);
-  render(route);
+  history.pushState({},'',`${routeHelpers.toUrlPath(resolved.route)}${resolved.search}${resolved.hash}`);
+  render(resolved.route);
   window.scrollTo({top:0,behavior:'smooth'});
 });
 
