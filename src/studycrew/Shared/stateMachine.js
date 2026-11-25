@@ -1,7 +1,7 @@
 /* Per-character state machine. Pure logic, no DOM. Priority model from the Motion System doc:
    Error > Success > Achievement > Notification > Idle. */
 import {tokens} from '../Themes/tokens.js';
-export const STATES=['Idle','Thinking','Reading','Searching','Typing','Loading','Success','Error','Celebrate','Sleep','Wake','Wave','HiddenPassword','VisiblePassword'];
+export const STATES=['Idle','Blink','LookAround','Greet','Curious','Happy','Thinking','Reading','Searching','Typing','Loading','Success','Error','Celebrate','Sleep','Wake','Wave','HiddenPassword','VisiblePassword'];
 export const PRIORITY={Error:100,Success:80,Celebrate:60,Wake:45,Wave:45,Loading:30,Thinking:30,Searching:30,Reading:30,Typing:30,HiddenPassword:30,VisiblePassword:30,Sleep:10,Idle:0};
 /* states that finish by themselves and fall back to a resting state */
 const M=tokens.motion;
