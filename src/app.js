@@ -180,7 +180,6 @@ async function populateRegistrationOptions(isStale){
   const classSelect=document.querySelector('[data-class-select]');
   const subjectSelect=document.querySelector('[data-subject-select]');
   if(!classSelect&&!subjectSelect)return;
-  setupTrackSelect();
   try{
     const structure=await import('./services/structure-service.js');
     if(subjectSelect){
@@ -197,8 +196,14 @@ async function populateRegistrationOptions(isStale){
       const refresh=()=>{
         const grade=gradeSelect?.value||'';
         const branch=branchSelect?.value||'';
-        const options=classes.filter(item=>item.grade===grade&&(!item.branch||item.branch===branch));
+        const tracks=Object.keys(TRACKS[grade]||{});
+        const options=classes.filter(item=>item.grade===grade&&(
+          tracks.length ? item.branch===branch : !item.branch
+        ));
         if(!classes.length){classSelect.hidden=true;classSelect.closest('label').hidden=true;if(fallback)fallback.hidden=false;return;}
+        classSelect.hidden=false;
+        classSelect.closest('label').hidden=false;
+        if(fallback)fallback.hidden=true;
         classSelect.disabled=!grade;
         classSelect.innerHTML=grade
           ?'<option value="">اختر الفصل</option>'+options.map(item=>`<option value="${escapeHtml(item.id)}">${escapeHtml(item.section)}</option>`).join('')
@@ -217,6 +222,8 @@ async function populateRegistrationOptions(isStale){
 
 function initializeAuthPage(generation){
   const statusTarget=document.querySelector('[data-auth-message]');
+  // عناصر المسار تُجهّز فور رسم الصفحة حتى لا تعتمد على اتصال Firebase.
+  setupTrackSelect();
   let cancelled=false;
   let unsubscribe=()=>{};
   pageCleanup=()=>{cancelled=true;unsubscribe();};

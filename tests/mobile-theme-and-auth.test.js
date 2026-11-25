@@ -6,7 +6,7 @@ import { schedulePage, subjectPage } from '../src/pages/public-pages.js';
 
 const read = path => fs.readFileSync(new URL(path, import.meta.url), 'utf8');
 
-test('التسجيل يطلب الهاتف والبريد وكلمة المرور، ويعرض استعادة كلمة المرور، ويعرض استعادة كلمة المرور', () => {
+test('التسجيل يطلب الهاتف والبريد وكلمة المرور ويستخدم classId حقيقيًا', () => {
   const html = loginPage('student');
   assert.match(html, /name="email" type="email"[^>]*required/u);
   assert.match(html, /name="password" type="password"[^>]*required/u);
@@ -14,7 +14,8 @@ test('التسجيل يطلب الهاتف والبريد وكلمة المرو�
   assert.match(html, /data-password-reset/u);
   assert.match(html, /name="branch"/u);
   assert.equal((html.match(/name="branch"/gu) || []).length, 1);
-  assert.match(html, /name="className"/u);
+  assert.match(html, /name="classId"/u);
+  assert.doesNotMatch(html, /name="className"/u);
   assert.doesNotMatch(html, /name="birthDate"/u);
 });
 
