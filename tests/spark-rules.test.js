@@ -225,3 +225,28 @@ test('إدارة الحسابات: الإدارة توقف وتنقل وتعدل
   await assertFails(updateDoc(doc(s,'profiles','s1'),{status:'active'}));
   await assertFails(updateDoc(doc(user('p1'),'profiles','s1'),{status:'disabled'}));
 });
+
+test('امتحانات وواجبات: المدرس المسند ينشر وطلاب الفصل فقط يقرؤون، ودفعة الحضور الجماعي بحدها', {skip:!emulatorAvailable}, async()=>{
+  const students=Array.from({length:8},(_,i)=>[`profiles/s${i}`,studentProfile(`s${i}`,{studentId:`STU-${i}`})]);
+  await seed([...base,
+    ['profiles/t1',{uid:'t1',role:'teacher',status:'active',displayName:'م',grades:['1'],subjectId:'math',subjectIds:['math'],assignedClassIds:['c1']}],
+    ['profiles/s9',studentProfile('s9',{studentId:'STU-9',classId:'c9'})],
+    ['teacherAssignments/t1_math_c1',{teacherUid:'t1',subjectId:'math',classId:'c1',grade:'1'}],...students]);
+  const t=user('t1');
+  const task={teacherUid:'t1',grade:'1',classId:'c1',subjectId:'math',subjectName:'رياضيات',kind:'exam',title:'امتحان',dueDate:'2026-12-20',note:'',createdAt:serverTimestamp()};
+  await assertSucceeds(setDoc(doc(t,'tasks','k1'),task));
+  await assertFails(setDoc(doc(t,'tasks','k2'),{...task,subjectId:'ar'}));
+  await assertFails(setDoc(doc(t,'tasks','k3'),{...task,dueDate:'غدا'}));
+  await assertFails(setDoc(doc(t,'tasks','k4'),{...task,kind:'party'}));
+  await assertSucceeds(getDoc(doc(user('s0'),'tasks','k1')));
+  await assertFails(getDoc(doc(user('s9'),'tasks','k1')));
+  const batch=writeBatch(t);
+  for(let i=0;i<8;i++)batch.set(doc(t,'attendance',`c1_math_2026-11-25_s${i}`),{teacherUid:'t1',studentUid:`s${i}`,grade:'1',classId:'c1',subjectId:'math',date:'2026-11-25',present:i%2===0,createdAt:serverTimestamp()});
+  await assertSucceeds(batch.commit());
+  const again=writeBatch(t);
+  for(let i=0;i<8;i++)again.set(doc(t,'attendance',`c1_math_2026-11-25_s${i}`),{teacherUid:'t1',studentUid:`s${i}`,grade:'1',classId:'c1',subjectId:'math',date:'2026-11-25',present:true,createdAt:serverTimestamp()});
+  await assertSucceeds(again.commit());
+  const gb=writeBatch(t);
+  for(let i=0;i<8;i++)gb.set(doc(t,'grades',`g${i}`),{teacherUid:'t1',studentUid:`s${i}`,grade:'1',classId:'c1',subjectId:'math',subjectName:'رياضيات',title:'اختبار',score:15,max:20,createdAt:serverTimestamp()});
+  await assertSucceeds(gb.commit());
+});

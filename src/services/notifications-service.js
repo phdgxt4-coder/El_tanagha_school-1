@@ -89,6 +89,7 @@ export const saveLastSeen = (database, uid) => setDoc(doc(database, 'notificatio
 const DERIVED = {
   content: item => ({ type: 'content', title: 'محتوى جديد', body: String(item.title ?? '').slice(0, 80) }),
   grade: item => ({ type: 'grade', title: 'درجة جديدة', body: `${String(item.subjectName ?? '').slice(0, 40)}: ${String(item.title ?? '').slice(0, 60)} (${item.score}/${item.max})` }),
+  task: item => ({ type: 'task', title: item.kind === 'exam' ? 'امتحان جديد' : 'واجب جديد', body: `${String(item.title ?? '').slice(0, 60)} · ${String(item.dueDate ?? '')}` }),
   message: item => ({ type: 'message', title: 'رسالة جديدة', body: `${String(item.lastText ?? '').slice(0, 80)}` }),
   attendance: item => ({ type: 'attendance', title: 'تسجيل غياب', body: `تم تسجيل غياب بتاريخ ${String(item.date ?? '').slice(0, 10)}.` })
 };
@@ -100,7 +101,7 @@ export function derivedQueries(database, profile, lastSeen, childUids = []) {
   const chat = field => ({ kind: 'message', skipOwn: profile.uid, q: query(collection(database, 'conversations'), where(field, '==', profile.uid), where('lastAt', '>', since), orderBy('lastAt', 'desc'), limit(5)) });
   if (profile.role === 'student') {
     const list = [chat('studentUid'), make('grades', 'grade', where('studentUid', '==', profile.uid)), make('attendance', 'attendance', where('studentUid', '==', profile.uid), where('present', '==', false))];
-    if (profile.classId) list.push(make('content', 'content', where('classId', '==', profile.classId), where('published', '==', true)));
+    if (profile.classId) list.push(make('content', 'content', where('classId', '==', profile.classId), where('published', '==', true)), make('tasks', 'task', where('classId', '==', profile.classId)));
     return list;
   }
   if (profile.role === 'parent') {
