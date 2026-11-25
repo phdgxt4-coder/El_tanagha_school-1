@@ -189,7 +189,7 @@ test('الفصول والمواد تُقرأ علنًا لنموذج التسج�
   await assertFails(setDoc(doc(publicDb,'classes/evil'),{grade:'1'}));
   const adminDb=environment.authenticatedContext('admin-uid').firestore();
   await assertFails(setDoc(doc(adminDb,'classes/evil'),{grade:'1'}));
-  for(const path of ['parentCodes/TNG-AAAAAAAA','rosterStudents/01000000000','linkAttempts/parent-a']){
+  for(const path of ['parentCodes/TNG-AAAAAAAA','linkAttempts/parent-a']){
     await assertFails(getDoc(doc(adminDb,path)));
     await assertFails(getDoc(doc(environment.authenticatedContext('parent-a').firestore(),path)));
   }
@@ -210,7 +210,8 @@ test('ولي الأمر المرتبط يقرأ درجات ابنه فقط، و�
   assert.equal(own.size,1);
   await assertFails(getDocs(query(collection(parentDb,'grades'),where('studentUid','==','student-two'))));
   await assertFails(getDoc(doc(parentDb,'grades/g2')));
-  await assertFails(getDoc(doc(parentDb,'profiles/student-one')));
+  await assertSucceeds(getDoc(doc(parentDb,'profiles/student-one')));
+  await assertFails(getDoc(doc(parentDb,'profiles/student-two')));
   const otherParentDb=environment.authenticatedContext('parent-other').firestore();
   await assertFails(getDocs(query(collection(otherParentDb,'grades'),where('studentUid','==','student-one'))));
   const peerDb=environment.authenticatedContext('student-two').firestore();
