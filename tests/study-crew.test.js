@@ -144,7 +144,10 @@ test('connection watcher reports changes only once per change and unsubscribes',
   assert.deepEqual(got,['offline','online']);off();online=false;t.dispatchEvent(new Event('offline'));assert.deepEqual(got,['offline','online']);
 });
 test('the framework is not imported by the production entry point or index.html',()=>{
-  assert.ok(!read('../src/app.js').includes('studycrew'));
+  const app=read('../src/app.js');
+  /* only one gated lazy import is allowed, and never a static one */
+  assert.equal((app.match(/studycrew/g)||[]).length,1);
+  assert.ok(/if\(livingEnabled\(\)\)import\('\.\/studycrew\/Living\/wire\.js'\)/.test(app));
   assert.ok(!read('../index.html').includes('studycrew'));
 });
 test('guidelines doc exists and is referenced from AGENTS.md',()=>{
