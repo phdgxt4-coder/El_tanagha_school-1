@@ -410,6 +410,20 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // أخطاء المتصفح: أي مستخدم مسجل يكتب خطأً واحدًا بشكل ثابت، والإدارة فقط تقرأ.
+    match /clientErrors/{errorId} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['uid', 'message', 'source', 'route', 'agent', 'at'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.message is string && request.resource.data.message.size() <= 300
+        && request.resource.data.source is string && request.resource.data.source.size() <= 120
+        && request.resource.data.route is string && request.resource.data.route.size() <= 120
+        && request.resource.data.agent is string && request.resource.data.agent.size() <= 150
+        && request.resource.data.at == request.time;
+      allow get, list: if isActiveAdmin();
+      allow update, delete: if false;
+    }
+
     match /content/{contentId} {
       allow get, list: if signedIn() && (
         isActiveAdmin()

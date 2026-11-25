@@ -1,6 +1,7 @@
 import {home,subjectsPage,subjectPage,teachersPage,renderTeacherCards,newsPage,schedulePage,resultsPage,contactPage,privacyPage,notFound} from './pages/public-pages.js';
 import {loginPage,teacherApprovalPage} from './pages/auth-pages.js';
 import {createRouteHelpers,resolveAppLink} from './utils/routes.js';
+import {initErrorReporter} from './services/error-reporter.js';
 import {initMotion,routeStart,routeEnd,withThemeTransition} from './ui/motion.js';
 
 const moduleScriptUrl=document.querySelector('script[type="module"][src]')?.src;
@@ -512,6 +513,7 @@ document.addEventListener('submit',event=>{
 
 window.addEventListener('popstate',()=>render(currentRoutePath()));
 initializeTheme();
+initErrorReporter();
 document.querySelector('.menu-toggle')?.addEventListener('click',event=>{
   const nav=document.querySelector('#nav');
   const opened=nav.classList.toggle('open');

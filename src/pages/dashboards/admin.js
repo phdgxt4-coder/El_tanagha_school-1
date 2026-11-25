@@ -3,7 +3,7 @@ import * as spark from '../../services/spark-backend.js';
 import { invalidateStructure, loadClasses, loadSubjects, loadClassAssignments } from '../../services/structure-service.js';
 import { esc, gradeNames, say, shellActions, skeletonRows } from './common.js';
 
-const SECTIONS = [['overview', 'نظرة عامة', '▦'], ['classes', 'الصفوف والفصول', '▤'], ['subjects', 'المواد', '✎'], ['teachers', 'المدرسون والإسناد', '☺'], ['students', 'استيراد الطلاب', '⇪'], ['links', 'ربط أولياء الأمور', '⚭'], ['users', 'إدارة الحسابات', '⚙'], ['timetable', 'جدول الحصص', '▦']];
+const SECTIONS = [['overview', 'نظرة عامة', '▦'], ['classes', 'الصفوف والفصول', '▤'], ['subjects', 'المواد', '✎'], ['teachers', 'المدرسون والإسناد', '☺'], ['students', 'استيراد الطلاب', '⇪'], ['links', 'ربط أولياء الأمور', '⚭'], ['users', 'إدارة الحسابات', '⚙'], ['timetable', 'جدول الحصص', '▦'], ['ops', 'النسخ والأخطاء', '⛁']];
 
 export function renderAdmin(profile) {
   return `<div class="dash dash-admin" data-dash="admin">
@@ -41,6 +41,10 @@ export function renderAdmin(profile) {
         <form class="adm-inline" data-promote-form><select name="from" required data-promote-from><option value="">من الفصل</option></select><select name="to" data-promote-to><option value="">تخريج (بدون فصل جديد)</option></select><button class="button" type="submit">تنفيذ</button></form><p class="form-note" data-msg="promote" role="status"></p></section>
       <section data-panel="timetable" hidden><h1>جدول الحصص</h1><p class="dash-muted">اختر الفصل ثم المادة لكل حصة. الخلية الفارغة تعني لا حصة. يظهر الجدول لطلاب الفصل.</p>
         <div class="adm-inline"><select data-tt-class><option value="">اختر الفصل</option></select></div><div data-tt-grid></div><button class="button" type="button" data-tt-save hidden>حفظ الجدول</button><p class="form-note" data-msg="timetable" role="status"></p></section>
+      <section data-panel="ops" hidden><h1>النسخ الاحتياطي والأخطاء</h1>
+        <p class="dash-muted">النسخ التلقائي المجدول يحتاج خطة Blaze، فهنا نسخة يدوية: تنزل ملف JSON فيه الفصول والمواد والحسابات والدرجات والحضور والمحتوى والمهام والجداول. الرسائل لا تدخل النسخة. كل مستند يُحسب قراءة من الحد المجاني (50 ألف يوميًا)، فاعملها خارج وقت الذروة، مرة أسبوعيًا مثلًا.</p>
+        <button class="button" type="button" data-export>تنزيل نسخة احتياطية</button><p class="form-note" data-msg="export" role="status"></p>
+        <h2>آخر أخطاء المتصفح</h2><button class="button ghost" type="button" data-errors-load>تحديث</button><table class="adm-table"><tbody data-errors></tbody></table></section>
     </main></div>`;
 }
 
@@ -198,7 +202,47 @@ export function mountAdmin(root, { auth, database }) {
     const { doc, serverTimestamp, setDoc } = await import('firebase/firestore');
     await setDoc(doc(database, 'timetables', classId), { classId, grade: info.grade, cells, updatedAt: serverTimestamp() });
   }, m('timetable'), 'تم حفظ الجدول.', true));
-  const loaders = { timetable: timetablePanel, users: usersPanel, overview, classes, subjects, teachers, links: () => links(true) };
+  const EXPORT_COLLECTIONS = ['classes', 'subjects', 'teacherAssignments', 'profiles', 'grades', 'attendance', 'content', 'tasks', 'timetables', 'parentLinks'];
+  const plain = value => {
+    if (value && typeof value.toMillis === 'function') return { _ts: value.toMillis() };
+    if (Array.isArray(value)) return value.map(plain);
+    if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, plain(v)]));
+    return value;
+  };
+  root.querySelector('[data-export]').addEventListener('click', event => {
+    const button = event.currentTarget;
+    if (!confirmAsk('سيقرأ كل البيانات ويُحسب من حد القراءات اليومي. متابعة؟')) return;
+    button.disabled = true;
+    guard(async () => {
+      const { documentId, startAfter } = await import('firebase/firestore');
+      const out = { exportedAt: new Date().toISOString(), collections: {} };
+      let total = 0;
+      for (const name of EXPORT_COLLECTIONS) {
+        out.collections[name] = {};
+        let last = null;
+        for (let page = 0; page < 20; page += 1) {
+          const snapshot = await getDocs(query(collection(database, name), orderBy(documentId()), ...(last ? [startAfter(last)] : []), limit(500)));
+          snapshot.docs.forEach(item => { out.collections[name][item.id] = plain(item.data()); });
+          total += snapshot.size;
+          if (snapshot.size < 500) break;
+          last = snapshot.docs[snapshot.docs.length - 1];
+        }
+        say(m('export'), `جارٍ التنزيل… ${total} مستند`);
+      }
+      const url = URL.createObjectURL(new Blob([JSON.stringify(out)], { type: 'application/json' }));
+      const link = document.createElement('a');
+      link.href = url; link.download = `school-backup-${out.exportedAt.slice(0, 10)}.json`; link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      say(m('export'), `تم تنزيل النسخة (${total} مستند). احفظها في مكان آمن لأنها تحتوي بيانات الطلاب.`);
+    }, m('export'), '', false).finally(() => { button.disabled = false; });
+  });
+  async function errorsPanel() {
+    const body = root.querySelector('[data-errors]');
+    const snapshot = await getDocs(query(collection(database, 'clientErrors'), orderBy('at', 'desc'), limit(30)));
+    body.innerHTML = snapshot.docs.length ? snapshot.docs.map(item => { const e = item.data(); return `<tr><td dir="ltr">${esc(e.message)}</td><td>${esc(e.route)}</td><td>${esc(e.at?.toDate?.().toLocaleString('ar-EG') || '')}</td></tr>`; }).join('') : '<tr><td>لا توجد أخطاء مسجلة.</td></tr>';
+  }
+  root.querySelector('[data-errors-load]').addEventListener('click', () => guard(errorsPanel, m('export'), '', false));
+  const loaders = { ops: errorsPanel, timetable: timetablePanel, users: usersPanel, overview, classes, subjects, teachers, links: () => links(true) };
 
   root.querySelector('.adm-side nav').addEventListener('click', event => {
     const button = event.target.closest('[data-section]');
