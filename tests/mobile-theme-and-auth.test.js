@@ -114,4 +114,9 @@ test('لوحات الأدوار تستخدم الترقيم بالمؤشر ول�
     assert.doesNotMatch(source, /getDocs\(collection\(database, '[a-zA-Z]+'\)\)/u);
   }
   assert.match(read('../src/pages/dashboards/common.js'), /startAfter/u);
+test('الجلسة محفوظة على الجهاز وتُفتح اللوحة تلقائيًا لمن سجّل دخوله', () => {
+  const auth = read('../src/auth/auth-service.js');
+  const app = read('../src/app.js');
+  assert.match(auth, /setPersistence\(authClient, browserLocalPersistence\)/u);
+  assert.match(app, /جارٍ فتح لوحتك/u);
 });
