@@ -1,5 +1,6 @@
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, where, writeBatch } from 'firebase/firestore';
 import { mountChat, renderChatPanel } from '../chat.js';
+import { mountParentChat, renderParentChat } from '../parent-chat.js';
 import { contentLinkError } from '../../utils/links.js';
 import { resizeImage } from '../../utils/image-resize.js';
 import { loadTeacherAssignments } from '../../services/structure-service.js';
@@ -41,7 +42,7 @@ export function renderTeacher(profile) {
         <label>الصورة<input name="file" type="file" accept="image/*" required></label>
         <p class="dash-muted">تُصغّر الصورة تلقائيًا (حتى 1400 بكسل و700 كيلو) وتظهر لطلاب هذا الفصل فقط. للملفات استخدم رابط جوجل درايف، وللفيديو رابط يوتيوب.</p>
         <button class="button" type="submit">نشر الصورة لهذا الفصل</button><p class="form-note" data-image-msg role="status"></p></form></section>
-      <section data-section-panel="chat" hidden>${renderChatPanel()}</section>
+      <section data-section-panel="chat" hidden>${renderChatPanel()}<h2>رسائل أولياء الأمور</h2><div data-tp-chat>${renderParentChat(false)}</div></section>
       <section data-section-panel="mine" hidden><div data-mine></div><button class="button ghost" type="button" data-more-mine hidden>تحميل المزيد</button></section>
     </main></div>`;
 }
@@ -238,6 +239,6 @@ export async function mountTeacher(root, { profile, auth, database }) {
     } catch { msg('task', 'تعذر النشر. تأكد أن الفصل والمادة مسندان لك.', 'error'); }
     finally { form.querySelector('button').disabled = false; }
   });
-  root.querySelector('[data-section="chat"]').addEventListener('click', () => mountChat(root.querySelector('[data-section-panel="chat"]'), { profile, database }), { once: true });
+  root.querySelector('[data-section="chat"]').addEventListener('click', () => { mountChat(root.querySelector('[data-section-panel="chat"]'), { profile, database }); mountParentChat(root.querySelector('[data-tp-chat]'), { profile, database }); }, { once: true });
   root.querySelector('[data-section="mine"]').addEventListener('click', () => mine.load(), { once: true });
 }
