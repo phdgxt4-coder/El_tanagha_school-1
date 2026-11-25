@@ -1,8 +1,9 @@
 import { addDoc, collection, orderBy, serverTimestamp, where } from 'firebase/firestore';
+import { mountChat, renderChatPanel } from '../chat.js';
 import { loadTeacherAssignments } from '../../services/structure-service.js';
 import { esc, formatDate, gradeNames, pager, say, shellActions } from './common.js';
 
-const NAV = [['roster', 'طلاب الفصل'], ['content', 'نشر محتوى'], ['grades', 'رصد درجة'], ['mine', 'ما نشرته']];
+const NAV = [['roster', 'طلاب الفصل'], ['content', 'نشر محتوى'], ['grades', 'رصد درجة'], ['mine', 'ما نشرته'], ['chat', 'الرسائل']];
 
 export function renderTeacher(profile) {
   return `<div class="dash dash-teacher" data-dash="teacher">
@@ -22,6 +23,7 @@ export function renderTeacher(profile) {
         <label>اسم التقييم<input name="title" maxlength="80" required style="direction:rtl;text-align:right" placeholder="اختبار شهري"></label>
         <label>الدرجة<input name="score" type="number" min="0" step="0.5" required></label><label>من<input name="max" type="number" min="1" step="0.5" required value="20"></label>
         <button class="button" type="submit">حفظ الدرجة</button><p class="form-note" data-grade-msg role="status"></p></form></section>
+      <section data-section-panel="chat" hidden>${renderChatPanel()}</section>
       <section data-section-panel="mine" hidden><div data-mine></div><button class="button ghost" type="button" data-more-mine hidden>تحميل المزيد</button></section>
     </main></div>`;
 }
@@ -116,5 +118,6 @@ export async function mountTeacher(root, { profile, auth, database }) {
   });
 
   const mine = pager(database, 'content', [where('teacherUid', '==', profile.uid), orderBy('createdAt', 'desc')], item => `<article class="tch-row"><b>${esc(item.title)}</b><span>${esc(item.type)} · ${formatDate(item.createdAt)}</span></article>`, { target: root.querySelector('[data-mine]'), more: root.querySelector('[data-more-mine]'), empty: 'لم تنشر شيئًا بعد.' });
+  root.querySelector('[data-section="chat"]').addEventListener('click', () => mountChat(root.querySelector('[data-section-panel="chat"]'), { profile, database }), { once: true });
   root.querySelector('[data-section="mine"]').addEventListener('click', () => mine.load(), { once: true });
 }

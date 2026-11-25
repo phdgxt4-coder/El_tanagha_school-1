@@ -521,6 +521,49 @@ service cloud.firestore {
     }
 
     // آخر مرة فتح فيها المستخدم الجرس (وضع Spark: الإشعارات مشتقة من البيانات نفسها).
+    // محادثات الطالب والمدرس (بدون مراقبة إدارية بقرار صاحب المنصة). المعرّف: studentUid_teacherUid
+    function chatParty(cid) {
+      return signedIn() && (cid.split('_')[0] == request.auth.uid || cid.split('_')[1] == request.auth.uid);
+    }
+    function chatRateOk(cid) {
+      return !exists(/databases/$(database)/documents/conversations/$(cid))
+        || get(/databases/$(database)/documents/conversations/$(cid)).data.lastAt < request.time - duration.value(2, 's');
+    }
+    function validChatText(data) {
+      return data.keys().hasOnly(['senderUid', 'text', 'createdAt'])
+        && data.text is string && data.text.size() >= 1 && data.text.size() <= 1000
+        && data.createdAt == request.time;
+    }
+
+    match /conversations/{cid} {
+      allow get: if chatParty(cid);
+      allow list: if signedIn()
+        && (resource.data.studentUid == request.auth.uid || resource.data.teacherUid == request.auth.uid);
+      allow create: if signedIn() && isActiveStudent()
+        && cid == request.auth.uid + '_' + request.resource.data.teacherUid
+        && request.resource.data.keys().hasOnly(['studentUid', 'teacherUid', 'studentName', 'teacherName', 'lastAt', 'lastText', 'lastBy'])
+        && request.resource.data.studentUid == request.auth.uid
+        && request.resource.data.lastBy == request.auth.uid
+        && request.resource.data.lastAt == request.time
+        && request.resource.data.lastText is string && request.resource.data.lastText.size() <= 80
+        && profile(request.resource.data.teacherUid).role == 'teacher'
+        && profile(request.resource.data.teacherUid).status == 'active';
+      allow update: if chatParty(cid) && chatRateOk(cid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastAt', 'lastText', 'lastBy'])
+        && request.resource.data.lastBy == request.auth.uid
+        && request.resource.data.lastAt == request.time
+        && request.resource.data.lastText is string && request.resource.data.lastText.size() <= 80;
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow get, list: if chatParty(cid);
+        allow create: if chatParty(cid) && validChatText(request.resource.data)
+          && request.resource.data.senderUid == request.auth.uid
+          && getAfter(/databases/$(database)/documents/conversations/$(cid)).data.lastAt == request.time;
+        allow update, delete: if false;
+      }
+    }
+
     match /notificationState/{userId} {
       allow get: if signedIn() && request.auth.uid == userId;
       allow create, update: if signedIn() && request.auth.uid == userId

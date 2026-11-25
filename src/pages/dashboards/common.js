@@ -71,7 +71,7 @@ export function shellActions() {
   return '<span data-bell-slot></span><button class="dash-signout" type="button" data-dashboard-sign-out>تسجيل الخروج</button>';
 }
 
-const NOTICE_ICONS = { content: '📚', grade: '📝', attendance: '📍', chat: '💬' };
+const NOTICE_ICONS = { content: '📚', grade: '📝', attendance: '📍', chat: '💬', message: '💬' };
 
 /** جرس الإشعارات: عدّاد غير المقروء، قائمة آخر 20، تفضيلات، وتفعيل الإشعارات اللحظية. */
 export async function mountBell(root, { profile, database }) {
