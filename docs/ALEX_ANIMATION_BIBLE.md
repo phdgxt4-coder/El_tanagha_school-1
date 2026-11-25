@@ -59,3 +59,9 @@ irises, closed-eye lids. All came from one AI-generated base picture (arms hangi
 Limits (honest): parts are cut from AI pictures, so bends stay moderate and arms look soft ("noodle") at big bends. No eyebrow or
 mouth change, no finger poses, no leg movement, the cap and the scroll are not separate parts (the scroll was dropped with the new rest pose).
 Weak devices and reduced motion use the simple image renderer. Not tested on a real phone. A real rig needs a Rive or Spine file.
+
+### v6 changes (Alex only)
+Faster springs and waits (about 0.62x), anticipation and settle on every move, weight shift through the spine with the feet planted,
+shoulder-first arm chains, fast ear perk with slow relax, tail amplitude tied to mood, irregular blinks, eyes lead the head, greet on
+open, pointer-following gaze while idle, new states Blink, LookAround, Greet.
+Checked in headless Chrome: 60 state changes in 9 s with no errors, 45 s idle at about 60 fps rendering, weak device falls back to the image renderer.
