@@ -6,16 +6,15 @@ import { schedulePage, subjectPage } from '../src/pages/public-pages.js';
 
 const read = path => fs.readFileSync(new URL(path, import.meta.url), 'utf8');
 
-test('التسجيل يبقي الهاتف اختياريًا والبريد وكلمة المرور إلزاميين، ويعرض استعادة كلمة المرور', () => {
+test('التسجيل يطلب الهاتف والبريد وكلمة المرور، ويعرض استعادة كلمة المرور، ويعرض استعادة كلمة المرور', () => {
   const html = loginPage('student');
   assert.match(html, /name="email" type="email"[^>]*required/u);
   assert.match(html, /name="password" type="password"[^>]*required/u);
-  assert.match(html, /name="phone" type="tel"[^>]*maxlength/u);
-  assert.doesNotMatch(html, /name="phone"[^>]*required/u);
+  assert.match(html, /name="phone" type="tel"[^>]*required/u);
   assert.match(html, /data-password-reset/u);
   assert.match(html, /name="branch"/u);
   assert.match(html, /name="className"/u);
-  assert.match(html, /name="birthDate"/u);
+  assert.doesNotMatch(html, /name="birthDate"/u);
 });
 
 test('دخول الإدارة يمر عبر صفحة المدرس ولا يتيح التسجيل الإداري', () => {
@@ -80,4 +79,16 @@ test('اختيار الصف وتبويب المادة يعرضان الحالة 
   assert.match(app, /button\.setAttribute\('aria-pressed',String\(selected\)\)/u);
   assert.match(app, /لا يوجد محتوى منشور في قسم \$\{label\}/u);
   assert.match(app, /لم يُنشر جدول \$\{gradeName\} بعد/u);
+});
+
+test('نموذج التسجيل يطلب الاسم والهاتف ويحمّل الفصول والمواد من الهيكل المعتمد', () => {
+  const html = loginPage('student');
+  assert.match(html, /name="phone"[^>]*required/u);
+  assert.match(html, /data-class-select/u);
+  assert.match(html, /الاسم الكامل \(للطالب: اسم رباعي\)/u);
+  assert.match(html, /حسابك يعمل فور إنشائه بدون موافقة الإدارة/u);
+  const teacher = loginPage('teacher');
+  assert.match(teacher, /data-subject-select/u);
+  assert.doesNotMatch(teacher, /name="grades"/u);
+  assert.match(teacher, /بانتظار اعتماد الإدارة/u);
 });

@@ -163,24 +163,6 @@
       ]
     },
     {
-      "collectionGroup": "classes",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "year",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "grade",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "section",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
       "collectionGroup": "parentLinks",
       "queryScope": "COLLECTION",
       "fields": [

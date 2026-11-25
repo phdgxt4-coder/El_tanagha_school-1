@@ -36,6 +36,7 @@ const routePatterns=routes.map(([pattern])=>pattern);
 
 let pageCleanup=()=>{};
 let pageGeneration=0;
+const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const escapeRoute=path=>path.startsWith('/subjects/')?'المادة الدراسية — ':'';
 
 function applyTheme(theme){
@@ -149,6 +150,41 @@ function setAuthMode(mode){
   showMessage(root.querySelector('[data-auth-message]'),'');
 }
 
+async function populateRegistrationOptions(isStale){
+  const classSelect=document.querySelector('[data-class-select]');
+  const subjectSelect=document.querySelector('[data-subject-select]');
+  if(!classSelect&&!subjectSelect)return;
+  try{
+    const structure=await import('./services/structure-service.js');
+    if(subjectSelect){
+      const list=await structure.loadSubjects();
+      if(isStale())return;
+      subjectSelect.innerHTML='<option value="">اختر المادة</option>'+list.map(item=>`<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join('');
+    }
+    if(classSelect){
+      const classes=await structure.loadClasses();
+      if(isStale())return;
+      const gradeSelect=document.querySelector('[data-grade-select]');
+      const fallback=document.querySelector('[data-class-fallback]');
+      const refresh=()=>{
+        const grade=gradeSelect?.value||'';
+        const options=classes.filter(item=>item.grade===grade);
+        if(!classes.length){classSelect.hidden=true;classSelect.closest('label').hidden=true;if(fallback)fallback.hidden=false;return;}
+        classSelect.disabled=!grade;
+        classSelect.innerHTML=grade
+          ?'<option value="">اختر الفصل</option>'+options.map(item=>`<option value="${escapeHtml(item.id)}">${escapeHtml(item.section)}</option>`).join('')
+          :'<option value="">اختر الصف أولًا</option>';
+        classSelect.required=Boolean(grade&&options.length);
+      };
+      gradeSelect?.addEventListener('change',refresh);
+      refresh();
+    }
+  }catch{
+    const fallback=document.querySelector('[data-class-fallback]');
+    if(fallback&&!isStale()){fallback.hidden=false;classSelect?.closest('label')?.setAttribute('hidden','');}
+  }
+}
+
 function initializeAuthPage(generation){
   const statusTarget=document.querySelector('[data-auth-message]');
   let cancelled=false;
@@ -158,10 +194,13 @@ function initializeAuthPage(generation){
     if(cancelled||generation!==pageGeneration||!statusTarget?.isConnected)return;
     if(!env.firebaseConfigured){
       showMessage(statusTarget,'لم تُضبط إعدادات Firebase في بيئة التطبيق، لذلك لا تُرسل بيانات الدخول.');
+      document.querySelector('[data-class-fallback]')?.removeAttribute('hidden');
+      document.querySelector('[data-class-select]')?.closest('label')?.setAttribute('hidden','');
       return;
     }
     const api=await import('./auth/auth-service.js');
     if(cancelled||generation!==pageGeneration||!statusTarget.isConnected)return;
+    void populateRegistrationOptions(()=>cancelled||!statusTarget.isConnected);
     unsubscribe=api.subscribeToAuth(async user=>{
       if(!user||cancelled||!statusTarget.isConnected)return;
       try{
@@ -319,10 +358,16 @@ async function handleRegistration(form){
     try{await api.sendVerificationIfNeeded();}catch{verificationSent=false;}
     const success=role==='teacher'
       ?'تم استلام طلب المدرس وهو بانتظار اعتماد الإدارة. لا يظهر الاسم أو التخصص للعامة قبل الاعتماد وموافقة النشر.'
-      :'تم إنشاء الحساب. أكمل توثيق بريدك الإلكتروني؛ صلاحيات ولي الأمر على بيانات الأبناء لا تُمنح قبل الربط الموثوق.';
+      :role==='parent'
+        ?'تم إنشاء حساب ولي الأمر وهو يعمل الآن. اربط ابنك بكوده من لوحتك. وثّق بريدك الإلكتروني أيضًا.'
+        :'تم إنشاء حساب الطالب وهو يعمل الآن. وثّق بريدك الإلكتروني أيضًا.';
     const note=verificationSent?' أُرسل رابط توثيق البريد الإلكتروني.':' تعذر إرسال رسالة التوثيق الآن؛ أعد المحاولة لاحقًا.';
     showMessage(message,`${success}${note}`);
     if(application.status==='pending')form.reset();
+    else if(application.status==='active'){
+      history.pushState({},'',routeHelpers.toUrlPath('/dashboard'));
+      render('/dashboard');
+    }
   }catch(error){
     const api=await import('./auth/auth-service.js').catch(()=>null);
     showMessage(message,api?api.friendlyAuthError(error):'تعذر تهيئة خدمة المصادقة.','error');
