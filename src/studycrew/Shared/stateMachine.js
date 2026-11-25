@@ -14,13 +14,16 @@ export const TRANSITIONS={
 };
 const can=(from,to)=>(TRANSITIONS[from]||ANY).includes(to)||PRIORITY[to]>PRIORITY[from];
 export function createStateMachine({initial='Idle',onChange=()=>{},setTimer=setTimeout,clearTimer=clearTimeout}={}){
-  let state=initial,timer=null,rest=initial;
+  /* a one-shot initial state must never become the resting state, or it would loop forever */
+  let state=initial,timer=null,rest=REST.includes(initial)?initial:'Idle';
   const enter=(next,reason)=>{
     clearTimer(timer);timer=null;
     const prev=state;state=next;
     onChange(next,prev,reason);
     if(ONE_SHOT[next])timer=setTimer(()=>{timer=null;enter(rest,'finished');},ONE_SHOT[next]);
   };
+  /* starting inside a one-shot state (SuccessAnimation, ErrorAnimation) must also end and fall back to rest */
+  if(ONE_SHOT[initial])timer=setTimer(()=>{timer=null;enter(rest,'finished');},ONE_SHOT[initial]);
   return{
     get state(){return state;},
     /* returns true when the request was accepted */
