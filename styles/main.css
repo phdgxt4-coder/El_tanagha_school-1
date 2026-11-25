@@ -681,3 +681,32 @@ button,input,textarea {
 .parent-code{display:block;direction:ltr;text-align:center;letter-spacing:.15em;font-size:1.45rem;color:var(--gold2);padding:.8rem;border:1px dashed #c9a24b66;border-radius:14px;background:#c9a24b10}
 .dashboard-form [data-kind="error"]{color:#ffb4a9}
 @media(max-width:700px){.dashboard-grid{grid-template-columns:1fr}.dashboard-page{padding-inline:.9rem}.dashboard-actions{display:grid;grid-template-columns:1fr}.dashboard-actions .button{width:100%}}
+
+/* ---- Performance and mobile smoothness polish (same look, lighter on phones) ---- */
+html{-webkit-text-size-adjust:100%;scroll-padding-top:84px}
+a,button,.button,.card{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+/* Animate once: the .stats wrapper no longer fades together with its children. */
+.hero-copy,.stats,.card,.stats>div{opacity:1;animation:none}
+.hero-copy,.stats>div,.card{animation:fadeUp .6s var(--ease-out-premium) both}
+.stats{opacity:1;animation:none}
+.card:nth-child(n+4){animation-delay:.3s}
+@keyframes fadeUp{from{opacity:0;transform:translate3d(0,18px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
+/* Touch screens: no sticky hover states, no hover lift */
+@media(hover:none){
+  .button:hover,.card:hover,.stats>div:hover{transform:none}
+  .button:active{transform:scale(.98)}
+}
+/* Phones and tablets: light glass, no heavy blur, shorter and smaller motion */
+@media(max-width:850px){
+  :root{--duration-fast:.2s;--duration-normal:.28s}
+  .topbar{backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 2px 12px #0003;background:#090d16e6}
+  :root[data-theme="light"] .topbar{background:#fffffff0}
+  .hero-mark,.stats>div{backdrop-filter:none;-webkit-backdrop-filter:none}
+  .hero-copy,.stats>div,.card{animation-duration:.45s}
+  .stats>div:nth-child(n){animation-delay:.05s}
+  .card:nth-child(n){animation-delay:.08s}
+}
+@media(prefers-reduced-motion:reduce){
+  .hero-copy,.stats>div,.card{animation:none;opacity:1;transform:none}
+  html{scroll-behavior:auto}
+}
