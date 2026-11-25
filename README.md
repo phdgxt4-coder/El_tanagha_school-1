@@ -17,7 +17,7 @@ pnpm dev
 
 ## إعداد GitHub Pages
 
-اختياريًا، مرّر إعدادات عميل Firebase إلى بناء Pages من متغيرات المستودع العامة في إعدادات GitHub Actions: `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID`، و`VITE_FIREBASE_FUNCTIONS_REGION` عند الحاجة. سير البناء يستخدمها فقط إذا كانت معرفة؛ وإن لم تكن، تبقى المنصة في حالة غير مهيأة. إعدادات Firebase Web عامة بطبيعتها وستُضمّن في JavaScript المنشور، فلا تحتوي أسرارًا. تقييد المفتاح لا يغني عن قواعد Firestore.
+اختياريًا، مرّر إعدادات عميل Firebase إلى بناء Pages من متغيرات المستودع العامة في إعدادات GitHub Actions: `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID`، و`VITE_FIREBASE_FUNCTIONS_REGION` عند الحاجة. سير البناء يستخدمها فقط إذا كانت معرفة؛ وإن لم تكن، تبقى المنصة في حالة غير مهيأة. ينشئ `scripts/create-static-routes.mjs` ملفات دخول لكل المسارات المعرفة كي تعمل الروابط المباشرة وإعادة التحميل برمز 200. إعدادات Firebase Web عامة بطبيعتها وستُضمّن في JavaScript المنشور، فلا تحتوي أسرارًا. تقييد المفتاح لا يغني عن قواعد Firestore.
 
 ## إعداد Firebase الحي
 

@@ -44,6 +44,8 @@ jobs:
           VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
           VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
           VITE_FIREBASE_FUNCTIONS_REGION: ${{ vars.VITE_FIREBASE_FUNCTIONS_REGION }}
+      - name: Create static entry pages for declared routes
+        run: node scripts/create-static-routes.mjs
       - name: Support direct page reloads on GitHub Pages
         run: cp dist/index.html dist/404.html
       - name: Upload Pages artifact
