@@ -3,7 +3,7 @@ import {loginPage,teacherApprovalPage,adminJoinPage} from './pages/auth-pages.js
 import {createRouteHelpers,resolveAppLink} from './utils/routes.js';
 import {initErrorReporter} from './services/error-reporter.js';
 import {TRACKS} from '../functions/src/validation.js';
-import {initMotion,routeStart,routeEnd,withThemeTransition} from './ui/motion.js';
+import {initMotion,routeStart,routeEnd,withThemeTransition,withPageTransition} from './ui/motion.js';
 
 const moduleScriptUrl=document.querySelector('script[type="module"][src]')?.src;
 const sourceBasePath=moduleScriptUrl?new URL('../',moduleScriptUrl).pathname:'/';
@@ -518,7 +518,7 @@ document.addEventListener('click',async event=>{
   event.preventDefault();
   history.pushState({},'',`${routeHelpers.toUrlPath(resolved.route)}${resolved.search}${resolved.hash}`);
   window.scrollTo({top:0,behavior:'instant'});
-  render(resolved.route);
+  withPageTransition(()=>render(resolved.route));
 });
 
 async function handleAdminJoin(form){
@@ -574,7 +574,7 @@ document.addEventListener('submit',event=>{
   }
 });
 
-window.addEventListener('popstate',()=>render(currentRoutePath()));
+window.addEventListener('popstate',()=>withPageTransition(()=>render(currentRoutePath())));
 initializeTheme();
 initErrorReporter();
 if(import.meta.env?.PROD&&'serviceWorker' in navigator){
