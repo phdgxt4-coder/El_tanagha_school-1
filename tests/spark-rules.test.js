@@ -185,3 +185,24 @@ test('Spark chat: حد الطول والمعدل والمدرس يرد ولا ي
   await assertFails(sendMsg(t,'s1_t1','t1','تاني فورًا',false));
   await assertFails(setDoc(doc(t,'conversations','s1_t1','messages','z'),{senderUid:'s1',text:'انتحال',createdAt:serverTimestamp()}));
 });
+
+test('الوسائط: فيديو يوتيوب وملف درايف فقط، وصور الفصل لطلابه فقط وبحد الحجم', {skip:!emulatorAvailable}, async()=>{
+  await seed([...base,
+    ['profiles/t1',{uid:'t1',role:'teacher',status:'active',displayName:'م',grades:['1'],subjectId:'math',subjectIds:['math'],assignedClassIds:['c1']}],
+    ['profiles/s1',studentProfile('s1')],
+    ['profiles/s9',studentProfile('s9',{studentId:'STU-9',classId:'c9'})],
+    ['teacherAssignments/t1_math_c1',{teacherUid:'t1',subjectId:'math',classId:'c1',grade:'1'}]]);
+  const t=user('t1');
+  const c={teacherUid:'t1',grade:'1',classId:'c1',subjectId:'math',title:'ع',published:true,createdAt:serverTimestamp()};
+  await assertSucceeds(setDoc(doc(t,'content','v1'),{...c,type:'video',url:'https://www.youtube.com/watch?v=abc'}));
+  await assertFails(setDoc(doc(t,'content','v2'),{...c,type:'video',url:'https://catbox.moe/x.mp4'}));
+  await assertSucceeds(setDoc(doc(t,'content','f1'),{...c,type:'file',url:'https://drive.google.com/file/d/1/view'}));
+  await assertFails(setDoc(doc(t,'content','f2'),{...c,type:'file',url:'https://evil.example/a.pdf'}));
+  const img={teacherUid:'t1',grade:'1',classId:'c1',subjectId:'math',title:'صورة',data:'data:image/jpeg;base64,AAAA',createdAt:serverTimestamp()};
+  await assertSucceeds(setDoc(doc(t,'images','i1'),img));
+  await assertFails(setDoc(doc(t,'images','i2'),{...img,data:'data:image/jpeg;base64,'+'A'.repeat(961000)}));
+  await assertFails(setDoc(doc(t,'images','i3'),{...img,data:'data:text/html;base64,AAAA'}));
+  await assertFails(setDoc(doc(t,'images','i4'),{...img,subjectId:'ar'}));
+  await assertSucceeds(getDoc(doc(user('s1'),'images','i1')));
+  await assertFails(getDoc(doc(user('s9'),'images','i1')));
+});

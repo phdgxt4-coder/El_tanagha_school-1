@@ -61,6 +61,7 @@ export function mountParent(root, { auth, database }) {
       childrenBox.innerHTML = students.length
         ? students.map(student => `<button type="button" class="par-child" data-child="${esc(student.uid)}"><b>${esc(student.displayName)}</b><small>${esc(gradeNames[student.grade] || '')} ${esc(student.className || '')}</small></button>`).join('') + ''
         : '<p class="dash-empty">لم تربط أي ابن بعد. استخدم كود الربط بالأسفل.</p>';
+      unlink.hidden = !students.length;
       if (students.length) select(students.some(s => s.uid === current) ? current : students[0].uid);
       else { stats.hidden = true; detail.hidden = true; }
     } catch { childrenBox.innerHTML = '<p class="dash-empty">تعذر تحميل الأبناء الآن.</p>'; }
@@ -69,6 +70,16 @@ export function mountParent(root, { auth, database }) {
   childrenBox.addEventListener('click', event => {
     const button = event.target.closest('[data-child]');
     if (button) select(button.dataset.child);
+  });
+  root.querySelector('[data-parent-link]').insertAdjacentHTML('beforebegin', '<button type="button" class="text-link" data-unlink hidden>إلغاء ربط الابن المحدد</button>');
+  const unlink = root.querySelector('[data-unlink]');
+  unlink.addEventListener('click', async () => {
+    const student = students.find(item => item.uid === current);
+    if (!student || !window.confirm(`إلغاء ربط ${student.displayName}؟ لن تستطيع رؤية بياناته إلا بكود جديد.`)) return;
+    unlink.disabled = true;
+    try { await auth.unlinkParentFromStudent(student.uid); current = null; await refresh(); }
+    catch { window.alert('تعذر إلغاء الربط الآن. حاول مرة أخرى.'); }
+    finally { unlink.disabled = false; }
   });
   root.querySelector('[data-parent-link]').addEventListener('submit', async event => {
     event.preventDefault();
