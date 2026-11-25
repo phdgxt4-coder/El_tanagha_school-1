@@ -137,3 +137,13 @@ test('Spark: ربط ولي الأمر بكود صالح مرة واحدة فقط
   await assertFails(updateDoc(doc(parent,'parentLinks/p1_s1'),{studentUid:'x'}));
   await assertSucceeds(updateDoc(doc(parent,'parentLinks/p1_s1'),{active:false,status:'revoked',revokedBy:'p1'}));
 });
+
+test('Spark: حالة الإشعارات (آخر فتح) لصاحبها فقط', {skip:!emulatorAvailable}, async()=>{
+  await seed(base);
+  const a=user('u1'),b=user('u2');
+  await assertSucceeds(setDoc(doc(a,'notificationState','u1'),{lastSeen:serverTimestamp()}));
+  await assertSucceeds(getDoc(doc(a,'notificationState','u1')));
+  await assertFails(getDoc(doc(b,'notificationState','u1')));
+  await assertFails(setDoc(doc(b,'notificationState','u1'),{lastSeen:serverTimestamp()}));
+  await assertFails(setDoc(doc(a,'notificationState','u1'),{lastSeen:serverTimestamp(),x:1}));
+});

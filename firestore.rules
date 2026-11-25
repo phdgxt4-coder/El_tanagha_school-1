@@ -520,6 +520,15 @@ service cloud.firestore {
       allow update: if false;
     }
 
+    // آخر مرة فتح فيها المستخدم الجرس (وضع Spark: الإشعارات مشتقة من البيانات نفسها).
+    match /notificationState/{userId} {
+      allow get: if signedIn() && request.auth.uid == userId;
+      allow create, update: if signedIn() && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['lastSeen'])
+        && request.resource.data.lastSeen is timestamp;
+      allow list, delete: if false;
+    }
+
     match /notificationPrefs/{userId} {
       allow get: if signedIn() && request.auth.uid == userId;
       allow create, update: if signedIn() && request.auth.uid == userId

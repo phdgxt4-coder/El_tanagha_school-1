@@ -1,6 +1,7 @@
 import {
-  collection, deleteDoc, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch
+  collection, deleteDoc, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, Timestamp, updateDoc, where, writeBatch
 } from 'firebase/firestore';
+import { isSpark } from '../config/backend-mode.js';
 import { getFirebaseApp } from '../config/firebase-app.js';
 
 export const LIST_SIZE = 20;
@@ -69,4 +70,54 @@ export async function enablePush(database, uid) {
 export async function disablePush(database, uid) {
   const snapshot = await getDocs(query(collection(database, 'pushDevices'), where('uid', '==', uid), limit(20)));
   await Promise.all(snapshot.docs.map(item => deleteDoc(item.ref)));
+}
+
+/* ---------- وضع Spark: إشعارات مشتقة من بيانات موجودة (بدون وظائف خادم) ---------- */
+export const sparkMode = isSpark;
+
+export async function loadLastSeen(database, uid) {
+  const ref = doc(database, 'notificationState', uid);
+  const snapshot = await getDoc(ref);
+  if (snapshot.exists()) return snapshot.data().lastSeen.toDate();
+  const now = new Date();
+  await setDoc(ref, { lastSeen: Timestamp.fromDate(now) });
+  return now;
+}
+
+export const saveLastSeen = (database, uid) => setDoc(doc(database, 'notificationState', uid), { lastSeen: serverTimestamp() });
+
+const DERIVED = {
+  content: item => ({ type: 'content', title: 'محتوى جديد', body: String(item.title ?? '').slice(0, 80) }),
+  grade: item => ({ type: 'grade', title: 'درجة جديدة', body: `${String(item.subjectName ?? '').slice(0, 40)}: ${String(item.title ?? '').slice(0, 60)} (${item.score}/${item.max})` }),
+  attendance: item => ({ type: 'attendance', title: 'تسجيل غياب', body: `تم تسجيل غياب بتاريخ ${String(item.date ?? '').slice(0, 10)}.` })
+};
+
+/** يبني استعلامات "الأحدث من آخر فتح" حسب الدور. كل استعلام محدود بـ 5 مستندات. */
+export function derivedQueries(database, profile, lastSeen, childUids = []) {
+  const since = Timestamp.fromDate(lastSeen);
+  const make = (path, kind, ...filters) => ({ kind, q: query(collection(database, path), ...filters, where('createdAt', '>', since), orderBy('createdAt', 'desc'), limit(5)) });
+  if (profile.role === 'student') {
+    const list = [make('grades', 'grade', where('studentUid', '==', profile.uid)), make('attendance', 'attendance', where('studentUid', '==', profile.uid), where('present', '==', false))];
+    if (profile.classId) list.push(make('content', 'content', where('classId', '==', profile.classId), where('published', '==', true)));
+    return list;
+  }
+  if (profile.role === 'parent') {
+    return childUids.slice(0, 5).flatMap(uid => [make('grades', 'grade', where('studentUid', '==', uid)), make('attendance', 'attendance', where('studentUid', '==', uid), where('present', '==', false))]);
+  }
+  return [];
+}
+
+export function watchDerived(database, profile, lastSeen, childUids, onChange) {
+  const queries = derivedQueries(database, profile, lastSeen, childUids);
+  const buckets = queries.map(() => []);
+  const publish = () => {
+    const items = buckets.flat().sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0)).slice(0, LIST_SIZE);
+    onChange(items, items.length);
+  };
+  const stops = queries.map(({ kind, q }, index) => onSnapshot(q, snapshot => {
+    buckets[index] = snapshot.docs.map(item => ({ id: `${kind}-${item.id}`, ...DERIVED[kind](item.data()), createdAt: item.data().createdAt, read: false }));
+    publish();
+  }, () => { buckets[index] = []; publish(); }));
+  publish();
+  return () => stops.forEach(stop => stop());
 }

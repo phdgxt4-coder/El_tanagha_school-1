@@ -92,13 +92,25 @@ export async function mountBell(root, { profile, database }) {
   const list = slot.querySelector('[data-bell-list]');
   const note = slot.querySelector('[data-bell-note]');
   let current = [];
-  const stop = service.watchNotifications(database, profile.uid, (items, unread) => {
+  const render = (items, unread) => {
     current = items;
     count.hidden = unread === 0;
     count.textContent = unread > 99 ? '99+' : String(unread);
     button.classList.toggle('has-unread', unread > 0);
     list.innerHTML = items.length ? items.map(item => `<button type="button" class="bell-item ${item.read ? '' : 'is-unread'}" data-id="${esc(item.id)}"><span aria-hidden="true">${NOTICE_ICONS[item.type] || '🔔'}</span><span><b>${esc(item.title)}</b><small>${esc(item.body)}</small><time>${formatDate(item.createdAt)}</time></span></button>`).join('') : '<p class="dash-empty">لا توجد إشعارات.</p>';
-  });
+  };
+  let stop = () => {};
+  if (service.sparkMode) {
+    const lastSeen = await service.loadLastSeen(database, profile.uid).catch(() => new Date());
+    let childUids = [];
+    if (profile.role === 'parent') {
+      const auth = await import('../../auth/auth-service.js');
+      childUids = (await auth.listLinkedStudents().catch(() => ({ students: [] }))).students.map(student => student.uid);
+    }
+    stop = service.watchDerived(database, profile, lastSeen, childUids, render);
+  } else {
+    stop = service.watchNotifications(database, profile.uid, render);
+  }
   button.addEventListener('click', () => {
     panel.hidden = !panel.hidden;
     button.setAttribute('aria-expanded', String(!panel.hidden));
@@ -106,9 +118,13 @@ export async function mountBell(root, { profile, database }) {
   document.addEventListener('click', event => { if (!slot.contains(event.target)) { panel.hidden = true; button.setAttribute('aria-expanded', 'false'); } });
   list.addEventListener('click', event => {
     const item = event.target.closest('[data-id]');
-    if (item) service.markRead(database, item.dataset.id).catch(() => {});
+    if (item && !service.sparkMode) service.markRead(database, item.dataset.id).catch(() => {});
   });
-  slot.querySelector('[data-bell-all]').addEventListener('click', () => service.markAllRead(database, current).catch(() => {}));
+  slot.querySelector('[data-bell-all]').addEventListener('click', () => {
+    if (service.sparkMode) service.saveLastSeen(database, profile.uid).then(() => { stop(); stop = service.watchDerived(database, profile, new Date(), [], render); render([], 0); }).catch(() => {});
+    else service.markAllRead(database, current).catch(() => {});
+  });
+  if (service.sparkMode) slot.querySelector('[data-bell-push]').hidden = true;
   const prefsBox = slot.querySelector('[data-bell-prefs]');
   const prefs = await service.loadPrefs(database, profile.uid).catch(() => ({}));
   prefsBox.innerHTML = service.PREF_KEYS.map(([key, label]) => `<label class="bell-pref"><input type="checkbox" data-pref="${key}" ${prefs[key] === false ? '' : 'checked'}> ${label}</label>`).join('');
