@@ -146,7 +146,6 @@ service cloud.firestore {
           (data.role == 'parent' && data.status == 'active'
             && data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'status', 'phone', 'createdAt']))
           || (data.role == 'teacher_applicant' && data.status == 'pending'
-            && request.auth.token.email_verified == true
             && data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'status', 'phone', 'createdAt']))
           || (data.role == 'student' && data.status == 'active'
             && data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'status', 'phone', 'createdAt',
@@ -253,6 +252,8 @@ service cloud.firestore {
       allow update: if isActiveAdmin()
         && resource.data.role in ['teacher_applicant', 'teacher']
         && request.resource.data.role in ['teacher_applicant', 'teacher']
+        && (resource.data.role == request.resource.data.role
+          || get(/databases/$(database)/documents/teacherApplications/$(userId)).data.emailVerified == true)
         && request.resource.data.uid == resource.data.uid
         && request.resource.data.email == resource.data.email
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
@@ -264,8 +265,8 @@ service cloud.firestore {
       allow get: if signedIn() && (request.auth.uid == userId || isActiveAdmin());
       allow list: if isActiveAdmin();
       allow create: if signedIn() && request.auth.uid == userId
-        && request.auth.token.email_verified == true
-        && request.resource.data.keys().hasOnly(['uid', 'displayName', 'subjectId', 'subjectName', 'phone', 'publishConsent', 'status', 'submittedAt'])
+        && request.resource.data.keys().hasOnly(['uid', 'displayName', 'subjectId', 'subjectName', 'phone', 'publishConsent', 'status', 'submittedAt', 'emailVerified'])
+        && request.resource.data.emailVerified == (request.auth.token.email_verified == true)
         && request.resource.data.uid == userId
         && request.resource.data.status == 'pending'
         && request.resource.data.submittedAt == request.time
@@ -273,6 +274,11 @@ service cloud.firestore {
         && validPhone(request.resource.data.phone)
         && exists(/databases/$(database)/documents/subjects/$(request.resource.data.subjectId))
         && getAfter(/databases/$(database)/documents/profiles/$(userId)).data.role == 'teacher_applicant';
+      // المدرس يثبت توثيق بريده بنفسه (الرمز يثبت ذلك، لا الواجهة).
+      allow update: if signedIn() && request.auth.uid == userId
+        && request.auth.token.email_verified == true
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['emailVerified'])
+        && request.resource.data.emailVerified == true;
       allow update: if isActiveAdmin()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt', 'rejectionReason'])
         && request.resource.data.status in ['approved', 'rejected'];
@@ -292,14 +298,18 @@ service cloud.firestore {
     }
 
     match /parentCodes/{code} {
-      allow get, list: if false;
+      // قراءة كود واحد بمعرّفه فقط (لا قائمة) لولي الأمر النشط والطالب صاحب الكود.
+      allow get: if isActiveParent() || (signedIn() && resource.data.studentUid == request.auth.uid);
+      allow list: if false;
       allow create: if isActiveStudent()
         && code.matches('^TNG-[A-Z0-9]{8,12}$')
-        && request.resource.data.keys().hasOnly(['studentUid', 'active', 'createdAt', 'expiresAt'])
+        && request.resource.data.keys().hasOnly(['studentUid', 'studentId', 'active', 'createdAt', 'expiresAt'])
         && request.resource.data.studentUid == request.auth.uid
+        && request.resource.data.studentId == profile(request.auth.uid).studentId
         && request.resource.data.active == true
         && request.resource.data.createdAt == request.time
-        && request.resource.data.expiresAt == request.time + duration.value(15, 'm');
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.expiresAt <= request.time + duration.value(16, 'm');
       // الطالب يلغي كوده، والولي يستهلكه مرة واحدة مع إنشاء الربط في نفس الدفعة.
       allow update: if (resource.data.studentUid == request.auth.uid
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active'])

@@ -61,10 +61,14 @@ test('Spark: ولي الأمر يسجل فورًا، والمدرس يحتاج �
   const parent={uid:'p1',email:'p1@example.com',displayName:'ولي أمر',role:'parent',status:'active',phone:'01012345678',createdAt:serverTimestamp()};
   await assertSucceeds(setDoc(doc(user('p1'),'profiles/p1'),parent));
   const teacherProfile={uid:'t1',email:'t1@example.com',displayName:'مدرس',role:'teacher_applicant',status:'pending',phone:'01012345678',createdAt:serverTimestamp()};
-  const application={uid:'t1',displayName:'مدرس',subjectId:'math',subjectName:'الرياضيات',phone:'01012345678',publishConsent:false,status:'pending',submittedAt:serverTimestamp()};
+  const application={uid:'t1',displayName:'مدرس',subjectId:'math',subjectName:'الرياضيات',phone:'01012345678',publishConsent:false,status:'pending',submittedAt:serverTimestamp(),emailVerified:true};
   const unverified=user('t1',{email_verified:false});
   const bad=writeBatch(unverified);bad.set(doc(unverified,'profiles/t1'),teacherProfile);bad.set(doc(unverified,'teacherApplications/t1'),application);
   await assertFails(bad.commit());
+  const early=writeBatch(unverified);early.set(doc(unverified,'profiles/t1'),teacherProfile);early.set(doc(unverified,'teacherApplications/t1'),{...application,emailVerified:false});
+  await assertSucceeds(early.commit());
+  await assertFails(updateDoc(doc(unverified,'teacherApplications/t1'),{emailVerified:true}));
+  await seed(base);
   const database=user('t1');
   const ok=writeBatch(database);ok.set(doc(database,'profiles/t1'),teacherProfile);ok.set(doc(database,'teacherApplications/t1'),application);
   await assertSucceeds(ok.commit());
@@ -75,8 +79,10 @@ test('Spark: اعتماد المدرس وإدارة الهيكل للإدارة 
   await seed([...base,
     ['profiles/t1',{uid:'t1',email:'t1@example.com',displayName:'مدرس',role:'teacher_applicant',status:'pending'}],
     ['profiles/s1',studentProfile('s1',{createdAt:new Date()})],
-    ['teacherApplications/t1',{uid:'t1',status:'pending'}]]);
+    ['teacherApplications/t1',{uid:'t1',status:'pending',emailVerified:false}]]);
   const admin=user('adm');
+  await assertFails(updateDoc(doc(admin,'profiles/t1'),{role:'teacher',status:'active',grades:[],assignedClassIds:[]}));
+  await assertSucceeds(updateDoc(doc(user('t1'),'teacherApplications/t1'),{emailVerified:true}));
   await assertSucceeds(updateDoc(doc(admin,'profiles/t1'),{role:'teacher',status:'active',subjectId:'math',grades:[],assignedClassIds:[]}));
   await assertSucceeds(updateDoc(doc(admin,'teacherApplications/t1'),{status:'approved',reviewedBy:'adm',reviewedAt:serverTimestamp()}));
   await assertFails(updateDoc(doc(admin,'profiles/s1'),{status:'disabled'}));
@@ -96,7 +102,7 @@ const codeSeed=(over={})=>[...base,
   ['profiles/s1',studentProfile('s1',{createdAt:new Date()})],
   ['profiles/p1',{uid:'p1',email:'p1@example.com',displayName:'ولي',role:'parent',status:'active'}],
   ['profiles/p2',{uid:'p2',email:'p2@example.com',displayName:'ولي',role:'parent',status:'active'}],
-  ['parentCodes/TNG-ABCD2345',{studentUid:'s1',active:true,createdAt:new Date(),expiresAt:nextHour(),...over}]];
+  ['parentCodes/TNG-ABCD2345',{studentUid:'s1',studentId:'STU-ABCDEFGH',active:true,createdAt:new Date(),expiresAt:nextHour(),...over}]];
 async function link(uid,code='TNG-ABCD2345',studentUid='s1'){
   const database=user(uid);
   const batch=writeBatch(database);
@@ -108,10 +114,13 @@ async function link(uid,code='TNG-ABCD2345',studentUid='s1'){
 test('Spark: الطالب يصدر كودًا صالحًا 15 دقيقة فقط ولا يقرأ أحد الأكواد', {skip:!emulatorAvailable}, async()=>{
   await seed([...base,['profiles/s1',studentProfile('s1',{createdAt:new Date()})]]);
   const student=user('s1');
-  const code={studentUid:'s1',active:true,createdAt:serverTimestamp(),expiresAt:Timestamp.fromMillis(Date.now()+900000)};
+  const code={studentUid:'s1',studentId:'STU-ABCDEFGH',active:true,createdAt:serverTimestamp(),expiresAt:Timestamp.fromMillis(Date.now()+900000)};
   await assertFails(setDoc(doc(student,'parentCodes/TNG-ABCD2345'),{...code,expiresAt:Timestamp.fromMillis(Date.now()+86400000)}));
+  await assertFails(setDoc(doc(student,'parentCodes/TNG-ABCD2345'),{...code,expiresAt:Timestamp.fromMillis(Date.now()-60000)}));
   await assertFails(setDoc(doc(student,'parentCodes/short'),code));
-  await assertFails(getDoc(doc(student,'parentCodes/TNG-ABCD2345')));
+  await assertSucceeds(setDoc(doc(student,'parentCodes/TNG-ABCD2345'),code));
+  await assertFails(setDoc(doc(student,'parentCodes/TNG-ZZZZ2345'),{...code,studentId:'STU-OTHEROTHER'}));
+  await assertFails(getDoc(doc(user('p9'),'parentCodes/TNG-ABCD2345')));
 });
 
 test('Spark: ربط ولي الأمر بكود صالح مرة واحدة فقط ويبقى مرتبطًا', {skip:!emulatorAvailable}, async()=>{
