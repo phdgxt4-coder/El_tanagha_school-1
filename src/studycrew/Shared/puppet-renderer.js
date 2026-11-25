@@ -39,13 +39,16 @@ export function createPuppetRenderer(host,manifest,cfg,opts={}){
   const sp=J(6,70,9,.07),tl=J(5,38,3.2,.1),eL=J(4,60,3.6,.1),eR=J(4,60,3.6,.1),aL=J(6,60,6.5,.08),aR=J(6,60,6.5,.08);
   const S={lean:SPR(34,6.5),bodyX:SPR(42,7),bodyY:SPR(120,12),crouch:SPR(110,10),headR:SPR(80,9),yaw:SPR(60,9),headY:SPR(90,10),
     gx:SPR(430,32),gy:SPR(430,32),earLb:SPR(120,9),earRb:SPR(120,9),tailB:SPR(46,6),lid:SPR(1300,80),
-    sL:SPR(55,7),cL:SPR(55,7),sR:SPR(55,7),cR:SPR(55,7),shr:SPR(110,11),wsh:SPR(45,7),tm:SPR(30,6,1)};
-  for(const k in S){if(k!=='lid'&&k!=='gx'&&k!=='gy'){S[k].k*=1.45;S[k].c*=1.2;}}
+    sL:SPR(55,7),cL:SPR(55,7),sR:SPR(55,7),cR:SPR(55,7),shr:SPR(110,11),wsh:SPR(45,7),tm:SPR(30,6,1),sx:SPR(430,32),sy:SPR(430,32)};
+  for(const k in S){if(k!=='lid'&&k!=='gx'&&k!=='gy'&&k!=='sx'&&k!=='sy'){S[k].k*=1.45;S[k].c*=1.2;}}
   [aL,aR].forEach(a=>a.forEach(j=>{j.k*=1.4;j.c*=1.2;}));eL[0].k=150;eR[0].k=150;
-  const TS=.62; // a small fox is quick: sequence waits are scaled
+  const TS=.54; // a small fox is quick: sequence waits are scaled
   const set=o=>{for(const k in o)S[k].t=o[k];};
-  let time=0,tPrev=performance.now(),paused=false,dead=false,state='Idle',busy=false,seq=0,wagAmp=0,wagRate=7,wagAmpT=0,calm=1,idleAt=2,blinkAt=2,waveL=0,waveLT=0,waveR=0,waveRT=0,front=0;
-  const look=(x,y,hw=.7,bw=.25,delay=90)=>{set({gx:x,gy:y});
+  let sacAt=1,time=0,tPrev=performance.now(),paused=false,dead=false,state='Idle',busy=false,seq=0,wagAmp=0,wagRate=7,wagAmpT=0,calm=1,idleAt=2,blinkAt=2,waveL=0,waveLT=0,waveR=0,waveRT=0,front=0;
+  let lastGx=0,lastGy=0;
+  const look=(x,y,hw=.7,bw=.25,delay=90)=>{const jump=Math.hypot(x-lastGx,y-lastGy);lastGx=x;lastGy=y;set({gx:x,gy:y});
+    if(jump>.7&&calm>.8){eL[0].v+=-90*jump;eR[0].v+=90*jump;if(Math.random()<.6)setTimeout(()=>{if(!dead&&!busy)blink();},delay+60);}   // attention: ears flick up, a blink rides the turn
+
     setTimeout(()=>{if(!dead)set({yaw:x*hw*16,headY:y*hw*8});},delay);
     setTimeout(()=>{if(!dead)set({bodyX:x*bw*20,lean:x*bw*3});},delay*2);};
   const blink=async(slow)=>{S.lid.t=1;await sleep(slow?260:85);if(!dead)S.lid.t=S.lid.hold||0;};
@@ -88,19 +91,19 @@ export function createPuppetRenderer(host,manifest,cfg,opts={}){
       waveLT=34;await w(1300);waveLT=0;set({sL:120,cL:34});await w(180);
       set({sL:40,cL:6});await w(160);set({sL:0,cL:0,headR:0,lean:0,lid:0,tm:1,shr:0});S.lid.hold=0;wagAmpT=0;look(0,0,.5,.2);await w(200);await settle(w);},
     Thinking:async w=>{
-      set({crouch:.014,lean:-1,gx:0,gy:0,tm:.3});await w(420);                                   // a real pause
-      set({gx:-.2,gy:-.05});await w(90);set({headR:-6,yaw:-9,lean:-2});await w(230);              // glance, head follows
-      look(-.78,-.78,.55,.25);set({earLb:9,earRb:-12,lid:.28});S.lid.hold=.28;await w(480);       // look up
-      set({shr:-3,sR:40});await w(130);set({sR:125,cR:175});await w(520);                         // hand to cheek, shoulder first
+      set({crouch:.014,lean:-1,tm:.3});look(.5,-.05,.5,.2);set({earRb:-14,earLb:4});await w(260);                              // something is heard: ears turn first
+      look(.1,0,.4,.15);await w(130);set({headR:-6,yaw:-9,lean:-2});await w(230);                                              // eyes search, head tilts
+      look(-.78,-.78,.55,.25);set({earLb:9,earRb:-8,lid:.28});S.lid.hold=.28;await w(420);                                      // look up and away
+      set({shr:-3,sR:40});await w(130);set({sR:125,cR:175});calm=.5;await w(480);                                              // hand to cheek, the body calms: slower breath
       look(.1,-.8,.5,.2);await w(480);look(.6,-.4,.55,.2);set({headR:-2});await w(480);
-      set({earLb:-22,earRb:18,crouch:-.015,bodyY:-6,lid:0});S.lid.hold=0;await w(110);            // the idea: ears perk fast
-      set({crouch:0,bodyY:0,tm:1.5});await w(330);look(0,0,.5,.2);set({sR:0,cR:0,earLb:0,earRb:0,headR:0,yaw:0,tm:1});await w(300);await settle(w);},
+      calm=1;set({earLb:-22,earRb:18,crouch:-.015,bodyY:-6,lid:0});S.lid.hold=0;await w(110);                                    // the idea: ears perk fast
+      set({crouch:0,bodyY:0,tm:1.6});await w(330);look(0,0,.5,.2);set({sR:0,cR:0,earLb:0,earRb:0,headR:0,yaw:0,tm:1});await w(300);await settle(w);},
     Success:async w=>{
-      set({crouch:.055,lean:-4,earLb:6,earRb:-6,sL:10,sR:10,tm:1.5});await w(170);               // anticipation
-      set({crouch:-.06,bodyY:-34,lean:3,earLb:-12,earRb:12,lid:.85,tailB:9,sL:120,sR:120,cL:10,cR:10,tm:2.6});S.lid.hold=.85;wagAmpT=24;wagRate=13;await w(210);
-      set({crouch:.05,bodyY:0,sL:30,sR:30});await w(150);
-      set({crouch:-.035,bodyY:-14,headR:-6,sL:80,sR:80});await w(190);
-      set({crouch:.02,bodyY:0,headR:4,lean:0,sL:0,sR:0,cL:0,cR:0});await w(170);set({crouch:-.01});await w(120);set({crouch:0});set({lid:.3});S.lid.hold=.3;},
+      look(0,-.2,.5,.2);set({crouch:.07,lean:-6,bodyY:4,earLb:8,earRb:-8,sL:8,sR:8,tm:1.6,tailB:-10,headR:-3});await w(190);                      // whole body loads: dip, weight back, ears pin
+      set({crouch:-.07,bodyY:-40,lean:5,bodyX:-3,earLb:-16,earRb:16,lid:.85,tailB:12,sL:125,sR:122,cL:12,cR:14,tm:2.8,headR:5});S.lid.hold=.85;wagAmpT=26;wagRate=14;await w(220);   // spring up: shoulders, arms, tail and ears follow
+      set({crouch:.065,bodyY:0,lean:-3,bodyX:2,sL:35,sR:30,headR:-5,earLb:6,earRb:-6});await w(170);                                           // land and compress
+      set({crouch:-.04,bodyY:-16,lean:3,headR:6,sL:85,sR:90,earLb:-14,earRb:14,tailB:8});await w(190);                                         // rebound hop
+      set({crouch:.03,bodyY:0,headR:2,lean:0,bodyX:0,sL:6,sR:6,cL:0,cR:0,earLb:0,earRb:0});await w(180);set({crouch:-.012});await w(130);set({crouch:0,tailB:0});set({lid:.3});S.lid.hold=.3;},
     Error:async w=>{
       set({crouch:-.012,bodyY:-3,earLb:-4,earRb:4,tm:.5});await w(110);                           // a small start
       set({crouch:.03,lean:-4,headY:6,earLb:12,earRb:-6,gy:.2,gx:-.3});await w(380);              // freeze: something is wrong
@@ -137,7 +140,7 @@ export function createPuppetRenderer(host,manifest,cfg,opts={}){
     const sa=sp.map((s,i)=>s.x+br*(i>=2?.9:.25)+wt*(i<3?.7:1.1));
     spine.solve(sa);
     const sy=1-S.crouch.x+br*.016, sx=1+S.crouch.x*.7-br*.007;
-    const root=M().translate(OX,OY).scale(K,K).translate(G.spine.P[0]+S.bodyX.x+wt*9,G.spine.P[1]+S.bodyY.x).scale(sx,sy).translate(-G.spine.P[0],-G.spine.P[1]);
+    const root=M().translate(OX,OY).scale(K,K).translate(G.spine.P[0]+S.bodyX.x+wt*9+(S.sR.x-S.sL.x)*.05,G.spine.P[1]+S.bodyY.x).scale(sx,sy).translate(-G.spine.P[0],-G.spine.P[1]);
     ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,cv.width,cv.height);
     ctx.save();ctx.setTransform(K,0,0,K,OX,OY);const sh=1-Math.min(.35,Math.max(-.35,-S.bodyY.x/90));
     const gr=ctx.createRadialGradient(G.shadow[0]+S.bodyX.x*.6,G.shadow[1],4,G.shadow[0]+S.bodyX.x*.6,G.shadow[1],G.shadow[2]*sh);
@@ -150,7 +153,7 @@ export function createPuppetRenderer(host,manifest,cfg,opts={}){
     // tail on the hip
     const hipM=root.multiply(spine.strip(G.hipStrip));
     const tws=Math.sin(time*wagRate)*wagAmp;
-    const exc=-(S.bodyX.v*.06+S.lean.v*.12+S.yaw.v*.02);
+    const exc=-(S.bodyX.v*.08+S.lean.v*.16+S.yaw.v*.03+S.bodyY.v*.012);
     tl.forEach((s,i)=>{s.t=i===0?S.tailB.x+tws+exc*5+(Math.sin(time*1.25*(.7+.3*S.tm.x)-.9)*5*idle+wt*-3.5)*S.tm.x:tl[i-1].x*.82+(i>1?tws*.07:0)+Math.sin(time*1.25-.9-i*.6)*1.4*idle*S.tm.x;});
     tail.solve(tl.map(s=>s.x));
     for(let i=0;i<tail.n;i++)stripDraw('tail',tail,hipM,i);
@@ -169,7 +172,7 @@ export function createPuppetRenderer(host,manifest,cfg,opts={}){
     if(!front)armsDraw();
     // head
     const neck=G.neck, headBase=root.multiply(spine.strip(spine.n-1));
-    const yawN=S.yaw.x+Math.sin(time*.9+1)*1.4*idle, hy=S.headY.x-br2*5.5, hr=S.headR.x+Math.sin(time*.7)*1.3*idle-wt*1.4+S.yaw.x*.08;
+    const yawN=S.yaw.x+S.sx.x*5+Math.sin(time*.9+1)*1.4*idle, hy=S.headY.x-br2*5.5, hr=S.headR.x+Math.sin(time*.7)*1.3*idle-wt*1.4+S.yaw.x*.08;
     const headM=headBase.translate(neck[0]+yawN,neck[1]+hy).rotate(hr).scale(1-Math.abs(yawN)*.0016,1+br2*.008).translate(-neck[0],-neck[1]);
     const he=-(S.yaw.v*.07+S.headR.v*.16+S.lean.v*.15+S.bodyY.v*.014);
     eL.forEach((s,i)=>{s.t=i===0?S.earLb.x+he*.9+Math.sin(time*.8)*2.6*idle:eL[i-1].x*.72+(i===1?-4:0)*(1-Math.abs(S.earLb.x)/25);});
@@ -181,7 +184,7 @@ export function createPuppetRenderer(host,manifest,cfg,opts={}){
     ['L','R'].forEach(k=>{
       const e=meta.eye[k],m=meta['iris'+k];
       ctx.save();ctx.setTransform(headM);ctx.beginPath();ctx.ellipse(e[0],e[1],e[2],e[3],0,0,Math.PI*2);ctx.clip();
-      ctx.drawImage(img['iris'+k],m[0]+S.gx.x*G.gaze[0],m[1]+S.gy.x*G.gaze[1],m[2],m[3]);
+      ctx.drawImage(img['iris'+k],m[0]+(S.gx.x+S.sx.x)*G.gaze[0],m[1]+(S.gy.x+S.sy.x)*G.gaze[1],m[2],m[3]);
       const l=Math.max(0,Math.min(1,S.lid.x));
       if(l>.01){const lm=meta['lid'+k];ctx.beginPath();ctx.rect(lm[0],lm[1],lm[2],lm[3]*l*.85);ctx.clip();ctx.drawImage(img['lid'+k],lm[0],lm[1],lm[2],lm[3]);}
       ctx.restore();});
@@ -191,8 +194,10 @@ export function createPuppetRenderer(host,manifest,cfg,opts={}){
     const dt=Math.min(.033,(now-tPrev)/1000);tPrev=now;time+=dt;
     wagAmp+=(wagAmpT-wagAmp)*Math.min(1,dt*5);waveL+=(waveLT-waveL)*Math.min(1,dt*6);waveR+=(waveRT-waveR)*Math.min(1,dt*6);
     for(let s=0;s<2;s++){const h=dt/2;for(const k in S)stepSpr(S[k],h);
-      sp.forEach((j,i)=>{j.t=S.lean.x*[.05,.12,.18,.25,.2,.2][i]*1.3+S.wsh.x*[0,.9,.7,-.4,-.7,-.6][i]+(i>0?sp[i-1].x*.3:0);stepSpr(j,h);});
+      const up=(S.sL.x+S.sR.x)/2,asym=(S.sR.x-S.sL.x);
+      sp.forEach((j,i)=>{j.t=S.lean.x*[.05,.12,.18,.25,.2,.2][i]*1.3+S.wsh.x*[0,.9,.7,-.4,-.7,-.6][i]+(i>0?sp[i-1].x*.3:0)+(-up*.016-Math.abs(S.cL.x+S.cR.x)*.004)*[0,.3,.6,.9,1,1][i]+asym*.012*[0,.5,.4,-.2,-.5,-.5][i];stepSpr(j,h);});   // arms up: weight goes back and sideways, feet stay planted
       [tl,eL,eR,aL,aR].forEach(a=>a.forEach((j,i)=>{if((a===eL||a===eR)&&i===0&&Math.abs(j.t)<Math.abs(j.x)){const k0=j.k;j.k=k0*.28;stepSpr(j,h);j.k=k0;}else stepSpr(j,h);}));}
+    if(state!=='Sleep'&&state!=='HiddenPassword'&&time>sacAt){sacAt=time+rnd(.35,1.5);S.sx.t=rnd(-.09,.09);S.sy.t=rnd(-.06,.05);}   // micro saccades: the gaze is never frozen
     if(!busy&&time>idleAt&&state==='Idle'){idleBeat();idleAt=time+rnd(1.8,4);}
     if(time>blinkAt&&state!=='Sleep'&&state!=='HiddenPassword'){blink(Math.random()<.2);blinkAt=time+(Math.random()<.25?rnd(.7,1.4):rnd(1.8,6.5));if(Math.random()<.18)setTimeout(blink,230);}
     draw();};
