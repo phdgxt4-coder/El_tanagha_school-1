@@ -10,6 +10,7 @@ import {
   validateRosterRows, validateSubjectInput
 } from '../../functions/src/validation.js';
 import { cacheInvalidate } from './cache.js';
+import { withTimeout } from '../utils/load-state.js';
 
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const CODE_TTL_MS = 15 * 60 * 1000;
@@ -85,13 +86,15 @@ export async function getMyAccountStatus() {
   const user = me();
   const database = db();
   if (!user.emailVerified) {
-    await user.reload().catch(() => {});
+    // reload() has no built-in timeout: on a stalled mobile connection it can pend for
+    // minutes and freeze the login screen, so cap it and keep the cached state on timeout.
+    await withTimeout(user.reload(), 10000).catch(() => {});
     if (user.emailVerified) await user.getIdToken(true).catch(() => {});
   }
   const emailVerified = user.emailVerified === true;
-  const admin = await getDoc(doc(database, 'admins', user.uid)).catch(() => null);
+  const admin = await withTimeout(getDoc(doc(database, 'admins', user.uid))).catch(() => null);
   if (admin?.exists() && admin.data().active === true) return { role: 'admin', status: 'active', emailVerified, displayName: admin.data().displayName ?? '' };
-  const snapshot = await getDoc(doc(database, 'profiles', user.uid));
+  const snapshot = await withTimeout(getDoc(doc(database, 'profiles', user.uid)));
   if (!snapshot.exists()) return { role: 'none', status: 'none', emailVerified };
   const data = snapshot.data();
   if (data.role === 'teacher_applicant' && emailVerified) {
