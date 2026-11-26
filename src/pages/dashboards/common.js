@@ -7,7 +7,7 @@ export const PAGE_SIZE = 20;
 
 export function formatDate(value) {
   const date = value?.toDate ? value.toDate() : value instanceof Date ? value : null;
-  return date ? date.toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' }) : '';
+  return date ? date.toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'Africa/Cairo' }) : '';
 }
 
 export function skeletonRows(count = 3) {
