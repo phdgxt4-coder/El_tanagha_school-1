@@ -5,6 +5,7 @@ import {initErrorReporter} from './services/error-reporter.js';
 import {initErrorBoundary,errorCardHtml} from './ui/error-boundary.js';
 import {TRACKS} from '../functions/src/validation.js';
 import {livingEnabled} from './config/features.js';
+import {initUpdateNotice} from './ui/update-notice.js';
 import {initMotion,routeStart,routeEnd,withThemeTransition,withPageTransition} from './ui/motion.js';
 
 const moduleScriptUrl=document.querySelector('script[type="module"][src]')?.src;
@@ -606,6 +607,7 @@ window.addEventListener('popstate',()=>withPageTransition(()=>render(currentRout
 initializeTheme();
 initErrorReporter();
 initErrorBoundary();
+initUpdateNotice();
 if(import.meta.env?.PROD&&'serviceWorker' in navigator){
   addEventListener('load',()=>navigator.serviceWorker.register(`${import.meta.env.BASE_URL||'/'}sw.js`,{scope:import.meta.env.BASE_URL||'/'}).catch(()=>{}));
 }
