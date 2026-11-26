@@ -51,6 +51,7 @@ test('التطبيق يربط البوابة: توجيه، شعار، إخفاء
   assert.match(css, /html\[data-session="active"\] \.topbar \.nav/u);
   assert.match(css, /html\[data-session="active"\] \.topbar \.menu-toggle/u);
   assert.match(css, /html\[data-session="active"\] \.topbar>\.button/u);
+  assert.match(css, /html\[data-session="active"\] \.footer/u);
 });
 
 test('تسجيل الخروج من اللوحة يبقى يعمل ويعيد لصفحة الدخول', () => {
