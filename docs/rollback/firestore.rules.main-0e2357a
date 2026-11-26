@@ -1,0 +1,818 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isActiveAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.active == true;
+    }
+
+    function profile(uid) {
+      return get(/databases/$(database)/documents/profiles/$(uid)).data;
+    }
+
+    function hasRole(role) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/profiles/$(request.auth.uid))
+        && request.auth.token.email_verified == true
+        && profile(request.auth.uid).role == role
+        && profile(request.auth.uid).status == 'active';
+    }
+
+    function isActiveTeacher() {
+      return hasRole('teacher');
+    }
+
+    function isActiveParent() {
+      return hasRole('parent');
+    }
+
+    function isActiveStudent() {
+      return hasRole('student');
+    }
+
+    function linkedParentTo(studentUid) {
+      return isActiveParent()
+        && exists(/databases/$(database)/documents/parentLinks/$(request.auth.uid + '_' + studentUid))
+        && get(/databases/$(database)/documents/parentLinks/$(request.auth.uid + '_' + studentUid)).data.active == true;
+    }
+
+    function studentInGrade(studentUid, grade) {
+      return studentUid is string
+        && exists(/databases/$(database)/documents/profiles/$(studentUid))
+        && profile(studentUid).role == 'student'
+        && profile(studentUid).status == 'active'
+        && profile(studentUid).grade == grade;
+    }
+
+    function ownsTeacherRecord(data) {
+      return isActiveTeacher() && data.teacherUid == request.auth.uid;
+    }
+
+    function teachesGrade(grade) {
+      return isActiveTeacher()
+        && profile(request.auth.uid).grades is list
+        && profile(request.auth.uid).grades.hasAny([grade]);
+    }
+
+    function teachesSubject(subjectId) {
+      return isActiveTeacher()
+        && ((profile(request.auth.uid).subjectIds is list && profile(request.auth.uid).subjectIds.hasAny([subjectId]))
+          || profile(request.auth.uid).subjectId == subjectId);
+    }
+
+    // الإسناد (مادة + فصل) يُنشئه المدير فقط عبر الوظائف الموثوقة.
+    function assignedTo(subjectId, classId) {
+      return isActiveTeacher()
+        && subjectId is string && classId is string
+        && exists(/databases/$(database)/documents/teacherAssignments/$(request.auth.uid + '_' + subjectId + '_' + classId));
+    }
+
+    function assignedToClass(classId) {
+      return isActiveTeacher()
+        && classId is string
+        && profile(request.auth.uid).assignedClassIds is list
+        && profile(request.auth.uid).assignedClassIds.hasAny([classId]);
+    }
+
+    function studentInClass(studentUid, classId) {
+      return studentUid is string && classId is string
+        && exists(/databases/$(database)/documents/profiles/$(studentUid))
+        && profile(studentUid).role == 'student'
+        && profile(studentUid).status == 'active'
+        && profile(studentUid).classId == classId;
+    }
+
+    function ownsExamSubmission(data) {
+      return isActiveTeacher()
+        && data.examId is string
+        && exists(/databases/$(database)/documents/exams/$(data.examId))
+        && get(/databases/$(database)/documents/exams/$(data.examId)).data.teacherUid == request.auth.uid;
+    }
+
+    function validContent(data) {
+      return data.keys().hasOnly(['teacherUid', 'grade', 'classId', 'subjectId', 'type', 'title', 'url', 'published', 'createdAt'])
+        && data.keys().hasAll(['teacherUid', 'grade', 'classId', 'subjectId', 'type', 'title', 'url', 'published', 'createdAt'])
+        && data.teacherUid is string
+        && data.grade in ['1', '2', '3']
+        && data.subjectId is string
+        && assignedTo(data.subjectId, data.classId)
+        && get(/databases/$(database)/documents/classes/$(data.classId)).data.grade == data.grade
+        && data.type in ['lesson', 'file', 'video', 'assignment']
+        && data.title is string
+        && data.title.size() > 0
+        && data.title.size() <= 120
+        && data.url is string
+        && data.url.matches('^https://[^ ]+$')
+        && (data.type != 'video' || data.url.matches('^https://(www\\.|m\\.)?(youtube\\.com|youtu\\.be)/[^ ]+$'))
+        && (!(data.type in ['file', 'assignment']) || data.url.matches('^https://(drive|docs)\\.google\\.com/[^ ]+$'))
+        && data.published is bool
+        && data.createdAt is timestamp;
+    }
+
+    function validTeacherNotification(data) {
+      return data.keys().hasOnly(['teacherUid', 'audience', 'grade', 'studentUid', 'title', 'body', 'createdAt'])
+        && data.keys().hasAll(['teacherUid', 'audience', 'grade', 'title', 'body'])
+        && data.teacherUid == request.auth.uid
+        && data.audience == 'grade'
+        && data.grade in ['1', '2', '3']
+        && teachesGrade(data.grade)
+        && data.title is string
+        && data.title.size() > 0
+        && data.title.size() <= 120
+        && data.body is string
+        && data.body.size() <= 2000
+        && (!('studentUid' in data) || studentInGrade(data.studentUid, data.grade))
+        && (!('createdAt' in data) || data.createdAt is timestamp);
+    }
+
+    // ===== وضع Spark: بدون Cloud Functions. كل ثابت يُفرض هنا في القواعد. =====
+    function emailOf() {
+      return request.auth.token.email.lower();
+    }
+
+    function validPhone(value) {
+      return value is string && value.matches('^[+]?[0-9]{8,15}$');
+    }
+
+    function validSelfProfile(userId, data) {
+      return data.uid == userId
+        && data.email == emailOf()
+        && data.displayName is string && data.displayName.size() >= 3 && data.displayName.size() <= 80
+        && validPhone(data.phone)
+        && data.createdAt == request.time
+        && data.consentAt == request.time
+        && (
+          (data.role == 'parent' && data.status == 'active'
+            && data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'status', 'phone', 'createdAt', 'consentAt']))
+          || (data.role == 'teacher_applicant' && data.status == 'pending'
+            && data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'status', 'phone', 'createdAt', 'consentAt']))
+          || (data.role == 'student' && data.status == 'active'
+            && data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'status', 'phone', 'createdAt',
+              'studentId', 'grade', 'branch', 'classId', 'className', 'rosterVerified', 'birthDate', 'consentAt'])
+            && data.displayName.split(' ').size() >= 4
+            && data.grade in ['1', '2', '3']
+            && data.classId is string
+            && get(/databases/$(database)/documents/classes/$(data.classId)).data.grade == data.grade
+            && ((get(/databases/$(database)/documents/classes/$(data.classId)).data.get('branch', '') == '' && data.branch == '')
+              || get(/databases/$(database)/documents/classes/$(data.classId)).data.get('branch', '') == data.branch)
+            && ((data.grade == '1' && data.branch == '')
+              || (data.grade == '2' && data.branch in ['bac_med', 'bac_eng', 'bac_biz', 'bac_arts'])
+              || (data.grade == '3' && data.branch in ['science', 'math', 'literary']))
+            && data.studentId is string && data.studentId.matches('^STU-[0-9A-Z]{8,12}$')
+            && !exists(/databases/$(database)/documents/studentIds/$(data.studentId))
+            && getAfter(/databases/$(database)/documents/studentIds/$(data.studentId)).data.uid == userId
+            && data.rosterVerified == false)
+        );
+    }
+
+    function validCodeLink(linkData, linkId) {
+      return linkData.keys().hasOnly(['parentUid', 'studentUid', 'studentId', 'status', 'active', 'createdAt', 'code'])
+        && linkData.parentUid == request.auth.uid
+        && linkId == request.auth.uid + '_' + linkData.studentUid
+        && linkData.active == true && linkData.status == 'active'
+        && linkData.createdAt == request.time
+        && linkData.code is string && linkData.code.matches('^TNG-[A-Z0-9]{8,12}$')
+        && isActiveParent()
+        && get(/databases/$(database)/documents/parentCodes/$(linkData.code)).data.studentUid == linkData.studentUid
+        && get(/databases/$(database)/documents/parentCodes/$(linkData.code)).data.active == true
+        && get(/databases/$(database)/documents/parentCodes/$(linkData.code)).data.expiresAt > request.time
+        && getAfter(/databases/$(database)/documents/parentCodes/$(linkData.code)).data.active == false
+        && getAfter(/databases/$(database)/documents/parentCodes/$(linkData.code)).data.usedBy == request.auth.uid
+        && profile(linkData.studentUid).role == 'student'
+        && profile(linkData.studentUid).studentId == linkData.studentId;
+    }
+
+    match /classes/{classId} {
+      allow get, list: if true;
+      allow create, update: if isActiveAdmin()
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 60
+        && request.resource.data.grade in ['1', '2', '3']
+        && request.resource.data.keys().hasOnly(['name', 'grade', 'section', 'year', 'branch', 'updatedAt'])
+        && request.resource.data.get('branch', '') in ['', 'bac_med', 'bac_eng', 'bac_biz', 'bac_arts', 'science', 'math', 'literary'];
+      allow delete: if isActiveAdmin();
+    }
+
+    match /subjects/{subjectId} {
+      allow get, list: if true;
+      allow create, update: if isActiveAdmin()
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 60
+        && request.resource.data.keys().hasOnly(['name', 'branches', 'updatedAt'])
+        && request.resource.data.get('branches', []) is list && request.resource.data.get('branches', []).size() <= 7;
+      allow delete: if isActiveAdmin();
+    }
+
+    match /teacherAssignments/{assignmentId} {
+      allow get, list: if signedIn() && (
+        isActiveAdmin()
+        || resource.data.teacherUid == request.auth.uid
+        || (isActiveStudent() && resource.data.classId == profile(request.auth.uid).classId)
+        || parentSeesClass(resource.data.classId)
+      );
+      allow create, update: if isActiveAdmin()
+        && request.resource.data.keys().hasOnly(['teacherUid', 'subjectId', 'classId', 'subjectName', 'className', 'grade', 'year', 'teacherName', 'assignedBy', 'assignedAt'])
+        && assignmentId == request.resource.data.teacherUid + '_' + request.resource.data.subjectId + '_' + request.resource.data.classId
+        && exists(/databases/$(database)/documents/classes/$(request.resource.data.classId))
+        && exists(/databases/$(database)/documents/subjects/$(request.resource.data.subjectId))
+        && profile(request.resource.data.teacherUid).role == 'teacher';
+      allow delete: if isActiveAdmin();
+    }
+
+    match /rosterStudents/{rosterId} {
+      allow read, create, update, delete: if isActiveAdmin();
+    }
+
+    match /studentIds/{studentId} {
+      allow get, list: if false;
+      allow create: if signedIn() && request.resource.data.keys().hasOnly(['uid'])
+        && request.resource.data.uid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.studentId == studentId;
+      allow update, delete: if false;
+    }
+
+    match /linkAttempts/{attemptId} {
+      allow read, write: if false;
+    }
+
+    match /auditLogs/{logId} {
+      allow get, list: if isActiveAdmin();
+      allow create: if isActiveAdmin() && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
+    }
+
+    match /profiles/{userId} {
+      // الأصل: صاحب الحساب أو الإدارة. المدرس المسند يرى طلاب فصله، وولي الأمر يرى ابنه المرتبط.
+      allow get: if signedIn() && (request.auth.uid == userId || isActiveAdmin()
+        || (resource.data.role == 'student' && assignedToClass(resource.data.classId))
+        || (resource.data.role == 'student' && linkedParentTo(userId))
+        || (resource.data.role == 'teacher' && isActiveStudent()));
+      allow list: if isActiveAdmin()
+        || (resource.data.role == 'student' && assignedToClass(resource.data.classId))
+        || (resource.data.role == 'teacher' && isActiveStudent());
+      allow update: if signedIn() && request.auth.uid == userId
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.status == resource.data.status
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'phone']);
+      allow create: if signedIn() && validSelfProfile(userId, request.resource.data);
+      // اعتماد المدرس وربطه بالمواد والفصول: الإدارة فقط وعلى حسابات المدرسين فقط.
+      allow update: if isActiveAdmin()
+        && resource.data.role in ['teacher_applicant', 'teacher']
+        && request.resource.data.role in ['teacher_applicant', 'teacher']
+        && (resource.data.role == request.resource.data.role
+          || get(/databases/$(database)/documents/teacherApplications/$(userId)).data.emailVerified == true)
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+          ['role', 'status', 'subjectId', 'subjectName', 'grades', 'assignedClassIds', 'subjectIds', 'reviewedAt', 'reviewedBy']);
+      // إدارة حسابات الطلاب وأولياء الأمور: إيقاف، تعديل الاسم والهاتف، نقل فصل، تخريج. لا تغيير للدور أو البريد.
+      allow update: if isActiveAdmin()
+        && resource.data.role in ['student', 'parent']
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.status in ['active', 'disabled', 'graduated']
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+          ['status', 'displayName', 'phone', 'classId', 'className', 'grade', 'branch', 'updatedBy', 'updatedAt'])
+        && request.resource.data.get('branch', '') in ['', 'bac_med', 'bac_eng', 'bac_biz', 'bac_arts', 'science', 'math', 'literary']
+        && (resource.data.role == 'parent'
+          || ((request.resource.data.grade == '1' && request.resource.data.get('branch', '') == '')
+            || (request.resource.data.grade == '2' && request.resource.data.get('branch', '') in ['bac_med', 'bac_eng', 'bac_biz', 'bac_arts'])
+            || (request.resource.data.grade == '3' && request.resource.data.get('branch', '') in ['science', 'math', 'literary'])))
+        && (request.resource.data.get('classId', '') == resource.data.get('classId', '')
+          || (get(/databases/$(database)/documents/classes/$(request.resource.data.classId)).data.grade == request.resource.data.grade
+            && ((get(/databases/$(database)/documents/classes/$(request.resource.data.classId)).data.get('branch', '') == '' && request.resource.data.get('branch', '') == '')
+              || get(/databases/$(database)/documents/classes/$(request.resource.data.classId)).data.get('branch', '') == request.resource.data.get('branch', ''))));
+      allow delete: if false;
+    }
+
+    match /teacherApplications/{userId} {
+      allow get: if signedIn() && (request.auth.uid == userId || isActiveAdmin());
+      allow list: if isActiveAdmin();
+      allow create: if signedIn() && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['uid', 'displayName', 'subjectId', 'subjectName', 'phone', 'publishConsent', 'status', 'submittedAt', 'emailVerified'])
+        && request.resource.data.emailVerified == (request.auth.token.email_verified == true)
+        && request.resource.data.uid == userId
+        && request.resource.data.status == 'pending'
+        && request.resource.data.submittedAt == request.time
+        && request.resource.data.publishConsent is bool
+        && validPhone(request.resource.data.phone)
+        && exists(/databases/$(database)/documents/subjects/$(request.resource.data.subjectId))
+        && getAfter(/databases/$(database)/documents/profiles/$(userId)).data.role == 'teacher_applicant';
+      // المدرس يثبت توثيق بريده بنفسه (الرمز يثبت ذلك، لا الواجهة).
+      allow update: if signedIn() && request.auth.uid == userId
+        && request.auth.token.email_verified == true
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['emailVerified'])
+        && request.resource.data.emailVerified == true;
+      allow update: if isActiveAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt', 'rejectionReason'])
+        && request.resource.data.status in ['approved', 'rejected'];
+      allow delete: if false;
+    }
+
+    match /publicTeachers/{teacherId} {
+      allow get, list: if resource.data.published == true;
+      allow create, update: if isActiveAdmin()
+        && request.resource.data.keys().hasOnly(['displayName', 'subjectId', 'subjectName', 'published', 'approvedAt']);
+      allow delete: if isActiveAdmin();
+    }
+
+    // الأدمن الأول يُنشأ يدويًا من Firebase Console. بعده الأدمن النشط فقط يدعو أدمن جديدًا بالبريد.
+    match /admins/{adminId} {
+      allow get, list: if isActiveAdmin();
+      // قبول دعوة: بريد موثق يطابق دعوة غير مستخدمة أنشأها أدمن، وتُعلَّم الدعوة مستخدمة في نفس الدفعة.
+      allow create: if signedIn() && adminId == request.auth.uid
+        && request.auth.token.email_verified == true
+        && exists(/databases/$(database)/documents/adminInvites/$(request.auth.token.email))
+        && get(/databases/$(database)/documents/adminInvites/$(request.auth.token.email)).data.claimed == false
+        && getAfter(/databases/$(database)/documents/adminInvites/$(request.auth.token.email)).data.claimedBy == request.auth.uid
+        && request.resource.data.keys().hasOnly(['active', 'email', 'displayName', 'createdBy', 'createdAt'])
+        && request.resource.data.active == true
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.displayName is string && request.resource.data.displayName.size() <= 80
+        && request.resource.data.createdBy == get(/databases/$(database)/documents/adminInvites/$(request.auth.token.email)).data.createdBy
+        && request.resource.data.createdAt == request.time;
+      // إيقاف أو تفعيل أدمن آخر (لا يوقف نفسه).
+      allow update: if isActiveAdmin() && adminId != request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active']);
+      allow delete: if false;
+    }
+
+    match /adminInvites/{inviteEmail} {
+      allow list: if isActiveAdmin();
+      allow get: if isActiveAdmin()
+        || (signedIn() && request.auth.token.email_verified == true && request.auth.token.email == inviteEmail);
+      allow create: if isActiveAdmin()
+        && request.resource.data.keys().hasOnly(['email', 'createdBy', 'createdAt', 'claimed'])
+        && request.resource.data.email == inviteEmail && inviteEmail == inviteEmail.lower()
+        && inviteEmail.matches('^[^@ ]+@[^@ ]+\\.[^@ ]+$')
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.claimed == false
+        && request.resource.data.createdAt == request.time;
+      allow update: if signedIn() && request.auth.token.email_verified == true && request.auth.token.email == inviteEmail
+        && resource.data.claimed == false
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['claimed', 'claimedBy', 'claimedAt'])
+        && request.resource.data.claimed == true && request.resource.data.claimedBy == request.auth.uid
+        && request.resource.data.claimedAt == request.time
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid)) == false;
+      allow delete: if isActiveAdmin() && resource.data.claimed == false;
+    }
+
+    match /parentCodes/{code} {
+      // قراءة كود واحد بمعرّفه فقط (لا قائمة) لولي الأمر النشط والطالب صاحب الكود.
+      allow get: if isActiveParent() || (signedIn() && resource.data.studentUid == request.auth.uid);
+      allow list: if false;
+      allow create: if isActiveStudent()
+        && code.matches('^TNG-[A-Z0-9]{8,12}$')
+        && request.resource.data.keys().hasOnly(['studentUid', 'studentId', 'active', 'createdAt', 'expiresAt'])
+        && request.resource.data.studentUid == request.auth.uid
+        && request.resource.data.studentId == profile(request.auth.uid).studentId
+        && request.resource.data.active == true
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.expiresAt <= request.time + duration.value(30, 'm'); // هامش لفرق ساعة الجهاز
+      // الطالب يلغي كوده، والولي يستهلكه مرة واحدة مع إنشاء الربط في نفس الدفعة.
+      allow update: if (resource.data.studentUid == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active'])
+          && request.resource.data.active == false)
+        || (isActiveParent() && resource.data.active == true
+          && resource.data.expiresAt > request.time
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active', 'usedBy', 'usedAt'])
+          && request.resource.data.active == false
+          && request.resource.data.usedBy == request.auth.uid
+          && request.resource.data.usedAt == request.time
+          && getAfter(/databases/$(database)/documents/parentLinks/$(request.auth.uid + '_' + resource.data.studentUid)).data.code == code);
+      allow delete: if resource.data.studentUid == request.auth.uid;
+    }
+
+    match /parentLinks/{linkId} {
+      allow get: if signedIn()
+        && (resource.data.parentUid == request.auth.uid || resource.data.studentUid == request.auth.uid || isActiveAdmin());
+      allow list: if signedIn() && (resource.data.parentUid == request.auth.uid || resource.data.studentUid == request.auth.uid || isActiveAdmin());
+      allow create: if signedIn() && validCodeLink(request.resource.data, linkId);
+      // فك الربط: الولي أو الطالب أو الإدارة. إعادة الربط بكود جديد تمر عبر نفس شروط الإنشاء.
+      allow update: if signedIn()
+        && ((resource.data.parentUid == request.auth.uid || resource.data.studentUid == request.auth.uid || isActiveAdmin())
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active', 'status', 'revokedAt', 'revokedBy'])
+          && request.resource.data.active == false)
+        || (resource.data.active == false && validCodeLink(request.resource.data, linkId));
+      allow delete: if false;
+    }
+
+    // صور الدروس: JPEG مصغّر (حتى 700 كيلو) داخل Firestore، مرئي لفصل الطالب فقط.
+    match /images/{imageId} {
+      allow get, list: if signedIn() && (
+        isActiveAdmin()
+        || (isActiveTeacher() && resource.data.teacherUid == request.auth.uid)
+        || (isActiveStudent() && resource.data.classId == profile(request.auth.uid).classId)
+      );
+      allow create: if isActiveTeacher()
+        && request.resource.data.keys().hasOnly(['teacherUid', 'grade', 'classId', 'subjectId', 'title', 'data', 'createdAt'])
+        && request.resource.data.teacherUid == request.auth.uid
+        && request.resource.data.grade in ['1', '2', '3']
+        && assignedTo(request.resource.data.subjectId, request.resource.data.classId)
+        && get(/databases/$(database)/documents/classes/$(request.resource.data.classId)).data.grade == request.resource.data.grade
+        && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 120
+        && request.resource.data.data is string
+        && request.resource.data.data.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$')
+        && request.resource.data.data.size() <= 960000
+        && request.resource.data.createdAt == request.time;
+      allow update: if false;
+      allow delete: if isActiveTeacher() && resource.data.teacherUid == request.auth.uid;
+    }
+
+    // امتحانات وواجبات الفصل: المدرس المسند ينشر، وطلاب الفصل يقرؤون.
+    match /tasks/{taskId} {
+      allow get, list: if signedIn() && (
+        isActiveAdmin()
+        || (isActiveTeacher() && resource.data.teacherUid == request.auth.uid)
+        || (isActiveStudent() && resource.data.classId == profile(request.auth.uid).classId)
+        || parentSeesClass(resource.data.classId)
+      );
+      allow create: if isActiveTeacher()
+        && request.resource.data.keys().hasOnly(['teacherUid', 'grade', 'classId', 'subjectId', 'subjectName', 'kind', 'title', 'dueDate', 'note', 'createdAt'])
+        && request.resource.data.teacherUid == request.auth.uid
+        && request.resource.data.grade in ['1', '2', '3']
+        && assignedTo(request.resource.data.subjectId, request.resource.data.classId)
+        && get(/databases/$(database)/documents/classes/$(request.resource.data.classId)).data.grade == request.resource.data.grade
+        && request.resource.data.kind in ['exam', 'assignment']
+        && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 120
+        && request.resource.data.subjectName is string && request.resource.data.subjectName.size() <= 60
+        && request.resource.data.dueDate is string && request.resource.data.dueDate.matches('^20[0-9]{2}-[0-1][0-9]-[0-3][0-9]$')
+        && request.resource.data.note is string && request.resource.data.note.size() <= 500
+        && request.resource.data.createdAt == request.time;
+      allow update: if false;
+      allow delete: if isActiveTeacher() && resource.data.teacherUid == request.auth.uid;
+    }
+
+    // جدول الحصص: الإدارة تكتبه، وطلاب الفصل يقرؤونه.
+    match /timetables/{classId} {
+      allow get: if signedIn() && (isActiveAdmin() || (isActiveStudent() && profile(request.auth.uid).classId == classId) || (isActiveTeacher() && assignedToClass(classId)) || parentSeesClass(classId));
+      allow list: if false;
+      allow create, update: if isActiveAdmin()
+        && request.resource.data.keys().hasOnly(['classId', 'grade', 'cells', 'updatedAt'])
+        && request.resource.data.classId == classId
+        && exists(/databases/$(database)/documents/classes/$(classId))
+        && request.resource.data.grade == get(/databases/$(database)/documents/classes/$(classId)).data.grade
+        && request.resource.data.cells is map && request.resource.data.cells.size() <= 48
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+
+    // أخطاء المتصفح: أي مستخدم مسجل يكتب خطأً واحدًا بشكل ثابت، والإدارة فقط تقرأ.
+    match /clientErrors/{errorId} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['uid', 'message', 'source', 'route', 'agent', 'at'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.message is string && request.resource.data.message.size() <= 300
+        && request.resource.data.source is string && request.resource.data.source.size() <= 120
+        && request.resource.data.route is string && request.resource.data.route.size() <= 120
+        && request.resource.data.agent is string && request.resource.data.agent.size() <= 150
+        && request.resource.data.at == request.time;
+      allow get, list: if isActiveAdmin();
+      allow update, delete: if false;
+    }
+
+    // رسائل نموذج التواصل: يكتبها أي زائر (بدون حساب) بشكل ثابت، والإدارة فقط تقرأ وتعلّمها مقروءة أو تحذفها.
+    match /contactMessages/{messageId} {
+      allow create: if request.resource.data.keys().hasOnly(['name', 'email', 'message', 'read', 'createdAt'])
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 60
+        && request.resource.data.email is string && request.resource.data.email.size() <= 120
+        && request.resource.data.message is string && request.resource.data.message.size() > 0 && request.resource.data.message.size() <= 800
+        && request.resource.data.read == false
+        && request.resource.data.createdAt == request.time;
+      allow get, list: if isActiveAdmin();
+      allow update: if isActiveAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
+        && request.resource.data.read is bool;
+      allow delete: if isActiveAdmin();
+    }
+
+    match /content/{contentId} {
+      allow get, list: if signedIn() && (
+        isActiveAdmin()
+        || ownsTeacherRecord(resource.data)
+        || (isActiveStudent() && resource.data.published == true
+          && resource.data.classId == profile(request.auth.uid).classId)
+      );
+      allow create: if ownsTeacherRecord(request.resource.data)
+        && request.resource.data.teacherUid == request.auth.uid
+        && teachesGrade(request.resource.data.grade)
+        && validContent(request.resource.data);
+      allow update: if ownsTeacherRecord(resource.data)
+        && resource.data.teacherUid == request.resource.data.teacherUid
+        && resource.data.grade == request.resource.data.grade
+        && resource.data.classId == request.resource.data.classId
+        && resource.data.subjectId == request.resource.data.subjectId
+        && resource.data.createdAt == request.resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['type', 'title', 'url'])
+        && teachesGrade(request.resource.data.grade)
+        && validContent(request.resource.data);
+      allow delete: if ownsTeacherRecord(resource.data)
+        && teachesGrade(resource.data.grade);
+    }
+
+    // لا تُتاح مستندات الامتحان للطالب قبل تصميم فصل آمن بين الأسئلة ومفتاح الإجابة.
+    match /exams/{examId} {
+      allow get, list: if signedIn() && (isActiveAdmin() || ownsTeacherRecord(resource.data));
+      allow create: if ownsTeacherRecord(request.resource.data)
+        && request.resource.data.teacherUid == request.auth.uid
+        && teachesGrade(request.resource.data.grade)
+        && teachesSubject(request.resource.data.subjectId);
+      allow update: if isActiveAdmin() || (ownsTeacherRecord(resource.data)
+        && resource.data.teacherUid == request.resource.data.teacherUid
+        && resource.data.grade == request.resource.data.grade
+        && resource.data.subjectId == request.resource.data.subjectId
+        && teachesGrade(request.resource.data.grade)
+        && teachesSubject(request.resource.data.subjectId));
+      allow delete: if isActiveAdmin() || (ownsTeacherRecord(resource.data)
+        && teachesGrade(resource.data.grade));
+    }
+
+    match /submissions/{submissionId} {
+      allow get: if signedIn() && (
+        isActiveAdmin() || resource.data.studentUid == request.auth.uid
+        || ownsExamSubmission(resource.data)
+        || (isActiveParent() && resource.data.studentUid is string
+          && linkedParentTo(resource.data.studentUid))
+      );
+      allow list: if isActiveAdmin()
+        || (isActiveStudent() && resource.data.studentUid == request.auth.uid)
+        || ownsExamSubmission(resource.data)
+        || (isActiveParent() && resource.data.studentUid is string
+          && linkedParentTo(resource.data.studentUid));
+      allow create: if isActiveStudent()
+        && request.resource.data.studentUid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['studentUid', 'examId', 'answers', 'submittedAt'])
+        && request.resource.data.keys().hasAll(['studentUid', 'examId', 'answers', 'submittedAt'])
+        && request.resource.data.examId is string
+        && submissionId == request.auth.uid + '_' + request.resource.data.examId
+        && exists(/databases/$(database)/documents/exams/$(request.resource.data.examId))
+        && get(/databases/$(database)/documents/exams/$(request.resource.data.examId)).data.grade == profile(request.auth.uid).grade
+        && request.resource.data.submittedAt == request.time;
+      allow update: if isActiveAdmin() || (ownsExamSubmission(resource.data)
+        && resource.data.studentUid == request.resource.data.studentUid
+        && resource.data.examId == request.resource.data.examId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['score', 'reviewedAt', 'reviewedBy']));
+      allow delete: if false;
+    }
+
+    match /grades/{gradeId} {
+      allow get, list: if signedIn() && (
+        isActiveAdmin() || resource.data.studentUid == request.auth.uid
+        || ownsTeacherRecord(resource.data)
+        || (isActiveParent() && resource.data.studentUid is string
+          && linkedParentTo(resource.data.studentUid))
+      );
+      allow create: if isActiveAdmin() || (ownsTeacherRecord(request.resource.data)
+        && request.resource.data.teacherUid == request.auth.uid
+        && teachesGrade(request.resource.data.grade)
+        && assignedTo(request.resource.data.subjectId, request.resource.data.classId)
+        && studentInClass(request.resource.data.studentUid, request.resource.data.classId)
+        && studentInGrade(request.resource.data.studentUid, request.resource.data.grade));
+      allow update: if isActiveAdmin() || (ownsTeacherRecord(resource.data)
+        && resource.data.teacherUid == request.resource.data.teacherUid
+        && resource.data.studentUid == request.resource.data.studentUid
+        && resource.data.grade == request.resource.data.grade
+        && resource.data.classId == request.resource.data.classId
+        && resource.data.subjectId == request.resource.data.subjectId
+        && assignedTo(resource.data.subjectId, resource.data.classId)
+        && teachesGrade(request.resource.data.grade)
+        && studentInClass(request.resource.data.studentUid, request.resource.data.classId));
+      allow delete: if isActiveAdmin();
+    }
+
+    match /attendance/{attendanceId} {
+      allow get, list: if signedIn() && (
+        isActiveAdmin() || resource.data.studentUid == request.auth.uid
+        || ownsTeacherRecord(resource.data)
+        || (isActiveParent() && resource.data.studentUid is string
+          && linkedParentTo(resource.data.studentUid))
+      );
+      allow create: if isActiveAdmin() || (ownsTeacherRecord(request.resource.data)
+        && request.resource.data.teacherUid == request.auth.uid
+        && teachesGrade(request.resource.data.grade)
+        && assignedToClass(request.resource.data.classId)
+        && studentInClass(request.resource.data.studentUid, request.resource.data.classId)
+        && studentInGrade(request.resource.data.studentUid, request.resource.data.grade));
+      allow update: if isActiveAdmin() || (ownsTeacherRecord(resource.data)
+        && resource.data.teacherUid == request.resource.data.teacherUid
+        && resource.data.studentUid == request.resource.data.studentUid
+        && resource.data.grade == request.resource.data.grade
+        && resource.data.classId == request.resource.data.classId
+        && assignedToClass(resource.data.classId)
+        && teachesGrade(request.resource.data.grade)
+        && studentInClass(request.resource.data.studentUid, request.resource.data.classId));
+      allow delete: if isActiveAdmin();
+    }
+
+    match /schedules/{scheduleId} {
+      allow get, list: if signedIn();
+      allow create, update, delete: if isActiveAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow get, list: if signedIn() && (
+        isActiveAdmin() || resource.data.audience == 'all'
+        || resource.data.uid == request.auth.uid
+        || (isActiveStudent() && resource.data.audience == 'grade'
+          && resource.data.grade == profile(request.auth.uid).grade
+          && (!('studentUid' in resource.data) || resource.data.studentUid == request.auth.uid))
+        || (isActiveParent() && resource.data.audience == 'grade'
+          && resource.data.studentUid is string && linkedParentTo(resource.data.studentUid)
+          && resource.data.grade == profile(resource.data.studentUid).grade)
+      );
+      allow create: if isActiveAdmin() || (isActiveTeacher()
+        && validTeacherNotification(request.resource.data));
+      allow update: if isActiveAdmin() || (ownsTeacherRecord(resource.data)
+        && resource.data.teacherUid == request.resource.data.teacherUid
+        && resource.data.audience == request.resource.data.audience
+        && resource.data.grade == request.resource.data.grade
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'body', 'updatedAt'])
+        && request.resource.data.audience == 'grade'
+        && teachesGrade(request.resource.data.grade)
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 120
+        && request.resource.data.body is string
+        && request.resource.data.body.size() <= 2000);
+      allow delete: if isActiveAdmin() || (ownsTeacherRecord(resource.data)
+        && resource.data.audience == 'grade' && teachesGrade(resource.data.grade));
+    }
+
+    match /messages/{messageId} {
+      allow get, list: if signedIn() && (
+        isActiveAdmin() || resource.data.fromUid == request.auth.uid
+        || resource.data.toUid == request.auth.uid
+        || (isActiveParent() && resource.data.studentUid is string
+          && linkedParentTo(resource.data.studentUid))
+      );
+      // مجموعة قديمة غير مستخدمة في التطبيق: كانت تسمح بإنشاء أي مستند بلا تحقق. أُغلق الإنشاء.
+      allow create: if false;
+      allow update, delete: if isActiveAdmin() || resource.data.fromUid == request.auth.uid;
+    }
+
+    // صندوق إشعارات المستخدم: تنشئه الوظائف فقط، ويقرأه ويعلّمه صاحبه فقط.
+    match /userNotifications/{notificationId} {
+      allow get, list: if signedIn() && resource.data.uid == request.auth.uid;
+      allow update: if signedIn() && resource.data.uid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+      allow create: if false;
+    }
+
+    // أجهزة الإشعارات اللحظية وتفضيلات كل مستخدم.
+    match /pushDevices/{deviceId} {
+      allow get, list: if signedIn() && resource.data.uid == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid', 'token', 'createdAt'])
+        && request.resource.data.token is string && request.resource.data.token.size() < 400;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+      allow update: if false;
+    }
+
+    // آخر مرة فتح فيها المستخدم الجرس (وضع Spark: الإشعارات مشتقة من البيانات نفسها).
+    // ولي الأمر يرى مهام وجدول فصل ابنه المرتبط (والربط ساري وفصل الابن الحالي يطابق).
+    function parentSeesClass(classId) {
+      return isActiveParent()
+        && exists(/databases/$(database)/documents/parentClassAccess/$(request.auth.uid + '_' + classId))
+        && linkedParentTo(get(/databases/$(database)/documents/parentClassAccess/$(request.auth.uid + '_' + classId)).data.studentUid)
+        && profile(get(/databases/$(database)/documents/parentClassAccess/$(request.auth.uid + '_' + classId)).data.studentUid).classId == classId;
+    }
+
+    match /parentClassAccess/{accessId} {
+      allow get: if signedIn() && accessId.matches('^' + request.auth.uid + '_.*');
+      allow create, update: if isActiveParent()
+        && request.resource.data.keys().hasOnly(['parentUid', 'classId', 'studentUid'])
+        && request.resource.data.parentUid == request.auth.uid
+        && accessId == request.auth.uid + '_' + request.resource.data.classId
+        && linkedParentTo(request.resource.data.studentUid)
+        && profile(request.resource.data.studentUid).classId == request.resource.data.classId;
+      allow list, delete: if false;
+    }
+
+    // محادثات الطالب والمدرس (بدون مراقبة إدارية بقرار صاحب المنصة). المعرّف: studentUid_teacherUid
+    function chatParty(cid) {
+      return signedIn() && (cid.split('_')[0] == request.auth.uid || cid.split('_')[1] == request.auth.uid);
+    }
+    function chatRateOk(cid) {
+      return !exists(/databases/$(database)/documents/conversations/$(cid))
+        || get(/databases/$(database)/documents/conversations/$(cid)).data.lastAt < request.time - duration.value(2, 's');
+    }
+    function validChatText(data) {
+      return data.keys().hasOnly(['senderUid', 'text', 'createdAt'])
+        && data.text is string && data.text.size() >= 1 && data.text.size() <= 1000
+        && data.createdAt == request.time;
+    }
+
+    match /conversations/{cid} {
+      allow get: if chatParty(cid);
+      allow list: if signedIn()
+        && (resource.data.studentUid == request.auth.uid || resource.data.teacherUid == request.auth.uid);
+      allow create: if signedIn() && isActiveStudent()
+        && cid == request.auth.uid + '_' + request.resource.data.teacherUid
+        && request.resource.data.keys().hasOnly(['studentUid', 'teacherUid', 'studentName', 'teacherName', 'lastAt', 'lastText', 'lastBy'])
+        && request.resource.data.studentUid == request.auth.uid
+        && request.resource.data.lastBy == request.auth.uid
+        && request.resource.data.lastAt == request.time
+        && request.resource.data.lastText is string && request.resource.data.lastText.size() <= 80
+        && profile(request.resource.data.teacherUid).role == 'teacher'
+        && profile(request.resource.data.teacherUid).status == 'active';
+      allow update: if chatParty(cid) && chatRateOk(cid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastAt', 'lastText', 'lastBy'])
+        && request.resource.data.lastBy == request.auth.uid
+        && request.resource.data.lastAt == request.time
+        && request.resource.data.lastText is string && request.resource.data.lastText.size() <= 80;
+      // إيصال القراءة: كل طرف يكتب وقت قراءته هو فقط (studentReadAt للطالب، teacherReadAt للمدرس).
+      allow update: if signedIn()
+        && ((resource.data.studentUid == request.auth.uid
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['studentReadAt'])
+              && request.resource.data.studentReadAt == request.time)
+          || (resource.data.teacherUid == request.auth.uid
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['teacherReadAt'])
+              && request.resource.data.teacherReadAt == request.time));
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow get, list: if chatParty(cid);
+        allow create: if chatParty(cid) && validChatText(request.resource.data)
+          && request.resource.data.senderUid == request.auth.uid
+          && getAfter(/databases/$(database)/documents/conversations/$(cid)).data.lastAt == request.time;
+        allow update, delete: if false;
+      }
+    }
+
+    // محادثات ولي الأمر والمدرس: يبدأها ولي الأمر مع مدرس مُسنَد لفصل ابنه المرتبط فقط. المعرّف: parentUid_teacherUid
+    function pcParty(cid) {
+      return signedIn() && (cid.split('_')[0] == request.auth.uid || cid.split('_')[1] == request.auth.uid);
+    }
+    function pcRateOk(cid) {
+      return get(/databases/$(database)/documents/parentConversations/$(cid)).data.lastAt < request.time - duration.value(2, 's');
+    }
+
+    match /parentConversations/{cid} {
+      allow get: if pcParty(cid);
+      allow list: if signedIn()
+        && (resource.data.parentUid == request.auth.uid || resource.data.teacherUid == request.auth.uid);
+      allow create: if isActiveParent()
+        && cid == request.auth.uid + '_' + request.resource.data.teacherUid
+        && request.resource.data.keys().hasOnly(['parentUid', 'teacherUid', 'parentName', 'teacherName', 'studentName', 'classId', 'subjectId', 'lastAt', 'lastText', 'lastBy'])
+        && request.resource.data.parentUid == request.auth.uid
+        && request.resource.data.lastBy == request.auth.uid
+        && request.resource.data.lastAt == request.time
+        && request.resource.data.lastText is string && request.resource.data.lastText.size() <= 80
+        && request.resource.data.parentName is string && request.resource.data.parentName.size() <= 80
+        && request.resource.data.teacherName is string && request.resource.data.teacherName.size() <= 80
+        && request.resource.data.studentName is string && request.resource.data.studentName.size() <= 80
+        && parentSeesClass(request.resource.data.classId)
+        && exists(/databases/$(database)/documents/teacherAssignments/$(request.resource.data.teacherUid + '_' + request.resource.data.subjectId + '_' + request.resource.data.classId))
+        && profile(request.resource.data.teacherUid).status == 'active';
+      allow update: if pcParty(cid) && pcRateOk(cid)
+        && (resource.data.teacherUid == request.auth.uid ? isActiveTeacher() : parentSeesClass(resource.data.classId))
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastAt', 'lastText', 'lastBy'])
+        && request.resource.data.lastBy == request.auth.uid
+        && request.resource.data.lastAt == request.time
+        && request.resource.data.lastText is string && request.resource.data.lastText.size() <= 80;
+      allow update: if signedIn()
+        && ((resource.data.parentUid == request.auth.uid
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['parentReadAt'])
+              && request.resource.data.parentReadAt == request.time)
+          || (resource.data.teacherUid == request.auth.uid
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['teacherReadAt'])
+              && request.resource.data.teacherReadAt == request.time));
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow get, list: if pcParty(cid);
+        allow create: if pcParty(cid) && validChatText(request.resource.data)
+          && request.resource.data.senderUid == request.auth.uid
+          && getAfter(/databases/$(database)/documents/parentConversations/$(cid)).data.lastAt == request.time;
+        allow update, delete: if false;
+      }
+    }
+
+    match /notificationState/{userId} {
+      allow get: if signedIn() && request.auth.uid == userId;
+      allow create, update: if signedIn() && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['lastSeen'])
+        && request.resource.data.lastSeen is timestamp;
+      allow list, delete: if false;
+    }
+
+    match /notificationPrefs/{userId} {
+      allow get: if signedIn() && request.auth.uid == userId;
+      allow create, update: if signedIn() && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['content', 'grade', 'attendance', 'chat'])
+        && request.resource.data.content is bool && request.resource.data.grade is bool
+        && request.resource.data.attendance is bool && request.resource.data.chat is bool;
+      allow list, delete: if false;
+    }
+
+    // لا توجد سماحات افتراضية لأي مجموعة أخرى.
+  }
+}
