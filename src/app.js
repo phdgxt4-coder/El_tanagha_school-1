@@ -275,7 +275,7 @@ function initializeAuthPage(generation){
 
 function safeTimestamp(value){
   if(!value)return 'وقت الإرسال غير متاح';
-  try{return new Intl.DateTimeFormat('ar-EG',{dateStyle:'medium',timeStyle:'short'}).format(new Date(value));}
+  try{return new Intl.DateTimeFormat('ar-EG',{dateStyle:'medium',timeStyle:'short',timeZone:'Africa/Cairo'}).format(new Date(value));}
   catch{return 'وقت الإرسال غير متاح';}
 }
 

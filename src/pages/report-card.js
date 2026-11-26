@@ -50,7 +50,7 @@ export async function openReportCard(database, student) {
   overlay.id = 'report-overlay';
   overlay.className = 'report-overlay';
   overlay.setAttribute('role', 'dialog'); overlay.setAttribute('aria-modal', 'true'); overlay.setAttribute('aria-label', 'شهادة الدرجات');
-  overlay.innerHTML = `<div class="rc-bar"><button class="button" type="button" data-rc-print>طباعة / حفظ PDF</button><button class="button ghost" type="button" data-rc-close>إغلاق</button></div>${reportHtml(student, report, new Date().toLocaleDateString('ar-EG'))}`;
+  overlay.innerHTML = `<div class="rc-bar"><button class="button" type="button" data-rc-print>طباعة / حفظ PDF</button><button class="button ghost" type="button" data-rc-close>إغلاق</button></div>${reportHtml(student, report, new Date().toLocaleDateString('ar-EG', { timeZone: 'Africa/Cairo' }))}`;
   document.body.append(overlay);
   document.body.classList.add('rc-open');
   const close = () => { overlay.remove(); document.body.classList.remove('rc-open'); };
