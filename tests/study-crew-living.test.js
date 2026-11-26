@@ -42,9 +42,9 @@ test('quality tiers and guard only downgrades',()=>{
   const g=createGuard({tier:2});for(let i=0;i<8;i++)g.frame(80);assert.equal(g.tier(),1);for(let i=0;i<100;i++)g.frame(5);assert.equal(g.tier(),1);
 });
 test('low quality caps tier at glow',()=>{assert.equal(D('browsing',{quality:()=>0})('score',{score:100}).tier,'glow');});
-test('feature flag is OFF by default and the app only lazy-imports behind it',async()=>{
+test('feature flag is ON by default and the app only lazy-imports behind it',async()=>{
   const {FEATURES,livingEnabled}=await import('../src/config/features.js');
-  assert.equal(FEATURES.living,false);assert.equal(livingEnabled(),false);
+  assert.equal(FEATURES.living,true);assert.equal(livingEnabled(),true);
   assert.ok(!/studycrew|Living/.test(readFileSync(new URL('../index.html',import.meta.url),'utf8')));
 });
 test('exam CSS rule silences motion and crew; wire.js hides on exam',()=>{
