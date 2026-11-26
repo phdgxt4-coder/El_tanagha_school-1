@@ -51,3 +51,5 @@ Rerun the 26 scenarios + image upload + chat + unauthorized attempts with the FI
 ## 06:45 RUNBOOK.md + docs/guides/* written. Left: CHANGELOG.md, RELEASE_NOTES update, FINAL_REPORT.md, issue.
 
 ## 06:45 MERGE cairo-dates -> main 499ddf0 (Africa/Cairo in 3 date formatters, test in 3 time zones). Deploy success, bundle main-Dlf1aHrd.js, 32/32 live checks clean.
+
+## 07:00 CHANGELOG.md written (update if more merges). All public form fields measured >=16px on live. Left: RELEASE_NOTES update, FINAL_REPORT, issue, final rerun.
