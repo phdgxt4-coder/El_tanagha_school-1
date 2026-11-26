@@ -39,3 +39,5 @@ Rerun the 26 scenarios + image upload + chat + unauthorized attempts with the FI
 ## 05:16 MERGE link checker (scripts only) -> main b9eb8fa. Item 17 done. Finding for HANDOFF: nested static entry pages (copies of index.html) carry ./ nav links that are wrong until app.js rewrites them (390 links on 29 pages): affects no-JS visitors and crawlers only. Fix idea: make create-static-routes rewrite ./ to the correct depth (not done, build script).
 
 ## 05:41 MERGE load-states -> main 7bfefeb: list pager 15s timeout + retry button + "service unavailable" message on permission-denied/failed-precondition (items 7.1/7.2 for lists). Deploy success, bundle main-DGUWwf7r.js, 32 live route checks clean, 4-role browser traversal 0 errors. Not covered: non-list screens still use their own error text.
+
+## 06:00 Phase 7 (characters): documented only (docs/CHARACTERS.md). Oscar already has a first version (5 expressions) on main, so no PR. Phase 1: #54 is closed (policy test is on main).
