@@ -1,7 +1,6 @@
 // قارئ بسيط لملفات Excel (.xlsx) بدون مكتبات خارجية: يقرأ أول ورقة فقط ويرجع الصفوف كنصوص.
 // يستخدم DecompressionStream المتاح في المتصفحات الحديثة. لا يدعم الصيغ المعقدة ولا الملفات المشفرة.
 const decoder = new TextDecoder('utf-8');
-const MAX_BYTES = 2_000_000;
 
 async function inflateRaw(bytes) {
   const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
@@ -63,7 +62,6 @@ export const MAX_ROWS = 2000;
 
 export async function readXlsxRows(buffer) {
   if (buffer.byteLength > MAX_XLSX_BYTES) throw new Error('الملف أكبر من 5 ميجا. قسّمه إلى ملفات أصغر.');
-  if (buffer.byteLength > MAX_BYTES) throw new Error('الملف كبير. الحد 2 ميجابايت.');
   const zip = readZipEntries(buffer);
   const shared = await readEntry(buffer, zip, 'xl/sharedStrings.xml');
   const strings = shared ? [...shared.matchAll(/<si[^>]*>([\s\S]*?)<\/si>/gu)].map(match => textOf(match[1])) : [];
