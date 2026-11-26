@@ -43,3 +43,5 @@ Rerun the 26 scenarios + image upload + chat + unauthorized attempts with the FI
 ## 06:00 Phase 7 (characters): documented only (docs/CHARACTERS.md). Oscar already has a first version (5 expressions) on main, so no PR. Phase 1: #54 is closed (policy test is on main).
 
 ## 06:28 MERGE touch-targets CSS -> main 9c3dcc5 (bell 28x44 -> 44, chips 36 -> 44, text buttons 32-34 -> 44). Measured 30 dashboard panels (student/teacher/admin) at 390: none under 40px after; 0 JS errors. Parent dashboard targets not measured. Deploy success; live check ran 24 of 32 route-width checks before the tool timeout, all clean (remaining 8 not re-run).
+
+## 06:41 HANDOFF.md written (deploy order first). Still to write: RUNBOOK.md, docs/guides/*, CHANGELOG.md, RELEASE_NOTES update, FINAL_REPORT.md, GitHub issue. HANDOFF scenario table must be refreshed after the final rerun.
