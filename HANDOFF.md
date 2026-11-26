@@ -38,6 +38,7 @@
 ## 2. نتائج السيناريوهات (آخر تشغيل، كود main الحالي)
 تفاصيل الطريقة والثغرات: `docs/SCENARIOS.md`. الجدول: القواعد الجديدة = `firestore.rules` في الريبو، القديمة = commit c0c0ebf.
 
+<!--SC-->
 | # | Step | NEW rules | OLD rules |
 |---|---|---|---|
 | 1 | admin doc created per ADMIN_BOOTSTRAP steps (console-style write) | PASS | PASS |
@@ -76,8 +77,15 @@
 | 34 | chat: teacher replies (after the 2s rate limit) | PASS | PASS |
 | 35 | chat: teacher lists own conversations | PASS | PASS |
 | 36 | teacher cannot self-assign / approve (negative) | PASS | PASS |
+| 37 | image: teacher resizes a real picture and publishes it | PASS | PASS |
+| 38 | image: teacher cannot publish a non-jpeg payload (negative) | PASS | PASS |
+| 39 | image: student of the class sees it | PASS | PASS |
+| 40 | image: student cannot publish an image (negative) | PASS | PASS |
 
-الثغرات بصراحة: رفع الصور لم يُختبر (لا يوجد Storage ولا مسار رفع في الريبو)، وشات ولي الأمر والمدرس مغطى باختبارات القواعد فقط. هذا إيميوليتر وليس Firebase الحقيقي: وصول الإيميل والفهارس الفعلية والحصص لم تُختبر.
+Result: NEW 40/40 pass, OLD 40/40 pass.
+<!--/SC-->
+
+الثغرات بصراحة: شات ولي الأمر والمدرس مغطى باختبارات القواعد فقط وليس بهذا السكربت. رفع الصور يتم كـ JPEG مصغّر داخل Firestore (لا يوجد Storage) واتجرّب هنا: صورة 2000x1200 اتصغّرت لحوالي 94KB ونُشرت، ورفض نوع غير JPEG ورفض رفع الطالب. هذا إيميوليتر وليس Firebase الحقيقي: وصول الإيميل والفهارس الفعلية والحصص لم تُختبر.
 
 ## 3. PRs مفتوحة (لم تُدمج لأنها تلمس مناطق حساسة حسب الـ brief)
 | PR | الموضوع | ليه مفتوح | قبل الدمج |

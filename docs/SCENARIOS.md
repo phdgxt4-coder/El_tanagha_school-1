@@ -1,9 +1,9 @@
-# Scenario results (final code at main 57cd01d)
+# Scenario results (code at main 57cd01d+)
 
-Run 26 Nov 2026 04:55 on the Firebase emulators with the current client code (a real Chrome page calling the app's own functions).
+Run 26 Nov 2026 06:40 on the Firebase emulators with the client code of that commit (a real Chrome page calling the app's own functions).
 - NEW = `firestore.rules` in the repo (the proposed rules).
 - OLD = rules at commit c0c0ebf (about what was deployed on 25 Nov evening).
-Script: `scripts/e2e/scenarios.mjs` (README next to it). 36 steps: registration (student, parent, teacher), verification, parent code and link, admin classes/subjects/approval/assignment/import/invite, teacher reads, chat (student to teacher, teacher reply), and negative (unauthorized) attempts.
+Script: `scripts/e2e/scenarios.mjs` (README next to it). Steps: registration (student, parent, teacher), verification, parent code and link, admin classes/subjects/approval/assignment/import/invite, teacher reads, chat (student to teacher and reply), image resize and publish, and negative (unauthorized) attempts.
 
 | # | Step | NEW rules | OLD rules |
 |---|---|---|---|
@@ -43,14 +43,17 @@ Script: `scripts/e2e/scenarios.mjs` (README next to it). 36 steps: registration 
 | 34 | chat: teacher replies (after the 2s rate limit) | PASS | PASS |
 | 35 | chat: teacher lists own conversations | PASS | PASS |
 | 36 | teacher cannot self-assign / approve (negative) | PASS | PASS |
+| 37 | image: teacher resizes a real picture and publishes it | PASS | PASS |
+| 38 | image: teacher cannot publish a non-jpeg payload (negative) | PASS | PASS |
+| 39 | image: student of the class sees it | PASS | PASS |
+| 40 | image: student cannot publish an image (negative) | PASS | PASS |
 
-Result: NEW 36/36 pass, OLD 36/36 pass, no failures.
+Result: NEW 40/40 pass, OLD 40/40 pass.
 
 Notes and gaps (honest):
-- The chat reply needs a pause of more than 2 seconds after the previous message: that is the rules' rate limit (chatRateOk), not a bug. The first run without the pause was refused by the rules in both versions.
-- An earlier harness version reported two failures ("list linked students", "list teacher applications"); those were the script reading the wrong result shape (the functions return an object with `students` / `applications`). Fixed in the script, both pass.
-- Image upload: not run. The repo has no Storage rules and no upload code path was exercised; the teacher "images" section was only rendered (0 JS errors), not used with a file.
+- The chat reply needs a pause of more than 2 seconds after the previous message: that is the rules' rate limit (chatRateOk), not a bug.
+- Images are stored as resized JPEG data inside Firestore (no Storage): the step resizes a 2000x1200 picture in the browser and publishes it; a non-JPEG payload and a student upload are refused.
 - Parent to teacher chat: covered by `tests/parent-chat-rules.test.js` (rules emulator), not by this script.
-- Unauthorized attempts covered here: student self-promote to admin, student sending as the teacher, student writing grades, student reading admins, student creating a class, teacher approving a teacher. More in the rules test suites (138 tests with the emulator).
+- Unauthorized attempts covered here: student self-promote to admin, student sending as the teacher, student writing grades, student reading admins, student creating a class, teacher approving a teacher, non-JPEG image, student image upload. More in the rules test suites.
 - Nothing was loosened to make a scenario pass.
 - This is an emulator, not the live project: real email delivery, real indexes and real quotas are untested.
