@@ -6,12 +6,52 @@ import {initErrorBoundary,errorCardHtml} from './ui/error-boundary.js';
 import {TRACKS} from '../functions/src/validation.js';
 import {runCleanups} from './ui/cleanups.js';
 import {livingEnabled} from './config/features.js';
+import {initUpdateNotice} from './ui/update-notice.js';
+import {isPublicRoute,shouldLockSession,gatedRoute} from './auth/session-gate.js';
 import {initMotion,routeStart,routeEnd,withThemeTransition,withPageTransition} from './ui/motion.js';
 
 const moduleScriptUrl=document.querySelector('script[type="module"][src]')?.src;
 const sourceBasePath=moduleScriptUrl?new URL('../',moduleScriptUrl).pathname:'/';
 const routeHelpers=createRouteHelpers(import.meta.env?.BASE_URL||sourceBasePath,location.origin);
 const currentRoutePath=()=>routeHelpers.fromUrlPath(location.pathname)??'/';
+
+/* Session gate (src/auth/session-gate.js): while an active account is signed in, public routes
+   redirect to /dashboard and the public menu hides. Fails open: an unreadable account status
+   (rules not deployed yet, offline) never locks anyone out of the public site. */
+let sessionLocked=false;
+function applySessionUi(){
+  const root=document.documentElement;
+  if(sessionLocked)root.dataset.session='active';else delete root.dataset.session;
+  const brand=document.querySelector('.topbar .brand');
+  if(brand)brand.setAttribute('href',routeHelpers.toUrlPath(sessionLocked?'/dashboard':'/'));
+}
+function setSessionLocked(locked){
+  if(sessionLocked===locked)return;
+  sessionLocked=locked;
+  applySessionUi();
+  if(locked&&isPublicRoute(currentRoutePath())){
+    history.replaceState({},'',routeHelpers.toUrlPath('/dashboard'));
+    render('/dashboard');
+  }
+}
+let sessionGateToken=0;
+async function initSessionGate(){
+  try{
+    const env=await import('./config/firebase-env.js');
+    if(!env.firebaseConfigured)return;
+    const auth=await import('./auth/auth-service.js');
+    auth.subscribeToAuth(async user=>{
+      const token=++sessionGateToken;
+      if(!user){setSessionLocked(false);return;}
+      try{
+        const status=await auth.getMyAccountStatus();
+        if(token===sessionGateToken)setSessionLocked(shouldLockSession(status));
+      }catch{
+        if(token===sessionGateToken)setSessionLocked(false);
+      }
+    });
+  }catch{/* Firebase unavailable: nothing to gate. */}
+}
 
 function normalizeInternalLinks(root=document){
   root.querySelectorAll('a[href]').forEach(link=>{
@@ -85,6 +125,8 @@ function showSignedInMessage(target,message,kind='status'){
 }
 
 function render(path=currentRoutePath()){
+  const gated=gatedRoute(path,sessionLocked);
+  if(gated!==path){history.replaceState({},'',routeHelpers.toUrlPath(gated));path=gated;}
   runCleanups();
   pageCleanup();
   pageCleanup=()=>{};
@@ -276,7 +318,7 @@ function initializeAuthPage(generation){
 
 function safeTimestamp(value){
   if(!value)return 'وقت الإرسال غير متاح';
-  try{return new Intl.DateTimeFormat('ar-EG',{dateStyle:'medium',timeStyle:'short'}).format(new Date(value));}
+  try{return new Intl.DateTimeFormat('ar-EG',{dateStyle:'medium',timeStyle:'short',timeZone:'Africa/Cairo'}).format(new Date(value));}
   catch{return 'وقت الإرسال غير متاح';}
 }
 
@@ -535,17 +577,9 @@ document.addEventListener('click',async event=>{
   const resolved=resolveAppLink(rawHref,location.href,routeHelpers,routePatterns);
   if(!resolved)return;
   event.preventDefault();
-  let destination=resolved;
-  if(resolved.route==='/'){
-    try{
-      const auth=await import('./auth/auth-service.js');
-      if(await auth.waitForInitialAuthState()){
-        destination={...resolved,route:'/dashboard',search:'',hash:''};
-      }
-    }catch{
-      // Keep the public home available if account status cannot be checked.
-    }
-  }
+  const destination=sessionLocked&&isPublicRoute(resolved.route)
+    ?{...resolved,route:'/dashboard',search:'',hash:''}
+    :resolved;
   history.pushState({},'',`${routeHelpers.toUrlPath(destination.route)}${destination.search}${destination.hash}`);
   window.scrollTo({top:0,behavior:'instant'});
   withPageTransition(()=>render(destination.route));
@@ -608,6 +642,7 @@ window.addEventListener('popstate',()=>withPageTransition(()=>render(currentRout
 initializeTheme();
 initErrorReporter();
 initErrorBoundary();
+initUpdateNotice();
 if(import.meta.env?.PROD&&'serviceWorker' in navigator){
   addEventListener('load',()=>navigator.serviceWorker.register(`${import.meta.env.BASE_URL||'/'}sw.js`,{scope:import.meta.env.BASE_URL||'/'}).catch(()=>{}));
 }
@@ -641,5 +676,6 @@ document.querySelector('.menu-toggle')?.addEventListener('click',event=>{
 });
 initMotion();
 render();
+initSessionGate();
 /* Living layer: OFF unless the feature flag is on (src/config/features.js). Lazy, never blocks the app. */
 if(livingEnabled())import('./studycrew/Living/wire.js').then(m=>m.startLiving()).catch(()=>{});

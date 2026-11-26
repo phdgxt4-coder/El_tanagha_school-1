@@ -170,3 +170,23 @@ html{overflow-x:clip;max-width:100%}
   .dash-parent,.dash-teacher,.dash-admin{padding-inline:.75rem}
   .adm-table,.tch-table{display:block;overflow-x:auto;max-width:100%}
 }
+
+/* Touch targets: at least 44px (measured at 390px; bell was squeezed to 28px wide, chips 36px, text buttons 32-34px). */
+.bell-btn{flex:none;width:44px}
+.tch-chip{min-height:44px;min-width:44px}
+.dash button.text-link{min-height:44px;padding-inline:.5rem}
+
+/* ---------- Final phone polish (verified by rendering at 390 and 360px) ---------- */
+/* Admin console: the side nav was a horizontal strip that clipped section names mid-word and
+   hid 8 of 11 sections with no scroll hint. Below desktop it becomes a wrapping 2+ column grid
+   where every section label is fully visible (matches the teacher nav's stacked pattern). */
+@media(max-width:959.98px){
+  .adm-side nav{display:grid;grid-template-columns:repeat(auto-fill,minmax(9.5rem,1fr));overflow:visible}
+  .adm-side nav button{white-space:normal;text-align:start;justify-content:flex-start}
+}
+/* Parent stats: a long value (a date like "٢٤ نوفمبر") overflowed its card at 360-480px. */
+.par-stats strong{overflow-wrap:anywhere}
+@media(max-width:480px){
+  .par-stats strong{font-size:clamp(1.15rem,.95rem + 2.5vw,2.6rem)}
+  .adm-side nav{grid-template-columns:1fr 1fr}
+}

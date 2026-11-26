@@ -1,0 +1,1 @@
+import{t as e}from"./rolldown-runtime-DK3Fl9T5.js";import{c as t,n,o as r}from"./studycrew-CRynrGhm.js";var i=e({haptic:()=>o}),a=t.haptics;function o(e=`tap`){if(!n().haptics||r()||typeof navigator>`u`||typeof navigator.vibrate!=`function`)return!1;try{return navigator.vibrate(a[e]||a.tap)}catch{return!1}}export{i as n,o as t};
