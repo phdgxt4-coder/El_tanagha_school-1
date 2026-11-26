@@ -25,3 +25,5 @@ Rerun the 26 scenarios + image upload + chat + unauthorized attempts with the FI
 ## 03:10 Finding: chat listener leak (cleanup returned by mountChat/mountParentChat was never called). Fix on branch fix/listener-cleanup, OPEN PR (touches chat, not merged). Baseline measurements in docs/MEASUREMENTS.md.
 
 ## 03:31 PR fix/import-hardening opened (not merged, admin import). Done: size limit, formula sanitising. Not done: per-row error display, CSV over-200KB message.
+
+## 03:54 MERGE meta-og (favicon link + OG tags + test) -> main 3f78086. Deploy success, live HTML has og:title, 32 live route checks (16 routes x 360/390) no overflow/errors. Already present (no change needed): lang/dir, theme-color, manifest, visibility pausing for Living timers. Open PRs: #54, #64 chat listeners, #65 import.
