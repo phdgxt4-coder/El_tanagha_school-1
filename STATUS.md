@@ -55,3 +55,4 @@ Rerun the 26 scenarios + image upload + chat + unauthorized attempts with the FI
 ## 07:00 CHANGELOG.md written (update if more merges). All public form fields measured >=16px on live. Left: RELEASE_NOTES update, FINAL_REPORT, issue, final rerun.
 - 07:01 DONE item 23: .nvmrc + engines merged (7e314cd), CI success, tests 140/140. Remaining: 16,19,20,22, Excel row errors (PR), freeze 12:15.
 - 07:20 DONE item 16: scripts/live-smoke.mjs (docs merge).
+- 07:42 DONE item 20: test-data audit of tracked files: no lorem/dummy data in site content; matches only in tests/e2e scripts and Living code comments. Nothing to fix.
