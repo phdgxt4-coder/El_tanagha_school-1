@@ -47,3 +47,5 @@ Rerun the 26 scenarios + image upload + chat + unauthorized attempts with the FI
 ## 06:41 HANDOFF.md written (deploy order first). Still to write: RUNBOOK.md, docs/guides/*, CHANGELOG.md, RELEASE_NOTES update, FINAL_REPORT.md, GitHub issue. HANDOFF scenario table must be refreshed after the final rerun.
 
 ## 06:42 Scenarios now 40 steps incl. image resize+publish: new rules 40/40, old 40/40. Regenerate at freeze: run scripts/e2e/scenarios.mjs on both rules, then make-report.py and sync-handoff.py.
+
+## 06:45 RUNBOOK.md + docs/guides/* written. Left: CHANGELOG.md, RELEASE_NOTES update, FINAL_REPORT.md, issue.
