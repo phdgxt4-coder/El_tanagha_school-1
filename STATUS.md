@@ -35,3 +35,5 @@ Rerun the 26 scenarios + image upload + chat + unauthorized attempts with the FI
 ## 04:56 Condition 02:29 PARTIALLY done: docs/SCENARIOS.md (36 steps, new rules 36/36, old rules 36/36) with main 57cd01d code. Must RERUN at freeze with final code (open PRs not included). Gaps: image upload, parent-teacher chat via script. HANDOFF deploy-order section still to write.
 
 ## 05:15 Lighthouse baseline recorded (docs/MEASUREMENTS.md). Home perf 96/a11y 100/bp 100/seo 92.
+
+## 05:16 MERGE link checker (scripts only) -> main b9eb8fa. Item 17 done. Finding for HANDOFF: nested static entry pages (copies of index.html) carry ./ nav links that are wrong until app.js rewrites them (390 links on 29 pages): affects no-JS visitors and crawlers only. Fix idea: make create-static-routes rewrite ./ to the correct depth (not done, build script).
