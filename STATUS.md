@@ -49,3 +49,5 @@ Rerun the 26 scenarios + image upload + chat + unauthorized attempts with the FI
 ## 06:42 Scenarios now 40 steps incl. image resize+publish: new rules 40/40, old 40/40. Regenerate at freeze: run scripts/e2e/scenarios.mjs on both rules, then make-report.py and sync-handoff.py.
 
 ## 06:45 RUNBOOK.md + docs/guides/* written. Left: CHANGELOG.md, RELEASE_NOTES update, FINAL_REPORT.md, issue.
+
+## 06:45 MERGE cairo-dates -> main 499ddf0 (Africa/Cairo in 3 date formatters, test in 3 time zones). Deploy success, bundle main-Dlf1aHrd.js, 32/32 live checks clean.
