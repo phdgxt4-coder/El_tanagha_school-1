@@ -31,3 +31,5 @@ Rerun the 26 scenarios + image upload + chat + unauthorized attempts with the FI
 ## 04:15 MERGE update notice -> main 57cd01d. Design: in-flow bar at top of page (a floating bottom version was rejected after the screenshot showed it covering a field), only on SW takeover of a running page, hidden while typing, never auto reload. 4 tests, 136 pass, live bundle main-DEsZNiMb.js, 32 route checks clean. Screenshot /downloads/update-notice-crop.png.
 
 ## 04:35 PR fix/parent-link-cooldown opened (not merged, parent link). Server-side limit still needed (HANDOFF).
+
+## 04:56 Condition 02:29 PARTIALLY done: docs/SCENARIOS.md (36 steps, new rules 36/36, old rules 36/36) with main 57cd01d code. Must RERUN at freeze with final code (open PRs not included). Gaps: image upload, parent-teacher chat via script. HANDOFF deploy-order section still to write.
