@@ -41,3 +41,5 @@ Rerun the 26 scenarios + image upload + chat + unauthorized attempts with the FI
 ## 05:41 MERGE load-states -> main 7bfefeb: list pager 15s timeout + retry button + "service unavailable" message on permission-denied/failed-precondition (items 7.1/7.2 for lists). Deploy success, bundle main-DGUWwf7r.js, 32 live route checks clean, 4-role browser traversal 0 errors. Not covered: non-list screens still use their own error text.
 
 ## 06:00 Phase 7 (characters): documented only (docs/CHARACTERS.md). Oscar already has a first version (5 expressions) on main, so no PR. Phase 1: #54 is closed (policy test is on main).
+
+## 06:28 MERGE touch-targets CSS -> main 9c3dcc5 (bell 28x44 -> 44, chips 36 -> 44, text buttons 32-34 -> 44). Measured 30 dashboard panels (student/teacher/admin) at 390: none under 40px after; 0 JS errors. Parent dashboard targets not measured. Deploy success; live check ran 24 of 32 route-width checks before the tool timeout, all clean (remaining 8 not re-run).
