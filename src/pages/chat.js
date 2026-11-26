@@ -2,6 +2,7 @@ import {
   addDoc, collection, doc, getDocs, updateDoc, limit, onSnapshot, orderBy, query, serverTimestamp, where, writeBatch
 } from 'firebase/firestore';
 import { esc, formatDate } from './dashboards/common.js';
+import { registerCleanup } from '../ui/cleanups.js';
 
 export const MAX_CHAT_TEXT = 1000;
 
@@ -122,5 +123,5 @@ export function mountChat(root, { profile, database }) {
       openThread({ studentUid: profile.uid, studentName: profile.displayName, teacherUid: teacher.uid, teacherName: teacher.displayName, isNew: !existing });
     });
   }
-  return () => { stopThread(); stopList(); };
+  return registerCleanup(() => { stopThread(); stopList(); });
 }

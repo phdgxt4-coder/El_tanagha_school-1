@@ -4,6 +4,7 @@ import {createRouteHelpers,resolveAppLink} from './utils/routes.js';
 import {initErrorReporter} from './services/error-reporter.js';
 import {initErrorBoundary,errorCardHtml} from './ui/error-boundary.js';
 import {TRACKS} from '../functions/src/validation.js';
+import {runCleanups} from './ui/cleanups.js';
 import {livingEnabled} from './config/features.js';
 import {initMotion,routeStart,routeEnd,withThemeTransition,withPageTransition} from './ui/motion.js';
 
@@ -84,6 +85,7 @@ function showSignedInMessage(target,message,kind='status'){
 }
 
 function render(path=currentRoutePath()){
+  runCleanups();
   pageCleanup();
   pageCleanup=()=>{};
   const generation=++pageGeneration;
