@@ -23,3 +23,5 @@ Rerun the 26 scenarios + image upload + chat + unauthorized attempts with the FI
 ## 02:49 MERGE #63 (error boundary, PII scrub) -> main b34d76c. Tests 131/131 with emulator, build OK, deploy success, live bundle main-CtnZSqAq.js, 16 routes at 360/390 no overflow, no broken images. Phase 2 partially done. Remaining queue: timeouts + "unavailable now" state (7.1/7.2), visibility pausing, listener audit, bundle/Lighthouse measurements, double-click/validation, update notice, Excel import hardening, parent-link cooldown, a11y, then 7-9 and items 16-24, scenario rerun vs new rules (condition 02:29).
 
 ## 03:10 Finding: chat listener leak (cleanup returned by mountChat/mountParentChat was never called). Fix on branch fix/listener-cleanup, OPEN PR (touches chat, not merged). Baseline measurements in docs/MEASUREMENTS.md.
+
+## 03:31 PR fix/import-hardening opened (not merged, admin import). Done: size limit, formula sanitising. Not done: per-row error display, CSV over-200KB message.
