@@ -15,3 +15,7 @@ Branch + tag `backup-2026-11-26-start` = 0e2357a63855390b77ec78dd768616c5886797e
 ## Next
 Phase 2 rest (timeouts, 404, listeners), 3 (security docs, npm audit, git history scan), 4 (screens with data), 5, 6, then 7-9, items 16-24, final docs, one merge for docs.
 Resume rule: read this file and `git log`, continue from the last DONE phase.
+
+## Added condition (user, 02:29): before the deadline
+Rerun the 26 scenarios + image upload + chat + unauthorized attempts with the FINAL code against the NEW proposed rules and the old rules; write each result in HANDOFF.md; failures documented by name and code shows "service unavailable" or is fixed; never loosen rules. HANDOFF.md top = safe deploy order: indexes first, wait until built, then rules, then immediate test with real accounts, rollback command for old rules ready. STATUS: PENDING (do after code changes freeze, before 12:15).
+## 02:29 UI e2e with data (emulator): teacher publishes lesson + task via UI, student sees task; 0 JS errors both roles. Parent dashboard has no tabs by design (children chips).
