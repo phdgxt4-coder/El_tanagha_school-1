@@ -45,3 +45,5 @@ Rerun the 26 scenarios + image upload + chat + unauthorized attempts with the FI
 ## 06:28 MERGE touch-targets CSS -> main 9c3dcc5 (bell 28x44 -> 44, chips 36 -> 44, text buttons 32-34 -> 44). Measured 30 dashboard panels (student/teacher/admin) at 390: none under 40px after; 0 JS errors. Parent dashboard targets not measured. Deploy success; live check ran 24 of 32 route-width checks before the tool timeout, all clean (remaining 8 not re-run).
 
 ## 06:41 HANDOFF.md written (deploy order first). Still to write: RUNBOOK.md, docs/guides/*, CHANGELOG.md, RELEASE_NOTES update, FINAL_REPORT.md, GitHub issue. HANDOFF scenario table must be refreshed after the final rerun.
+
+## 06:42 Scenarios now 40 steps incl. image resize+publish: new rules 40/40, old 40/40. Regenerate at freeze: run scripts/e2e/scenarios.mjs on both rules, then make-report.py and sync-handoff.py.
