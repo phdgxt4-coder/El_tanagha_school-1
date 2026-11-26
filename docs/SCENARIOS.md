@@ -1,6 +1,6 @@
-# Scenario results (code at main 57cd01d+)
+# Scenario results (code at main 7e314cd)
 
-Run 26 Nov 2026 06:40 on the Firebase emulators with the client code of that commit (a real Chrome page calling the app's own functions).
+Run 26 Nov 2026 08:03 on the Firebase emulators with the client code of that commit (a real Chrome page calling the app's own functions).
 - NEW = `firestore.rules` in the repo (the proposed rules).
 - OLD = rules at commit c0c0ebf (about what was deployed on 25 Nov evening).
 Script: `scripts/e2e/scenarios.mjs` (README next to it). Steps: registration (student, parent, teacher), verification, parent code and link, admin classes/subjects/approval/assignment/import/invite, teacher reads, chat (student to teacher and reply), image resize and publish, and negative (unauthorized) attempts.
