@@ -6,7 +6,7 @@ import { schedulePage, subjectPage } from '../src/pages/public-pages.js';
 
 const read = path => fs.readFileSync(new URL(path, import.meta.url), 'utf8');
 
-test('التسجيل يطلب الهاتف والبريد وكلمة المرور، ويعرض استعادة كلمة المرور، ويعرض استعادة كلمة المرور', () => {
+test('التسجيل يطلب الهاتف والبريد وكلمة المرور ويستخدم classId حقيقيًا', () => {
   const html = loginPage('student');
   assert.match(html, /name="email" type="email"[^>]*required/u);
   assert.match(html, /name="password" type="password"[^>]*required/u);
@@ -14,14 +14,18 @@ test('التسجيل يطلب الهاتف والبريد وكلمة المرو�
   assert.match(html, /data-password-reset/u);
   assert.match(html, /name="branch"/u);
   assert.equal((html.match(/name="branch"/gu) || []).length, 1);
-  assert.match(html, /name="className"/u);
+  assert.match(html, /name="classId"/u);
+  assert.doesNotMatch(html, /name="className"/u);
   assert.doesNotMatch(html, /name="birthDate"/u);
 });
 
-test('دخول الإدارة يمر عبر صفحة المدرس ولا يتيح التسجيل الإداري', () => {
+test('صفحة دخول الإدارة بعنوانها الصحيح ولا تتيح التسجيل الإداري', () => {
   const html = loginPage('admin');
-  assert.match(html, /data-role="teacher"/u);
+  assert.match(html, /data-role="admin"/u);
+  assert.match(html, /دخول الإدارة/u);
+  assert.doesNotMatch(html, /دخول المدرس/u);
   assert.doesNotMatch(html, /id="register-form"/u);
+  assert.doesNotMatch(html, /data-auth-mode="register"/u);
   assert.doesNotMatch(html, /href="\/login\/admin"/u);
 });
 

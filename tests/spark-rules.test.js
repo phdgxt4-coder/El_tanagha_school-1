@@ -209,12 +209,12 @@ test('الوسائط: فيديو يوتيوب وملف درايف فقط، وص�
 
 test('إدارة الحسابات: الإدارة توقف وتنقل وتعدل الطالب فقط دون تغيير الدور أو البريد، والطالب لا يفعل ذلك', {skip:!emulatorAvailable}, async()=>{
   await seed([...base,
-    ['classes/c2',{name:'1/2',grade:'2',section:'2',year:'2026-2027'}],
+    ['classes/c2',{name:'1/2',grade:'2',section:'2',year:'2026-2027',branch:'bac_med'}],
     ['profiles/s1',studentProfile('s1')],
     ['profiles/p1',{uid:'p1',email:'p1@example.com',displayName:'ولي أمر',role:'parent',status:'active',phone:'01012345678'}]]);
   const a=user('adm');
   await assertSucceeds(updateDoc(doc(a,'profiles','s1'),{status:'disabled',updatedBy:'adm',updatedAt:serverTimestamp()}));
-  await assertSucceeds(updateDoc(doc(a,'profiles','s1'),{status:'active',classId:'c2',className:'1/2',grade:'2'}));
+  await assertSucceeds(updateDoc(doc(a,'profiles','s1'),{status:'active',classId:'c2',className:'1/2',grade:'2',branch:'bac_med'}));
   await assertFails(updateDoc(doc(a,'profiles','s1'),{classId:'c1',className:'1/1',grade:'3'}));
   await assertFails(updateDoc(doc(a,'profiles','s1'),{role:'admin'}));
   await assertFails(updateDoc(doc(a,'profiles','s1'),{email:'x@example.com'}));

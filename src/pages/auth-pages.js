@@ -10,7 +10,7 @@ const ROLE_LABELS = Object.freeze({
 
 function registrationFields(role) {
   const roleFields = role === 'student'
-    ? `<label>الصف الدراسي<select name="grade" required data-grade-select><option value="">اختر الصف</option><option value="1">الأول الثانوي</option><option value="2">الثاني الثانوي</option><option value="3">الثالث الثانوي</option></select></label><label hidden data-branch-label>المسار الدراسي<select name="branch" data-branch-select><option value="">اختر الصف أولًا</option></select></label><label>الفصل<select name="classId" data-class-select disabled><option value="">اختر الصف أولًا</option></select></label><label hidden data-class-fallback>الفصل<input name="className" maxlength="40" placeholder="مثال: 1/أ"></label>`
+    ? `<label>الصف الدراسي<select name="grade" required data-grade-select><option value="">اختر الصف</option><option value="1">الأول الثانوي</option><option value="2">الثاني الثانوي</option><option value="3">الثالث الثانوي</option></select></label><label hidden data-branch-label>المسار الدراسي<select name="branch" data-branch-select><option value="">اختر الصف أولًا</option></select></label><label>الفصل<select name="classId" data-class-select disabled><option value="">اختر الصف أولًا</option></select></label>`
     : role === 'teacher'
       ? `<label>المادة<select name="subjectId" required data-subject-select><option value="">اختر المادة</option>${Object.entries(SUBJECTS).map(([id,label])=>`<option value="${id}">${label}</option>`).join('')}</select></label><label class="consent-row"><input type="checkbox" name="publishConsent" value="yes"><span>أوافق على نشر اسمي وتخصصي في دليل المدرسين بعد اعتماد الإدارة. لن يُنشر بريدي أو هاتفي.</span></label>`
       : '';
@@ -25,9 +25,9 @@ function registrationFields(role) {
 }
 
 export function loginPage(role = 'student') {
-  const safeRole = role === 'admin' ? 'teacher' : (Object.hasOwn(ROLE_LABELS, role) ? role : 'student');
+  const safeRole = Object.hasOwn(ROLE_LABELS, role) ? role : 'student';
   const roleLabel = ROLE_LABELS[safeRole];
-  const registerAvailable = role !== 'admin' && safeRole !== 'admin';
+  const registerAvailable = safeRole !== 'admin';
   const roleLinks = ['student','parent','teacher'].map(item =>
     `<a class="role-link ${item===safeRole?'selected':''}" href="/login/${item}">${ROLE_LABELS[item]}</a>`
   ).join('');

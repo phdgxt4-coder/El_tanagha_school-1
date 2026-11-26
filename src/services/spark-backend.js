@@ -68,7 +68,7 @@ export async function submitAccountRequest(profile) {
   const classSnapshot = classId ? await getDoc(doc(database, 'classes', classId)) : null;
   if (!classSnapshot?.exists()) throw fail('invalid-argument', 'الفصل المختار غير موجود.');
   if (classSnapshot.data().grade !== profile.grade) throw fail('invalid-argument', 'الفصل المختار لا يتبع الصف الدراسي المحدد.');
-  if (classSnapshot.data().branch && classSnapshot.data().branch !== (profile.branch ?? '')) throw fail('invalid-argument', 'الفصل المختار لا يتبع المسار الدراسي المحدد.');
+  if ((classSnapshot.data().branch ?? '') !== (profile.branch ?? '')) throw fail('invalid-argument', 'الفصل المختار لا يتبع المسار الدراسي المحدد.');
   const studentId = `STU-${token(10)}`;
   const record = {
     ...base, role: 'student', status: 'active', studentId, grade: profile.grade, branch: profile.branch ?? '',
@@ -156,8 +156,10 @@ const LAST_CODE_KEY = 'tn:last-parent-code';
 export async function issueParentCode() {
   const user = me();
   const database = db();
+  await user.getIdToken(true).catch(() => {}); // قواعد Firestore تقرأ email_verified من التوكن: حدّثه قبل الكتابة.
   const profile = await getDoc(doc(database, 'profiles', user.uid));
   if (!profile.exists() || profile.data().role !== 'student') throw fail('permission-denied', 'إصدار كود الربط متاح للطالب النشط فقط.');
+  if (!/^STU-[0-9A-Z]{8,12}$/u.test(String(profile.data().studentId ?? ''))) throw fail('failed-precondition', 'حساب الطالب بلا رقم طالب صالح. تواصل مع الإدارة.');
   const code = `TNG-${token(12)}`;
   const batch = writeBatch(database);
   let previous = '';
@@ -420,7 +422,7 @@ export async function adminMoveStudent(uid, classId) {
   if (!student.exists() || student.data().role !== 'student') throw fail('not-found', 'الطالب غير موجود.');
   if (!target.exists()) throw fail('not-found', 'الفصل غير موجود.');
   const batch = writeBatch(database);
-  batch.update(doc(database, 'profiles', uid), { classId: target.id, className: target.data().name, grade: target.data().grade, ...(target.data().branch ? { branch: target.data().branch } : {}), updatedBy: me().uid, updatedAt: serverTimestamp() });
+  batch.update(doc(database, 'profiles', uid), { classId: target.id, className: target.data().name, grade: target.data().grade, branch: target.data().branch ?? '', updatedBy: me().uid, updatedAt: serverTimestamp() });
   audit(batch, 'student_moved', { targetUid: uid, fromClassId: student.data().classId ?? '', toClassId: target.id });
   await batch.commit();
   return { classId: target.id };

@@ -10,6 +10,7 @@ const loadSpark = () => import('../services/spark-backend.js');
 
 let authClient;
 let functionsClient;
+let authPersistencePromise;
 
 function getAuthClients() {
   if (!firebaseConfigured) throw new Error('firebase/not-configured');
@@ -17,10 +18,12 @@ function getAuthClients() {
     const app = getFirebaseApp();
     authClient = getAuth(app);
     // تسجيل الدخول يبقى محفوظًا على الجهاز حتى يضغط المستخدم تسجيل الخروج.
-    setPersistence(authClient, browserLocalPersistence).catch(() => {});
+    // Avoid a race where sign-in finishes before Firebase has enabled durable sessions.
+    authPersistencePromise = setPersistence(authClient, browserLocalPersistence);
+    authPersistencePromise.catch(() => {});
     functionsClient = getFunctions(app, functionsRegion);
   }
-  return { auth: authClient, functions: functionsClient };
+  return { auth: authClient, functions: functionsClient, persistence: authPersistencePromise };
 }
 
 function callable(name, data) {
@@ -32,8 +35,9 @@ export function getCurrentUser() {
   return firebaseConfigured ? getAuthClients().auth.currentUser : null;
 }
 
-export function createAuthUser(email, password) {
-  const {auth} = getAuthClients();
+export async function createAuthUser(email, password) {
+  const {auth, persistence} = getAuthClients();
+  await persistence;
   return createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
 }
 
@@ -50,20 +54,23 @@ export async function sendVerificationIfNeeded(user = getCurrentUser()) {
   return true;
 }
 
-export function signIn(email, password) {
-  const {auth} = getAuthClients();
+export async function signIn(email, password) {
+  const {auth, persistence} = getAuthClients();
+  await persistence;
   return signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
 }
 
-export function sendPasswordReset(email) {
-  const {auth} = getAuthClients();
+export async function sendPasswordReset(email) {
+  const {auth, persistence} = getAuthClients();
+  await persistence;
   const normalizedEmail = String(email ?? '').trim().toLowerCase();
   if (!normalizedEmail) throw Object.assign(new Error('اكتب البريد الإلكتروني أولًا.'), {code:'auth/invalid-email'});
   return sendPasswordResetEmail(auth, normalizedEmail);
 }
 
-export function signOutUser() {
-  const {auth} = getAuthClients();
+export async function signOutUser() {
+  const {auth, persistence} = getAuthClients();
+  await persistence;
   return signOut(auth);
 }
 
@@ -169,16 +176,18 @@ export function listClassStudents(classId, after = '') {
 
 export function waitForInitialAuthState() {
   if (!firebaseConfigured) return Promise.resolve(null);
-  const {auth}=getAuthClients();
+  const {auth,persistence}=getAuthClients();
   return new Promise((resolve,reject)=>{
     let unsubscribe=()=>{};
-    unsubscribe=onAuthStateChanged(auth,user=>{
-      unsubscribe();
-      resolve(user);
-    },error=>{
-      unsubscribe();
-      reject(error);
-    });
+    persistence.then(()=>{
+      unsubscribe=onAuthStateChanged(auth,user=>{
+        unsubscribe();
+        resolve(user);
+      },error=>{
+        unsubscribe();
+        reject(error);
+      });
+    },reject);
   });
 }
 

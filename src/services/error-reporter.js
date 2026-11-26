@@ -1,11 +1,12 @@
 // يسجل أخطاء المتصفح لمستخدم مسجل الدخول في Firestore ليراها المدير. حد 5 أخطاء لكل جلسة، بدون بيانات شخصية.
 import { firebaseConfigured } from '../config/firebase-env.js';
+import { scrubMessage } from '../ui/error-boundary.js';
 
 const seen = new Set();
 let sent = 0;
 
 async function report(message, source) {
-  const text = String(message || '').slice(0, 300);
+  const text = scrubMessage(message);
   if (!firebaseConfigured || !text || sent >= 5 || seen.has(text)) return;
   seen.add(text);
   try {

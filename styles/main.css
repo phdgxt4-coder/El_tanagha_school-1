@@ -87,6 +87,13 @@ button,input,textarea {
   border-radius:12px;
   padding:.45rem .7rem
 }
+/* جلسة نشطة: القائمة العامة وزر الدخول يختفيان حتى تسجيل الخروج (src/auth/session-gate.js).
+   يبقى الشعار (يقود للوحة الحساب) وزر تبديل المظهر. */
+html[data-session="active"] .topbar .nav,
+html[data-session="active"] .topbar .menu-toggle,
+html[data-session="active"] .topbar>.button {
+  display:none
+}
 .button {
   display:inline-flex;
   align-items:center;

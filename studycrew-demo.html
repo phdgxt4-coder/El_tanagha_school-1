@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Study Crew dev demo</title>
+  <meta name="robots" content="noindex">
+  <style>
+    body{margin:0;background:#090d16;color:#f0f2f5;font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif}
+    main{max-width:960px;margin:auto;padding:16px;display:grid;gap:20px}
+    h1{font-size:20px;margin:0}h2{font-size:16px;margin:0 0 8px;color:#e4bf63}
+    .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    .chip{min-height:44px;padding:0 14px;border-radius:999px;border:1px solid #ffffff22;background:#151c29;color:inherit;font:inherit;cursor:pointer}
+    .chip[aria-pressed="true"],.chip[aria-current="true"]{background:#c9a24b;color:#090d16;border-color:#c9a24b}
+    html,body{overflow-x:hidden}
+    .stage{position:relative;display:grid;place-items:center;min-height:220px;border-radius:22px;background:#111722;padding:16px}
+    label{display:inline-flex;gap:6px;align-items:center;min-height:44px}
+    pre{margin:0;max-height:160px;overflow:auto;background:#0d121c;border-radius:12px;padding:10px;font-size:12px;direction:ltr;text-align:left}
+    .stage .sc-host{--sc-size-character:min(64vw,300px,36vh);inline-size:var(--sc-size-character);block-size:calc(var(--sc-size-character)*1.15)}
+    @media (max-width:520px){main{padding:10px;gap:10px}h1{font-size:16px}.chip{min-height:40px;padding:0 11px;font-size:13px}.stage{min-height:0;padding:8px}h2{margin-bottom:6px}}
+    #gallery{position:relative;display:grid;gap:12px;min-height:160px}
+  </style>
+</head>
+<body>
+<main>
+  <h1>Study Crew: صفحة تجربة للمطورين</h1>
+  <section><h2>الإعدادات</h2><div class="bar" id="settings"></div></section>
+  <section><h2>الشخصية</h2><div class="bar" id="chars"></div><div class="stage" id="stage"></div></section>
+  <section><h2>الحالات</h2><div class="bar" id="states"></div></section>
+  <section><h2>المكوّنات</h2><div class="bar" id="comps"></div><div id="gallery"></div></section>
+  <section><h2>السجل</h2><pre id="log"></pre></section>
+</main>
+<script type="module" src="/src/studycrew/demo.js"></script>
+</body>
+</html>
