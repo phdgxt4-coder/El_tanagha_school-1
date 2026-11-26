@@ -19,3 +19,11 @@ chat.js 3 (conversation list, open thread messages, thread doc), parent-chat.js 
 
 ## Images over 200KB
 Only public/assets/icons/icon-512.png (424194 B), used as the app icon; the 512 size is required by the manifest. Could be compressed with a tool (not changed).
+
+## Lighthouse mobile (local `vite preview` of main 57cd01d, Lighthouse default mobile emulation with simulated throttling, measured 26 Nov 05:14)
+| page | Performance | Accessibility | Best Practices | SEO | LCP | TBT | CLS |
+|---|---|---|---|---|---|---|---|
+| home | 96 | 100 | 100 | 92 | 1.5 s | 220 ms | 0.002 |
+| /login/student | 99 | 100 | 100 | 92 | 1.4 s | 120 ms | 0.036 |
+SEO 92: the only failed audit is `robots.txt` missing. Not added: whether a school site with minors' data should be indexed is the owner's decision (recommendation: add a robots.txt that allows public pages and disallows /dashboard and /login).
+These are lab numbers on this machine's local server, not real phones and not the live GitHub Pages network path. Performance under load is not measured. No "before" run exists for the earlier releases, so there is no before/after comparison, only this baseline.
