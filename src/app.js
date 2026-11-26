@@ -207,7 +207,6 @@ function setAuthMode(mode){
   showMessage(root.querySelector('[data-auth-message]'),'');
 }
 
-let resyncRegistration=()=>{};
 /* Registration selects. Tracks are static (no Firebase). Classes come from the backend; a real classId is required, never typed by hand. */
 function setupRegistrationSelects(isStale){
   const grade=document.querySelector('[data-grade-select]');
@@ -235,7 +234,6 @@ function setupRegistrationSelects(isStale){
     if(note){note.textContent=state.message;note.dataset.kind=state.status==='empty'||state.status==='unavailable'?'error':'status';}
     if(submit)submit.disabled=!canSubmitStudent(state,classSelect.value);
   };
-  resyncRegistration=refresh;
   grade.addEventListener('change',()=>{refreshTracks();refresh();});
   branch.addEventListener('change',refresh);
   classSelect.addEventListener('change',refresh);
