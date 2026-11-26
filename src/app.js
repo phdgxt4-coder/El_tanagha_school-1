@@ -2,6 +2,7 @@ import {home,subjectsPage,subjectPage,teachersPage,renderTeacherCards,newsPage,s
 import {loginPage,teacherApprovalPage,adminJoinPage} from './pages/auth-pages.js';
 import {createRouteHelpers,resolveAppLink} from './utils/routes.js';
 import {initErrorReporter} from './services/error-reporter.js';
+import {initErrorBoundary,errorCardHtml} from './ui/error-boundary.js';
 import {TRACKS} from '../functions/src/validation.js';
 import {livingEnabled} from './config/features.js';
 import {initMotion,routeStart,routeEnd,withThemeTransition,withPageTransition} from './ui/motion.js';
@@ -89,9 +90,13 @@ function render(path=currentRoutePath()){
   const app=document.querySelector('#app');
   routeStart();
   let html=notFound();
-  for(const [pattern,view] of routes){
-    const match=path.match(pattern);
-    if(match){html=view(...match.slice(1));break;}
+  try{
+    for(const [pattern,view] of routes){
+      const match=path.match(pattern);
+      if(match){html=view(...match.slice(1));break;}
+    }
+  }catch{
+    html=errorCardHtml('تعذر عرض الصفحة','حدث خلل أثناء تحميل هذه الصفحة. أعد المحاولة، ولو تكرر الأمر تواصل مع الإدارة.');
   }
   app.innerHTML=html;
   routeEnd(app);
@@ -600,6 +605,7 @@ document.addEventListener('submit',event=>{
 window.addEventListener('popstate',()=>withPageTransition(()=>render(currentRoutePath())));
 initializeTheme();
 initErrorReporter();
+initErrorBoundary();
 if(import.meta.env?.PROD&&'serviceWorker' in navigator){
   addEventListener('load',()=>navigator.serviceWorker.register(`${import.meta.env.BASE_URL||'/'}sw.js`,{scope:import.meta.env.BASE_URL||'/'}).catch(()=>{}));
 }
@@ -625,6 +631,7 @@ function syncOnlineBanner(){
   netBar('لا يوجد اتصال بالإنترنت. البيانات الحية لن تعمل حتى يعود الاتصال.',false);
 }
 addEventListener('online',syncOnlineBanner);addEventListener('offline',syncOnlineBanner);syncOnlineBanner();
+document.addEventListener('click',event=>{if(event.target.closest?.('[data-error-retry]'))location.reload();});
 document.querySelector('.menu-toggle')?.addEventListener('click',event=>{
   const nav=document.querySelector('#nav');
   const opened=nav.classList.toggle('open');
