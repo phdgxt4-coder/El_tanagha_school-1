@@ -53,3 +53,4 @@ Rerun the 26 scenarios + image upload + chat + unauthorized attempts with the FI
 ## 06:45 MERGE cairo-dates -> main 499ddf0 (Africa/Cairo in 3 date formatters, test in 3 time zones). Deploy success, bundle main-Dlf1aHrd.js, 32/32 live checks clean.
 
 ## 07:00 CHANGELOG.md written (update if more merges). All public form fields measured >=16px on live. Left: RELEASE_NOTES update, FINAL_REPORT, issue, final rerun.
+- 07:01 DONE item 23: .nvmrc + engines merged (7e314cd), CI success, tests 140/140. Remaining: 16,19,20,22, Excel row errors (PR), freeze 12:15.
