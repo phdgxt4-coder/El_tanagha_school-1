@@ -33,3 +33,5 @@ Rerun the 26 scenarios + image upload + chat + unauthorized attempts with the FI
 ## 04:35 PR fix/parent-link-cooldown opened (not merged, parent link). Server-side limit still needed (HANDOFF).
 
 ## 04:56 Condition 02:29 PARTIALLY done: docs/SCENARIOS.md (36 steps, new rules 36/36, old rules 36/36) with main 57cd01d code. Must RERUN at freeze with final code (open PRs not included). Gaps: image upload, parent-teacher chat via script. HANDOFF deploy-order section still to write.
+
+## 05:15 Lighthouse baseline recorded (docs/MEASUREMENTS.md). Home perf 96/a11y 100/bp 100/seo 92.
