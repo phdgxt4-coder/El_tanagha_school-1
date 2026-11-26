@@ -19,10 +19,13 @@ test('التسجيل يطلب الهاتف والبريد وكلمة المرو�
   assert.doesNotMatch(html, /name="birthDate"/u);
 });
 
-test('دخول الإدارة يمر عبر صفحة المدرس ولا يتيح التسجيل الإداري', () => {
+test('صفحة دخول الإدارة بعنوانها الصحيح ولا تتيح التسجيل الإداري', () => {
   const html = loginPage('admin');
-  assert.match(html, /data-role="teacher"/u);
+  assert.match(html, /data-role="admin"/u);
+  assert.match(html, /دخول الإدارة/u);
+  assert.doesNotMatch(html, /دخول المدرس/u);
   assert.doesNotMatch(html, /id="register-form"/u);
+  assert.doesNotMatch(html, /data-auth-mode="register"/u);
   assert.doesNotMatch(html, /href="\/login\/admin"/u);
 });
 
