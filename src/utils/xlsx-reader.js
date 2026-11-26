@@ -58,7 +58,11 @@ const unescapeXml = text => text.replace(/&(lt|gt|amp|quot|apos|#\d+|#x[0-9a-f]+
 const textOf = xml => [...xml.matchAll(/<t[^>]*>([\s\S]*?)<\/t>/gu)].map(match => unescapeXml(match[1])).join('');
 const columnIndex = ref => [...ref.replace(/\d+/gu, '')].reduce((sum, ch) => sum * 26 + ch.charCodeAt(0) - 64, 0) - 1;
 
+export const MAX_XLSX_BYTES = 5 * 1024 * 1024;
+export const MAX_ROWS = 2000;
+
 export async function readXlsxRows(buffer) {
+  if (buffer.byteLength > MAX_XLSX_BYTES) throw new Error('الملف أكبر من 5 ميجا. قسّمه إلى ملفات أصغر.');
   if (buffer.byteLength > MAX_BYTES) throw new Error('الملف كبير. الحد 2 ميجابايت.');
   const zip = readZipEntries(buffer);
   const shared = await readEntry(buffer, zip, 'xl/sharedStrings.xml');
@@ -81,18 +85,23 @@ export async function readXlsxRows(buffer) {
       cells[ref ? columnIndex(ref) : cells.length] = value.trim();
     }
     rows.push(Array.from(cells, value => value ?? ''));
-    if (rows.length > 2000) break;
+    if (rows.length > MAX_ROWS) break;
   }
   return rows;
+}
+
+/** يمنع حقن الصيغ: خلية تبدأ بـ = + - @ تفقد هذه الأحرف حتى لا تُنفذ كصيغة عند فتح الملف المصدّر لاحقًا. */
+export function sanitizeCell(value) {
+  return String(value ?? '').replace(/^[\s=+\-@\t\r]+/u, '').trim();
 }
 
 /** يحوّل صفوف Excel إلى أسطر "الاسم, الهاتف" ويعيد الصفر الأول المفقود في أرقام الموبايل المصرية. */
 export function rosterLinesFromRows(rows) {
   return rows
-    .filter(row => row[0] && /\d{7,}/u.test(row[1] ?? ''))
+    .filter(row => sanitizeCell(row[0]) && /\d{7,}/u.test(row[1] ?? ''))
     .map(row => {
       let phone = String(row[1]).replace(/\s+/gu, '');
       if (/^1\d{9}$/u.test(phone)) phone = `0${phone}`;
-      return `${row[0]}, ${phone}`;
+      return `${sanitizeCell(row[0])}, ${phone}`;
     });
 }
