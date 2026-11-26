@@ -41,6 +41,13 @@ test('فشل تحميل اللوحة يعرض زر إعادة محاولة بد�
   assert.match(page, /withTimeout\(getDoc\(doc\(database,'profiles',user\.uid\)\)/u);
 });
 
+test('حالة الحساب تُخزن مؤقتًا 15 ثانية وتُبطل عند إنشاء الملف (تخفيف قراءات التكرار)', () => {
+  const spark = read('../src/services/spark-backend.js');
+  assert.match(spark, /account-status:\$\{user\.uid\}/u);
+  assert.match(spark, /cacheSet\(cacheKey,[\s\S]*?15000\)/u);
+  assert.match(spark, /cacheInvalidate\(`account-status:\$\{user\.uid\}`\)/u);
+});
+
 test('رسالة الخطأ المفهومة تغطي مهلة التحميل', () => {
   const auth = read('../src/auth/auth-service.js');
   assert.match(auth, /'load-timeout':/u);

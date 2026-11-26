@@ -9,7 +9,7 @@ import {
   SUBJECTS, normalizeArabicName, normalizePhone, validateClassInput, validateRejectionReason,
   validateRosterRows, validateSubjectInput
 } from '../../functions/src/validation.js';
-import { cacheInvalidate } from './cache.js';
+import { cacheInvalidate, cacheGet, cacheSet } from './cache.js';
 import { withTimeout } from '../utils/load-state.js';
 
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -41,6 +41,7 @@ function audit(batch, action, extra = {}) {
 export async function submitAccountRequest(profile) {
   const user = me();
   const database = db();
+  cacheInvalidate(`account-status:${user.uid}`);
   const email = String(user.email ?? '').toLowerCase();
   if (!email) throw fail('failed-precondition', 'استخدم حسابًا مسجلًا ببريد إلكتروني.');
   const profileRef = doc(database, 'profiles', user.uid);
@@ -85,6 +86,18 @@ export async function submitAccountRequest(profile) {
 export async function getMyAccountStatus() {
   const user = me();
   const database = db();
+  // Called by the session gate, the auth page and the dashboard on every visit: a short
+  // per-user cache turns 3 identical reads into 1 (quota headroom for many concurrent users).
+  // 15s staleness is fine for role/status; the emailVerified refresh below stays live.
+  const cacheKey = `account-status:${user.uid}`;
+  const cachedStatus = cacheGet(cacheKey);
+  if (cachedStatus) {
+    if (!user.emailVerified) {
+      await withTimeout(user.reload(), 10000).catch(() => {});
+      if (user.emailVerified) await user.getIdToken(true).catch(() => {});
+    }
+    return { ...cachedStatus, emailVerified: user.emailVerified === true };
+  }
   if (!user.emailVerified) {
     // reload() has no built-in timeout: on a stalled mobile connection it can pend for
     // minutes and freeze the login screen, so cap it and keep the cached state on timeout.
@@ -93,7 +106,10 @@ export async function getMyAccountStatus() {
   }
   const emailVerified = user.emailVerified === true;
   const admin = await withTimeout(getDoc(doc(database, 'admins', user.uid))).catch(() => null);
-  if (admin?.exists() && admin.data().active === true) return { role: 'admin', status: 'active', emailVerified, displayName: admin.data().displayName ?? '' };
+  if (admin?.exists() && admin.data().active === true) {
+    cacheSet(cacheKey, { role: 'admin', status: 'active', displayName: admin.data().displayName ?? '' }, 15000);
+    return { role: 'admin', status: 'active', emailVerified, displayName: admin.data().displayName ?? '' };
+  }
   const snapshot = await withTimeout(getDoc(doc(database, 'profiles', user.uid)));
   if (!snapshot.exists()) return { role: 'none', status: 'none', emailVerified };
   const data = snapshot.data();
@@ -102,6 +118,7 @@ export async function getMyAccountStatus() {
     writeBack.update(doc(database, 'teacherApplications', user.uid), { emailVerified: true });
     await writeBack.commit().catch(() => {});
   }
+  cacheSet(cacheKey, { role: data.role, status: data.status, displayName: data.displayName ?? '' }, 15000);
   return { role: data.role, status: data.status, displayName: data.displayName ?? '', emailVerified };
 }
 
