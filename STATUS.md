@@ -27,3 +27,5 @@ Rerun the 26 scenarios + image upload + chat + unauthorized attempts with the FI
 ## 03:31 PR fix/import-hardening opened (not merged, admin import). Done: size limit, formula sanitising. Not done: per-row error display, CSV over-200KB message.
 
 ## 03:54 MERGE meta-og (favicon link + OG tags + test) -> main 3f78086. Deploy success, live HTML has og:title, 32 live route checks (16 routes x 360/390) no overflow/errors. Already present (no change needed): lang/dir, theme-color, manifest, visibility pausing for Living timers. Open PRs: #54, #64 chat listeners, #65 import.
+
+## 04:15 MERGE update notice -> main 57cd01d. Design: in-flow bar at top of page (a floating bottom version was rejected after the screenshot showed it covering a field), only on SW takeover of a running page, hidden while typing, never auto reload. 4 tests, 136 pass, live bundle main-DEsZNiMb.js, 32 route checks clean. Screenshot /downloads/update-notice-crop.png.
