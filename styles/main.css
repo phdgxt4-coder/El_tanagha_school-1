@@ -87,11 +87,13 @@ button,input,textarea {
   border-radius:12px;
   padding:.45rem .7rem
 }
-/* جلسة نشطة: القائمة العامة وزر الدخول يختفيان حتى تسجيل الخروج (src/auth/session-gate.js).
-   يبقى الشعار (يقود للوحة الحساب) وزر تبديل المظهر. */
+/* جلسة نشطة: القائمة العامة وزر الدخول والفوتر العام يختفيان حتى تسجيل الخروج (src/auth/session-gate.js).
+   يبقى الشعار (يقود للوحة الحساب) وزر تبديل المظهر. الفوتر جزء من الموقع العام، فيُخفى هو أيضًا
+   حتى لا يبقى أي طريق للصفحة الرئيسية أو بيانات الموقع العام أثناء الجلسة. */
 html[data-session="active"] .topbar .nav,
 html[data-session="active"] .topbar .menu-toggle,
-html[data-session="active"] .topbar>.button {
+html[data-session="active"] .topbar>.button,
+html[data-session="active"] .footer {
   display:none
 }
 .button {
