@@ -1,3 +1,4 @@
+import { loadErrorMessage, withTimeout } from '../../utils/load-state.js';
 import { collection, getDocs, limit, query, startAfter } from 'firebase/firestore';
 
 export const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -6,7 +7,7 @@ export const PAGE_SIZE = 20;
 
 export function formatDate(value) {
   const date = value?.toDate ? value.toDate() : value instanceof Date ? value : null;
-  return date ? date.toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' }) : '';
+  return date ? date.toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'Africa/Cairo' }) : '';
 }
 
 export function skeletonRows(count = 3) {
@@ -35,7 +36,7 @@ export function pager(database, path, constraints, render, { target, more, size 
     try {
       const parts = [...constraints, limit(size + 1)];
       if (cursor) parts.push(startAfter(cursor));
-      const snapshot = await getDocs(query(collection(database, path), ...parts));
+      const snapshot = await withTimeout(getDocs(query(collection(database, path), ...parts)));
       const docs = snapshot.docs.slice(0, size);
       const html = docs.map(item => render({ id: item.id, ...item.data() })).join('');
       if (first) target.innerHTML = docs.length ? html : emptyNote(empty);
@@ -43,13 +44,14 @@ export function pager(database, path, constraints, render, { target, more, size 
       first = false;
       cursor = docs[docs.length - 1] ?? cursor;
       if (more) more.hidden = snapshot.docs.length <= size;
-    } catch {
-      if (first) target.innerHTML = emptyNote('تعذر تحميل البيانات الآن. حاول مرة أخرى.');
+    } catch (error) {
+      if (first) target.innerHTML = `${emptyNote(loadErrorMessage(error))}<button type="button" class="text-link" data-pager-retry>إعادة المحاولة</button>`;
     } finally {
       loading = false;
     }
   }
   more?.addEventListener('click', load);
+  target.addEventListener('click', event => { if (event.target.closest('[data-pager-retry]')) load(); });
   return { load, reset() { cursor = null; first = true; return load(); } };
 }
 
@@ -59,7 +61,7 @@ export function bindTabs(root) {
   const loaded = new Set();
   const handlers = new Map();
   function show(name) {
-    tabs.forEach(tab => { const on = tab.dataset.tab === name; tab.classList.toggle('is-active', on); tab.setAttribute('aria-selected', String(on)); });
+    tabs.forEach(tab => { const on = tab.dataset.tab === name; tab.classList.toggle('is-active', on); tab.setAttribute('aria-selected', String(on)); if (on) tab.scrollIntoView?.({ block: 'nearest', inline: 'center' }); });
     panels.forEach(panel => { panel.hidden = panel.dataset.panel !== name; });
     if (!loaded.has(name)) { loaded.add(name); handlers.get(name)?.(); }
   }

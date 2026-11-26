@@ -1,3 +1,4 @@
+import {statSync} from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync,readdirSync,existsSync} from 'node:fs';
@@ -84,8 +85,10 @@ test('every character has a manifest with 20 own idles, known recipes, and a reg
     assert.ok(existsSync(new URL(`../src/studycrew/Characters/${m.name}/manifest.js`,import.meta.url)));
   }
 });
-test('every character manifest points at placeholder art only (no heavy assets yet)',async()=>{
-  for(const id of characterIds()){const m=(await characterLoaders[id]()).default;assert.equal(m.renderer.type,'svg');assert.equal(m.renderer.rive,null);assert.equal(m.renderer.lottie,null);}
+test('manifests use placeholder SVG or the light WebP image renderer (no Rive/Lottie yet)',async()=>{
+  for(const id of characterIds()){const m=(await characterLoaders[id]()).default;assert.ok(['svg','image'].includes(m.renderer.type));assert.equal(m.renderer.rive,null);assert.equal(m.renderer.lottie,null);}
+  const alex=(await characterLoaders.alex()).default.renderer.image;
+  for(const u of Object.values(alex.frames))assert.ok(statSync(new URL(u)).size<60000,'frame too heavy');
 });
 test('every --sc-* variable used in CSS is defined by the tokens',()=>{
   const vars=tokenVars();
@@ -144,10 +147,27 @@ test('connection watcher reports changes only once per change and unsubscribes',
   assert.deepEqual(got,['offline','online']);off();online=false;t.dispatchEvent(new Event('offline'));assert.deepEqual(got,['offline','online']);
 });
 test('the framework is not imported by the production entry point or index.html',()=>{
-  assert.ok(!read('../src/app.js').includes('studycrew'));
+  const app=read('../src/app.js');
+  /* only one gated lazy import is allowed, and never a static one */
+  assert.equal((app.match(/studycrew/g)||[]).length,1);
+  assert.ok(/if\(livingEnabled\(\)\)import\('\.\/studycrew\/Living\/wire\.js'\)/.test(app));
   assert.ok(!read('../index.html').includes('studycrew'));
 });
 test('guidelines doc exists and is referenced from AGENTS.md',()=>{
   assert.ok(read('../STUDY_CREW_GUIDELINES.md').includes('كيف تضيف شخصية'));
   assert.ok(read('../AGENTS.md').includes('STUDY_CREW_GUIDELINES.md'));
+});
+test('starting in a one-shot state ends once and returns to Idle, never loops',()=>{
+  for(const initial of ['Success','Error','Celebrate']){
+    const timers=[];const seen=[];
+    const m=createStateMachine({initial,onChange:(n)=>seen.push(n),setTimer:(f,ms)=>{timers.push({f,ms});return timers.length;},clearTimer:()=>{}});
+    assert.equal(m.state,initial);assert.equal(timers.length,1,'timer set at start');
+    timers.shift().f();
+    assert.equal(m.state,'Idle');assert.deepEqual(seen,['Idle']);assert.equal(timers.length,0,'no second timer');
+  }
+});
+test('one-shot after a one-shot start still returns to Idle',()=>{
+  const timers=[];
+  const m=createStateMachine({initial:'Success',setTimer:(f)=>{timers.push(f);return timers.length;},clearTimer:()=>{}});
+  assert.equal(m.request('Error',{force:true}),true);timers.pop()();assert.equal(m.state,'Idle');
 });

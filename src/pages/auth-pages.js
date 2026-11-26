@@ -25,9 +25,9 @@ function registrationFields(role) {
 }
 
 export function loginPage(role = 'student') {
-  const safeRole = role === 'admin' ? 'teacher' : (Object.hasOwn(ROLE_LABELS, role) ? role : 'student');
+  const safeRole = Object.hasOwn(ROLE_LABELS, role) ? role : 'student';
   const roleLabel = ROLE_LABELS[safeRole];
-  const registerAvailable = role !== 'admin' && safeRole !== 'admin';
+  const registerAvailable = safeRole !== 'admin';
   const roleLinks = ['student','parent','teacher'].map(item =>
     `<a class="role-link ${item===safeRole?'selected':''}" href="/login/${item}">${ROLE_LABELS[item]}</a>`
   ).join('');

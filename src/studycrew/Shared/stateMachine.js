@@ -1,7 +1,7 @@
 /* Per-character state machine. Pure logic, no DOM. Priority model from the Motion System doc:
    Error > Success > Achievement > Notification > Idle. */
 import {tokens} from '../Themes/tokens.js';
-export const STATES=['Idle','Thinking','Reading','Searching','Typing','Loading','Success','Error','Celebrate','Sleep','Wake','Wave','HiddenPassword','VisiblePassword'];
+export const STATES=['Idle','Blink','LookAround','Greet','Curious','Happy','Thinking','Reading','Searching','Typing','Loading','Success','Error','Celebrate','Sleep','Wake','Wave','HiddenPassword','VisiblePassword'];
 export const PRIORITY={Error:100,Success:80,Celebrate:60,Wake:45,Wave:45,Loading:30,Thinking:30,Searching:30,Reading:30,Typing:30,HiddenPassword:30,VisiblePassword:30,Sleep:10,Idle:0};
 /* states that finish by themselves and fall back to a resting state */
 const M=tokens.motion;
@@ -14,13 +14,16 @@ export const TRANSITIONS={
 };
 const can=(from,to)=>(TRANSITIONS[from]||ANY).includes(to)||PRIORITY[to]>PRIORITY[from];
 export function createStateMachine({initial='Idle',onChange=()=>{},setTimer=setTimeout,clearTimer=clearTimeout}={}){
-  let state=initial,timer=null,rest=initial;
+  /* a one-shot initial state must never become the resting state, or it would loop forever */
+  let state=initial,timer=null,rest=REST.includes(initial)?initial:'Idle';
   const enter=(next,reason)=>{
     clearTimer(timer);timer=null;
     const prev=state;state=next;
     onChange(next,prev,reason);
     if(ONE_SHOT[next])timer=setTimer(()=>{timer=null;enter(rest,'finished');},ONE_SHOT[next]);
   };
+  /* starting inside a one-shot state (SuccessAnimation, ErrorAnimation) must also end and fall back to rest */
+  if(ONE_SHOT[initial])timer=setTimer(()=>{timer=null;enter(rest,'finished');},ONE_SHOT[initial]);
   return{
     get state(){return state;},
     /* returns true when the request was accepted */

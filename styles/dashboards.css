@@ -150,3 +150,43 @@
 .rc-note{font-size:.8rem;color:#444}
 @media print{body.rc-open>*:not(.report-overlay){display:none!important}.report-overlay{position:static;padding:0}.report-overlay .rc-bar{display:none}}
 .chat-tick{margin-inline-start:.5rem;font-size:.8rem;opacity:.8}
+
+/* ---------- Phone fit (RTL, 320 to 480px): no horizontal overflow ---------- */
+html{overflow-x:clip;max-width:100%}
+.dash,.dash *{min-width:0}
+.dash{box-sizing:border-box;max-width:100%}
+.stu-tabs{overflow-x:auto;overflow-y:hidden;justify-content:flex-start;scroll-snap-type:x proximity;scrollbar-width:none;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;max-width:100vw;box-sizing:border-box}
+.stu-tabs::-webkit-scrollbar{display:none}
+.stu-tabs button{flex:0 0 auto;min-width:4.1rem;padding-inline:.4rem;scroll-snap-align:center;white-space:nowrap}
+@media(min-width:900px){.stu-tabs{overflow:visible;scroll-snap-type:none}.stu-tabs button{min-width:0}}
+@media(max-width:480px){
+  .stu-hero{flex-wrap:wrap;padding:1rem;border-radius:22px;gap:.6rem}
+  .stu-hero>div{flex:1 1 12rem}
+  .stu-hero h1{overflow-wrap:anywhere}
+  .stu-hero [data-bell-slot],.stu-hero .dash-signout{flex:none}
+  .brand{min-width:0;flex:1 1 auto;overflow:hidden}
+  .brand>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .brand small{display:none}
+  .dash-parent,.dash-teacher,.dash-admin{padding-inline:.75rem}
+  .adm-table,.tch-table{display:block;overflow-x:auto;max-width:100%}
+}
+
+/* Touch targets: at least 44px (measured at 390px; bell was squeezed to 28px wide, chips 36px, text buttons 32-34px). */
+.bell-btn{flex:none;width:44px}
+.tch-chip{min-height:44px;min-width:44px}
+.dash button.text-link{min-height:44px;padding-inline:.5rem}
+
+/* ---------- Final phone polish (verified by rendering at 390 and 360px) ---------- */
+/* Admin console: the side nav was a horizontal strip that clipped section names mid-word and
+   hid 8 of 11 sections with no scroll hint. Below desktop it becomes a wrapping 2+ column grid
+   where every section label is fully visible (matches the teacher nav's stacked pattern). */
+@media(max-width:959.98px){
+  .adm-side nav{display:grid;grid-template-columns:repeat(auto-fill,minmax(9.5rem,1fr));overflow:visible}
+  .adm-side nav button{white-space:normal;text-align:start;justify-content:flex-start}
+}
+/* Parent stats: a long value (a date like "٢٤ نوفمبر") overflowed its card at 360-480px. */
+.par-stats strong{overflow-wrap:anywhere}
+@media(max-width:480px){
+  .par-stats strong{font-size:clamp(1.15rem,.95rem + 2.5vw,2.6rem)}
+  .adm-side nav{grid-template-columns:1fr 1fr}
+}

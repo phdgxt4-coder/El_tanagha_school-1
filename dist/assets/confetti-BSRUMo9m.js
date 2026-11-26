@@ -1,0 +1,1 @@
+import{c as e}from"./studycrew-CRynrGhm.js";import{t}from"./preload-helper-BzputcT5.js";async function n(n,r=e.budget.maxParticles){let{celebrate:i}=await t(async()=>{let{celebrate:e}=await import(`./celebrate-Ckaz6UnZ.js`);return{celebrate:e}},[]);i(n,r)}export{n as confetti};

@@ -3,12 +3,54 @@ import {loginPage,teacherApprovalPage,adminJoinPage} from './pages/auth-pages.js
 import {createRouteHelpers,resolveAppLink} from './utils/routes.js';
 import {initErrorReporter} from './services/error-reporter.js';
 import {trackOptions,classState,canSubmitStudent} from './utils/registration-logic.js';
+import {initErrorBoundary,errorCardHtml} from './ui/error-boundary.js';
+import {livingEnabled} from './config/features.js';
+import {initUpdateNotice} from './ui/update-notice.js';
+import {isPublicRoute,shouldLockSession,gatedRoute} from './auth/session-gate.js';
 import {initMotion,routeStart,routeEnd,withThemeTransition,withPageTransition} from './ui/motion.js';
 
 const moduleScriptUrl=document.querySelector('script[type="module"][src]')?.src;
 const sourceBasePath=moduleScriptUrl?new URL('../',moduleScriptUrl).pathname:'/';
 const routeHelpers=createRouteHelpers(import.meta.env?.BASE_URL||sourceBasePath,location.origin);
 const currentRoutePath=()=>routeHelpers.fromUrlPath(location.pathname)??'/';
+
+/* Session gate (src/auth/session-gate.js): while an active account is signed in, public routes
+   redirect to /dashboard and the public menu hides. Fails open: an unreadable account status
+   (rules not deployed yet, offline) never locks anyone out of the public site. */
+let sessionLocked=false;
+function applySessionUi(){
+  const root=document.documentElement;
+  if(sessionLocked)root.dataset.session='active';else delete root.dataset.session;
+  const brand=document.querySelector('.topbar .brand');
+  if(brand)brand.setAttribute('href',routeHelpers.toUrlPath(sessionLocked?'/dashboard':'/'));
+}
+function setSessionLocked(locked){
+  if(sessionLocked===locked)return;
+  sessionLocked=locked;
+  applySessionUi();
+  if(locked&&isPublicRoute(currentRoutePath())){
+    history.replaceState({},'',routeHelpers.toUrlPath('/dashboard'));
+    render('/dashboard');
+  }
+}
+let sessionGateToken=0;
+async function initSessionGate(){
+  try{
+    const env=await import('./config/firebase-env.js');
+    if(!env.firebaseConfigured)return;
+    const auth=await import('./auth/auth-service.js');
+    auth.subscribeToAuth(async user=>{
+      const token=++sessionGateToken;
+      if(!user){setSessionLocked(false);return;}
+      try{
+        const status=await auth.getMyAccountStatus();
+        if(token===sessionGateToken)setSessionLocked(shouldLockSession(status));
+      }catch{
+        if(token===sessionGateToken)setSessionLocked(false);
+      }
+    });
+  }catch{/* Firebase unavailable: nothing to gate. */}
+}
 
 function normalizeInternalLinks(root=document){
   root.querySelectorAll('a[href]').forEach(link=>{
@@ -82,15 +124,21 @@ function showSignedInMessage(target,message,kind='status'){
 }
 
 function render(path=currentRoutePath()){
+  const gated=gatedRoute(path,sessionLocked);
+  if(gated!==path){history.replaceState({},'',routeHelpers.toUrlPath(gated));path=gated;}
   pageCleanup();
   pageCleanup=()=>{};
   const generation=++pageGeneration;
   const app=document.querySelector('#app');
   routeStart();
   let html=notFound();
-  for(const [pattern,view] of routes){
-    const match=path.match(pattern);
-    if(match){html=view(...match.slice(1));break;}
+  try{
+    for(const [pattern,view] of routes){
+      const match=path.match(pattern);
+      if(match){html=view(...match.slice(1));break;}
+    }
+  }catch{
+    html=errorCardHtml('تعذر عرض الصفحة','حدث خلل أثناء تحميل هذه الصفحة. أعد المحاولة، ولو تكرر الأمر تواصل مع الإدارة.');
   }
   app.innerHTML=html;
   routeEnd(app);
@@ -217,6 +265,7 @@ async function populateRegistrationOptions(isStale){
 
 function initializeAuthPage(generation){
   const statusTarget=document.querySelector('[data-auth-message]');
+  // عناصر المسار والفصل تُجهّز فور رسم الصفحة حتى لا تعتمد على اتصال Firebase.
   let cancelled=false;
   registrationView=setupRegistrationSelects(()=>cancelled||!statusTarget?.isConnected);
   let unsubscribe=()=>{};
@@ -261,7 +310,7 @@ function initializeAuthPage(generation){
 
 function safeTimestamp(value){
   if(!value)return 'وقت الإرسال غير متاح';
-  try{return new Intl.DateTimeFormat('ar-EG',{dateStyle:'medium',timeStyle:'short'}).format(new Date(value));}
+  try{return new Intl.DateTimeFormat('ar-EG',{dateStyle:'medium',timeStyle:'short',timeZone:'Africa/Cairo'}).format(new Date(value));}
   catch{return 'وقت الإرسال غير متاح';}
 }
 
@@ -399,8 +448,8 @@ async function handleRegistration(form){
     const success=role==='teacher'
       ?'تم استلام طلب المدرس وهو بانتظار اعتماد الإدارة. لا يظهر الاسم أو التخصص للعامة قبل الاعتماد وموافقة النشر.'
       :role==='parent'
-        ?'تم إنشاء حساب ولي الأمر وهو يعمل الآن. اربط ابنك بكوده من لوحتك. وثّق بريدك الإلكتروني أيضًا.'
-        :'تم إنشاء حساب الطالب وهو يعمل الآن. وثّق بريدك الإلكتروني أيضًا.';
+        ?'تم إنشاء حساب ولي الأمر. افتح رسالة التأكيد في بريدك وافتح الرابط، وبعدها تفتح لوحتك مباشرة بدون موافقة الإدارة.'
+        :'تم إنشاء حساب الطالب. افتح رسالة التأكيد في بريدك وافتح الرابط، وبعدها تفتح لوحتك مباشرة بدون موافقة الإدارة.';
     const note=verificationSent?' أُرسل رابط توثيق البريد الإلكتروني.':' تعذر إرسال رسالة التوثيق الآن؛ أعد المحاولة لاحقًا.';
     showMessage(message,`${success}${note}`);
     celebrate(message);
@@ -521,9 +570,12 @@ document.addEventListener('click',async event=>{
   const resolved=resolveAppLink(rawHref,location.href,routeHelpers,routePatterns);
   if(!resolved)return;
   event.preventDefault();
-  history.pushState({},'',`${routeHelpers.toUrlPath(resolved.route)}${resolved.search}${resolved.hash}`);
+  const destination=sessionLocked&&isPublicRoute(resolved.route)
+    ?{...resolved,route:'/dashboard',search:'',hash:''}
+    :resolved;
+  history.pushState({},'',`${routeHelpers.toUrlPath(destination.route)}${destination.search}${destination.hash}`);
   window.scrollTo({top:0,behavior:'instant'});
-  withPageTransition(()=>render(resolved.route));
+  withPageTransition(()=>render(destination.route));
 });
 
 async function handleAdminJoin(form){
@@ -582,6 +634,8 @@ document.addEventListener('submit',event=>{
 window.addEventListener('popstate',()=>withPageTransition(()=>render(currentRoutePath())));
 initializeTheme();
 initErrorReporter();
+initErrorBoundary();
+initUpdateNotice();
 if(import.meta.env?.PROD&&'serviceWorker' in navigator){
   addEventListener('load',()=>navigator.serviceWorker.register(`${import.meta.env.BASE_URL||'/'}sw.js`,{scope:import.meta.env.BASE_URL||'/'}).catch(()=>{}));
 }
@@ -607,6 +661,7 @@ function syncOnlineBanner(){
   netBar('لا يوجد اتصال بالإنترنت. البيانات الحية لن تعمل حتى يعود الاتصال.',false);
 }
 addEventListener('online',syncOnlineBanner);addEventListener('offline',syncOnlineBanner);syncOnlineBanner();
+document.addEventListener('click',event=>{if(event.target.closest?.('[data-error-retry]'))location.reload();});
 document.querySelector('.menu-toggle')?.addEventListener('click',event=>{
   const nav=document.querySelector('#nav');
   const opened=nav.classList.toggle('open');
@@ -614,3 +669,6 @@ document.querySelector('.menu-toggle')?.addEventListener('click',event=>{
 });
 initMotion();
 render();
+initSessionGate();
+/* Living layer: OFF unless the feature flag is on (src/config/features.js). Lazy, never blocks the app. */
+if(livingEnabled())import('./studycrew/Living/wire.js').then(m=>m.startLiving()).catch(()=>{});

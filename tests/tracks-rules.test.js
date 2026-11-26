@@ -21,7 +21,7 @@ const user=(uid,extra={})=>environment.authenticatedContext(uid,{email:`${uid}@e
 const base=[
   ['classes/c1',{name:'1/1',grade:'1',section:'1',year:'2026-2027'}],
   ['classes/c2',{name:'2/1',grade:'2',section:'1',year:'2026-2027',branch:'bac_med'}],
-  ['classes/c3',{name:'3/1',grade:'3',section:'1',year:'2026-2027'}],
+  ['classes/c3',{name:'3/1',grade:'3',section:'1',year:'2026-2027',branch:'math'}],
   ['subjects/math',{name:'الرياضيات'}],
   ['admins/adm',{active:true}]
 ];
