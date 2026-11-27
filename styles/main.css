@@ -824,3 +824,10 @@ body{letter-spacing:.005em;text-rendering:optimizeLegibility}
 :root[data-theme="light"] .hero::after{background:linear-gradient(0deg,#10182766,transparent)}
 :root[data-theme="light"] .hero-mark{background:var(--glass-bg),#151b2999;background:linear-gradient(145deg,#ffffff1f,#ffffff08),#151b29b3}
 :root[data-theme="light"] .stats b{background:linear-gradient(135deg,#7a5710,#a77c20 55%,#c9a24b);-webkit-background-clip:text;background-clip:text}
+
+/* زر الرجوع للأعلى: دائرة صغيرة فيها أليكس (أو سهم حتى تجهز الشخصية) */
+.back-to-top{position:fixed;inset-block-end:18px;inset-inline-end:18px;z-index:70;inline-size:56px;block-size:56px;border-radius:50%;border:1px solid color-mix(in srgb,var(--gold) 45%,transparent);background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(10px);color:var(--gold);font-size:22px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 6px 24px rgba(0,0,0,.35);padding:0;overflow:hidden}
+.back-to-top:hover{border-color:var(--gold)}
+.back-to-top-host{inline-size:100%;block-size:100%;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.back-to-top-host .sc-host{inline-size:48px;block-size:48px}
+[data-sc-focus=exam] .back-to-top{display:none!important}

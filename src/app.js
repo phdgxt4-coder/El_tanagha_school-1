@@ -13,6 +13,7 @@ import {initUpdateNotice} from './ui/update-notice.js';
 import {isPublicRoute,shouldLockSession,gatedRoute} from './auth/session-gate.js';
 import {withTimeout} from './utils/load-state.js';
 import {initMotion,routeStart,routeEnd,withThemeTransition,withPageTransition} from './ui/motion.js';
+import {mountBackToTop} from './ui/back-to-top.js';
 /* firebase-env and school-info are already in the main chunk (via the error reporter and the
    catalog), so import them statically: dynamic import() here only added warnings, never splitting. */
 import {firebaseConfigured} from './config/firebase-env.js';
@@ -734,5 +735,6 @@ document.querySelector('.menu-toggle')?.addEventListener('click',event=>{
 initMotion();
 render();
 initSessionGate();
+mountBackToTop();
 /* Living layer: OFF unless the feature flag is on (src/config/features.js). Lazy, never blocks the app. */
 if(livingEnabled())import('./studycrew/Living/wire.js').then(m=>m.startLiving()).catch(()=>{});
