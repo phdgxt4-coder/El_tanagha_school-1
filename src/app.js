@@ -4,6 +4,8 @@ import {createRouteHelpers,resolveAppLink} from './utils/routes.js';
 import {initErrorReporter} from './services/error-reporter.js';
 import {trackOptions,classState,canSubmitStudent} from './utils/registration-logic.js';
 import {initErrorBoundary,errorCardHtml} from './ui/error-boundary.js';
+import {enhancePasswordFields} from './ui/password-toggle.js';
+import {runCleanups} from './ui/cleanups.js';
 import {livingEnabled} from './config/features.js';
 import {initUpdateNotice} from './ui/update-notice.js';
 import {isPublicRoute,shouldLockSession,gatedRoute} from './auth/session-gate.js';
@@ -126,6 +128,7 @@ function showSignedInMessage(target,message,kind='status'){
 function render(path=currentRoutePath()){
   const gated=gatedRoute(path,sessionLocked);
   if(gated!==path){history.replaceState({},'',routeHelpers.toUrlPath(gated));path=gated;}
+  runCleanups();
   pageCleanup();
   pageCleanup=()=>{};
   const generation=++pageGeneration;
@@ -147,6 +150,7 @@ function render(path=currentRoutePath()){
   document.querySelector('#nav')?.classList.remove('open');
   document.querySelector('.menu-toggle')?.setAttribute('aria-expanded','false');
   if(/^\/teachers\/?$/.test(path)) initializeTeacherDirectory(generation);
+  if(/^\/login(?:\/|$)/.test(path)||/^\/admin\/join\/?$/.test(path))enhancePasswordFields(app);
   if(/^\/login(?:\/|$)/.test(path)) initializeAuthPage(generation);
   if(/^\/admin\/teacher-requests\/?$/.test(path)) initializeTeacherApprovals(generation);
   if(/^\/dashboard\/?$/.test(path)) initializeDashboard(generation);
