@@ -28,7 +28,7 @@ export function mountBackToTop(doc=document){
     loading=true;
     try{
       const {mountCharacter}=await import('../studycrew/Shared/characterManager.js');
-      alex=await mountCharacter(host,'alex',{slot:'popup',tracking:false,sound:false,state:'Idle'});
+      alex=await mountCharacter(host,'alex',{slot:'backtotop',tracking:false,sound:false,state:'Idle'});
       if(alex)host.textContent='';
     }catch{/* الزر يعمل بالسهم حتى بدون الشخصية */}
   };
