@@ -35,7 +35,7 @@ export const DANCES={
     {transform:'translate(5%,-4%) rotate(7deg)',offset:.75},
     {transform:'translate(0,0) rotate(0deg)'}]}
 };
-export const DEFAULT_DANCE=1;
+export const DEFAULT_DANCE=2;
 export const REGISTER_LINE='يلا سجل!';
 
 let current=null;
