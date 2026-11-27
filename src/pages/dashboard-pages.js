@@ -2,8 +2,26 @@ import { doc, getDoc, getFirestore } from 'firebase/firestore';
 import { getFirebaseApp } from '../config/firebase-app.js';
 import { firebaseConfigured } from '../config/firebase-env.js';
 import { sectionHeading, skeletonCards } from '../components/cards.js';
+import { withTimeout } from '../utils/load-state.js';
 
 function settle(status,message){status.classList.add('is-settled');status.dataset.kind='error';const text=status.querySelector('p');if(text)text.textContent=message;}
+
+/* Shows the failure with a retry button instead of a dead skeleton: the dashboard load is
+   re-run in place, so a stalled connection never strands the user on an endless spinner. */
+function settleWithRetry(status,message,retry){
+  settle(status,message);
+  const button=document.createElement('button');
+  button.type='button';
+  button.className='button ghost';
+  button.textContent='إعادة المحاولة';
+  button.addEventListener('click',()=>{
+    status.classList.remove('is-settled');
+    delete status.dataset.kind;
+    status.innerHTML='<p>جارٍ التحقق من الحساب…</p>';
+    void retry();
+  });
+  status.append(' ',button);
+}
 
 export function dashboardPage(){
   return `<section class="section page dashboard-page">
@@ -31,7 +49,7 @@ export async function initializeDashboard(){
     ]).finally(()=>clearTimeout(authTimeout));
     if(!status.isConnected)return;
     if(!user){settle(status,'يجب تسجيل الدخول للوصول إلى اللوحة.');return;}
-    const account=await auth.getMyAccountStatus();
+    const account=await withTimeout(auth.getMyAccountStatus());
     if(!status.isConnected)return;
     if(account.status!=='active'){
       settle(status,account.status==='disabled'||account.status==='graduated'?'هذا الحساب موقوف حاليًا. تواصل مع إدارة المدرسة.':`حالة الحساب: ${account.status||'غير متاح'}.`);
@@ -39,7 +57,22 @@ export async function initializeDashboard(){
     }
     if(account.role!=='admin'&&account.emailVerified!==true){
       status.innerHTML='<p>وثّق بريدك الإلكتروني أولًا لتفتح لوحتك. افتح الرابط المرسل إلى بريدك ثم اضغط "وثّقت بريدي".</p><button type="button" class="button" data-check-verify>وثّقت بريدي</button> <button type="button" class="button ghost" data-resend-verify>أرسل رابط التوثيق مرة أخرى</button>';
-      status.querySelector('[data-check-verify]').addEventListener('click',()=>location.reload());
+      // Recheck in place (refresh the auth token, then reload the dashboard state) instead of
+      // a full page reload: faster, and the recheck itself is capped so it cannot hang.
+      status.querySelector('[data-check-verify]').addEventListener('click',async event=>{
+        const button=event.currentTarget;
+        button.disabled=true;
+        button.textContent='جارٍ التحقق…';
+        try{
+          const user=auth.getCurrentUser();
+          if(user)await withTimeout(user.reload(),10000);
+          status.innerHTML='<p>جارٍ التحقق من الحساب…</p>';
+          await initializeDashboard();
+        }catch{
+          button.disabled=false;
+          button.textContent='وثّقت بريدي';
+        }
+      });
       status.querySelector('[data-resend-verify]').addEventListener('click',async event=>{event.currentTarget.disabled=true;try{await auth.sendVerificationIfNeeded();event.currentTarget.textContent='تم الإرسال. افحص بريدك.';}catch{event.currentTarget.textContent='تعذر الإرسال الآن، حاول لاحقًا.';}});
       return;
     }
@@ -48,7 +81,7 @@ export async function initializeDashboard(){
     if(account.role==='admin'){
       profile={uid:user.uid,email:user.email,role:'admin',status:'active',displayName:account.displayName||user.email};
     }else{
-      const profileSnapshot=await getDoc(doc(database,'profiles',user.uid));
+      const profileSnapshot=await withTimeout(getDoc(doc(database,'profiles',user.uid)));
       if(!status.isConnected)return;
       profile=profileSnapshot.exists()?{uid:user.uid,...profileSnapshot.data(),email:user.email}:{uid:user.uid,email:user.email,role:account.role,status:account.status,displayName:account.displayName};
     }
@@ -65,8 +98,10 @@ export async function initializeDashboard(){
     import('./dashboards/common.js').then(common=>{common.mountBell(root,{profile,database});common.labelOrphans(root);}).catch(()=>{});
     await mod[`mount${cap}`](root,{profile,auth,database});
   }catch(error){
-    if(status.isConnected)settle(status,error?.message==='auth/timeout'
-      ?'تأخر التحقق من جلسة الدخول. تحقق من الاتصال ثم أعد المحاولة.'
-      :'تعذر تحميل لوحة الحساب. تحقق من إعداد Firebase ثم حاول مجددًا.');
+    if(!status.isConnected)return;
+    const slow=error?.message==='auth/timeout'||error?.code==='load-timeout';
+    settleWithRetry(status,slow
+      ?'الاتصال بطيء جدًا أو الخدمة لم تجهز بعد (تأكد أن قاعدة بيانات Firestore أُنشئت والقواعد منشورة). تحقق ثم أعد المحاولة.'
+      :'تعذر تحميل لوحة الحساب. تحقق من إعداد Firebase ثم حاول مجددًا.',initializeDashboard);
   }
 }

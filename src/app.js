@@ -9,6 +9,7 @@ import {runCleanups} from './ui/cleanups.js';
 import {livingEnabled} from './config/features.js';
 import {initUpdateNotice} from './ui/update-notice.js';
 import {isPublicRoute,shouldLockSession,gatedRoute} from './auth/session-gate.js';
+import {withTimeout} from './utils/load-state.js';
 import {initMotion,routeStart,routeEnd,withThemeTransition,withPageTransition} from './ui/motion.js';
 
 const moduleScriptUrl=document.querySelector('script[type="module"][src]')?.src;
@@ -45,7 +46,7 @@ async function initSessionGate(){
       const token=++sessionGateToken;
       if(!user){setSessionLocked(false);return;}
       try{
-        const status=await auth.getMyAccountStatus();
+        const status=await withTimeout(auth.getMyAccountStatus());
         if(token===sessionGateToken)setSessionLocked(shouldLockSession(status));
       }catch{
         if(token===sessionGateToken)setSessionLocked(false);
@@ -287,7 +288,7 @@ function initializeAuthPage(generation){
     unsubscribe=api.subscribeToAuth(async user=>{
       if(!user||cancelled||!statusTarget.isConnected)return;
       try{
-        const status=await api.getMyAccountStatus();
+        const status=await withTimeout(api.getMyAccountStatus());
         if(cancelled||!statusTarget.isConnected)return;
         if(status.role==='teacher_applicant'&&status.status==='pending'){
           showSignedInMessage(statusTarget,'طلب المدرس قيد مراجعة الإدارة. لن يظهر الاسم أو التخصص في الدليل قبل الاعتماد وموافقة النشر.');
@@ -408,7 +409,7 @@ async function handleLogin(form){
     const api=await import('./auth/auth-service.js');
     const {email,password}=formValues(form);
     await api.signIn(email,password);
-    const status=await api.getMyAccountStatus();
+    const status=await withTimeout(api.getMyAccountStatus());
     if(status.role==='admin'){
       history.pushState({},'',routeHelpers.toUrlPath('/dashboard'));
       render('/dashboard');
@@ -443,8 +444,8 @@ async function handleRegistration(form){
   try{
     const api=await import('./auth/auth-service.js');
     const currentUser=api.getCurrentUser();
-    if(currentUser?.email?.toLowerCase()!==email.trim().toLowerCase())await api.createAuthUser(email,password);
-    const application=await api.submitAccountRequest(profile);
+    if(currentUser?.email?.toLowerCase()!==email.trim().toLowerCase())await withTimeout(api.createAuthUser(email,password));
+    const application=await withTimeout(api.submitAccountRequest(profile));
     let verificationSent=true;
     try{await api.sendVerificationIfNeeded();}catch{verificationSent=false;}
     const success=role==='teacher'

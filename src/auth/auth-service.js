@@ -205,6 +205,7 @@ export function friendlyAuthError(error) {
     'auth/invalid-email': 'اكتب بريدًا إلكترونيًا صحيحًا.',
     'auth/missing-email': 'اكتب البريد الإلكتروني أولًا.',
     'auth/too-many-requests': 'محاولات كثيرة؛ انتظر قليلًا ثم أعد المحاولة.',
+    'load-timeout': 'الاتصال بطيء جدًا. تحقق من الشبكة ثم أعد المحاولة.',
     'functions/unauthenticated': 'انتهت الجلسة؛ سجّل الدخول ثم أعد المحاولة.',
     'functions/permission-denied': 'ليست لديك صلاحية تنفيذ هذا الإجراء.',
     'functions/failed-precondition': error?.message || 'يلزم استكمال خطوة تحقق قبل المتابعة.',
