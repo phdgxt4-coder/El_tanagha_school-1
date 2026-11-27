@@ -10,7 +10,7 @@ let environment;
 before(async()=>{
   if(!emulatorAvailable)return;
   environment=await initializeTestEnvironment({
-    projectId:'demo-nibras-rules',
+    projectId:'demo-owner-diagnostics',
     firestore:{rules:fs.readFileSync(new URL('../firestore.rules',import.meta.url),'utf8')}
   });
 });
