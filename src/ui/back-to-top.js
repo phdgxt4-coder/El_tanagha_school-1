@@ -28,9 +28,10 @@ export function mountBackToTop(doc=document){
     loading=true;
     try{
       const {mountCharacter}=await import('../studycrew/Shared/characterManager.js');
+      host.textContent='';  // امسح السهم قبل التركيب: مسحه بعده كان يزيل عنصر أليكس نفسه
       alex=await mountCharacter(host,'alex',{slot:'backtotop',tracking:false,sound:false,state:'Idle'});
-      if(alex)host.textContent='';
-    }catch{/* الزر يعمل بالسهم حتى بدون الشخصية */}
+      if(!alex)host.textContent='↑';
+    }catch{host.textContent='↑';/* الزر يعمل بالسهم حتى بدون الشخصية */}
   };
 
   const onScroll=()=>{
