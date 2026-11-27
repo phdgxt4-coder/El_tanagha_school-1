@@ -1,5 +1,6 @@
 import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { esc, formatDate, gradeNames, pager, say, shellActions } from './common.js';
+import { createAttemptLimiter } from '../../utils/attempt-limiter.js';
 import { mountParentChat, renderParentChat } from '../parent-chat.js';
 
 export function renderParent(profile) {
@@ -100,6 +101,7 @@ export function mountParent(root, { auth, database, profile }) {
   });
   root.querySelector('[data-parent-link]').insertAdjacentHTML('beforebegin', '<button type="button" class="text-link" data-unlink hidden>إلغاء ربط الابن المحدد</button>');
   const unlink = root.querySelector('[data-unlink]');
+  const linkLimiter = createAttemptLimiter();
   unlink.addEventListener('click', async () => {
     const student = students.find(item => item.uid === current);
     if (!student || !window.confirm(`إلغاء ربط ${student.displayName}؟ لن تستطيع رؤية بياناته إلا بكود جديد.`)) return;
@@ -113,13 +115,16 @@ export function mountParent(root, { auth, database, profile }) {
     const form = event.currentTarget;
     const button = form.querySelector('button');
     const message = form.querySelector('[data-link-message]');
+    const wait = linkLimiter.remainingMs();
+    if (wait > 0) { say(message, `محاولات كثيرة غير صحيحة. انتظر ${Math.ceil(wait / 1000)} ثانية ثم حاول مرة أخرى.`, 'error'); return; }
     button.disabled = true;
     try {
       const result = await auth.linkParentToStudent(new FormData(form).get('code'));
+      linkLimiter.succeed();
       say(message, `تم ربط ${result.displayName || 'الطالب'} بحسابك.`);
       form.reset();
       await refresh();
-    } catch (error) { say(message, auth.friendlyAuthError(error), 'error'); }
+    } catch (error) { linkLimiter.fail(); say(message, auth.friendlyAuthError(error), 'error'); }
     finally { button.disabled = false; }
   });
   root.querySelector('[data-report-card]').addEventListener('click', async event => {

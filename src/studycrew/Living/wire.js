@@ -62,6 +62,45 @@ export function startLiving(doc=document){
     }else if(m.dataset.kind==='success'){say(director('success'),'alex');doc.querySelector('.auth-panel')?.classList.add('sc-glow');}
   };
 
+  /* Crew spots outside auth (guidelines §1): Oscar on the student's tasks tab, Chloe on the grades
+     tab, Arthur welcomes the teacher and parent dashboards, Alex covers 404, Leo owns network
+     states. Each hint shows once per session through the same focus policy; exam stays silent. */
+  const shownHints=new Set();
+  const hintOnce=(key,characterId)=>{
+    if(shownHints.has(key)||getFocus()==='exam')return;
+    try{if(sessionStorage.getItem('sc.hint.'+key))return;sessionStorage.setItem('sc.hint.'+key,'1');}catch{}
+    shownHints.add(key);
+    say(director('hint',{hint:key}),characterId);
+  };
+  const checkSpots=()=>{
+    if(doc.querySelector('.dash-teacher'))hintOnce('teacher','arthur');
+    if(doc.querySelector('.dash-parent'))hintOnce('parent','arthur');
+    if(doc.querySelector('.dash-student [data-panel="tasks"]:not([hidden])'))hintOnce('tasks','oscar');
+    if(doc.querySelector('.dash-student [data-panel="grades"]:not([hidden])'))hintOnce('grades','chloe');
+    if(doc.querySelector('[data-page="404"]'))hintOnce('notFound','alex');
+  };
+
+  /* Leo owns network states (guidelines §8): a calm note when the connection drops or returns.
+     The app's own offline bar stays; Leo only adds a face, and important info stays real text. */
+  let leoNote=null,netWasOff=false;
+  const clearLeo=()=>{leoNote?.destroy?.();leoNote=null;};
+  const networkNote=online=>{
+    refreshFocus();
+    if(getFocus()==='exam')return;
+    clearLeo();
+    const out=director('hint',{hint:online?'online':'offline'});
+    if(!out.show||!out.message)return;
+    import('../Shared/components.js').then(({NotificationCharacter})=>{
+      if(getFocus()==='exam')return;
+      clearLeo();
+      leoNote=NotificationCharacter({type:online?'success':'warn',text:out.message,characterId:'leo'});
+      layer.append(leoNote.el);
+      setTimeout(clearLeo,6000);
+    }).catch(()=>{});
+  };
+  addEventListener('offline',()=>{netWasOff=true;networkNote(false);});
+  addEventListener('online',()=>{if(netWasOff){netWasOff=false;networkNote(true);}});
+
   /* Student home: welcome back once per session, only after a long absence. */
   let welcomed=false;
   const checkHome=()=>{
@@ -82,13 +121,13 @@ export function startLiving(doc=document){
   let queued=false;
   const mo=new MutationObserver(()=>{
     if(queued)return;queued=true;
-    setTimeout(()=>{queued=false;refreshFocus();if(getFocus()==='exam')return;checkAuth();checkHome();},120);
+    setTimeout(()=>{queued=false;refreshFocus();if(getFocus()==='exam')return;checkAuth();checkHome();checkSpots();},120);
   });
-  mo.observe(doc.body,{childList:true,subtree:true,attributes:true,attributeFilter:['data-kind']});
+  mo.observe(doc.body,{childList:true,subtree:true,attributes:true,attributeFilter:['data-kind','hidden']});
   doc.addEventListener('focusin',refreshFocus);
   const tick=setInterval(()=>{if(doc.visibilityState==='visible'){refreshFocus();say(director('tick'),'alex');}},TICK_MS);
   addEventListener('pagehide',()=>{clearInterval(tick);remember('route',location.pathname);remember('scroll:'+location.pathname,Math.round(scrollY));});
   addEventListener('popstate',sample);
-  refreshFocus();sample();checkAuth();checkHome();
+  refreshFocus();sample();checkAuth();checkHome();checkSpots();
 }
 export const _cfg=LIVING;
