@@ -3,6 +3,7 @@ import {loginPage,teacherApprovalPage,adminJoinPage} from './pages/auth-pages.js
 import {createRouteHelpers,resolveAppLink} from './utils/routes.js';
 import {initErrorReporter} from './services/error-reporter.js';
 import {initErrorBoundary,errorCardHtml} from './ui/error-boundary.js';
+import {enhancePasswordFields} from './ui/password-toggle.js';
 import {TRACKS} from '../functions/src/validation.js';
 import {livingEnabled} from './config/features.js';
 import {initUpdateNotice} from './ui/update-notice.js';
@@ -147,6 +148,7 @@ function render(path=currentRoutePath()){
   document.querySelector('#nav')?.classList.remove('open');
   document.querySelector('.menu-toggle')?.setAttribute('aria-expanded','false');
   if(/^\/teachers\/?$/.test(path)) initializeTeacherDirectory(generation);
+  if(/^\/login(?:\/|$)/.test(path)||/^\/admin\/join\/?$/.test(path))enhancePasswordFields(app);
   if(/^\/login(?:\/|$)/.test(path)) initializeAuthPage(generation);
   if(/^\/admin\/teacher-requests\/?$/.test(path)) initializeTeacherApprovals(generation);
   if(/^\/dashboard\/?$/.test(path)) initializeDashboard(generation);
