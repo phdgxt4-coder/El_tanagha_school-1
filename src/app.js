@@ -517,7 +517,7 @@ async function handleRegistration(form){
   }catch(error){
     const api=await import('./auth/auth-service.js').catch(()=>null);
     showMessage(message,api?api.friendlyAuthError(error):'تعذر تهيئة خدمة المصادقة.','error');
-  }finally{if(button.isConnected){button.disabled=false;resyncRegistration();}}
+  }finally{if(button.isConnected)button.disabled=false;}
 }
 
 document.addEventListener('click',async event=>{
