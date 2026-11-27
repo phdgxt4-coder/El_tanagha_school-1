@@ -6,15 +6,15 @@ export function isNoise(message) {
   return !text || NOISE.some(pattern => pattern.test(text));
 }
 
-/** يقنّع البريد والهاتف وأكواد الربط ومعرّفات المستخدمين قبل أي تسجيل. */
-export function scrubMessage(message) {
+/** يقنّع البريد والهاتف وأكواد الربط ومعرّفات المستخدمين قبل أي تسجيل. max اختياري (الافتراضي 300). */
+export function scrubMessage(message, max = 300) {
   return String(message ?? '')
     .replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/gu, '[email]')
     .replace(/\bTNG-[A-Z0-9]{6,}\b/gu, '[code]')
     .replace(/\bSTU-[A-Z0-9]{6,}\b/gu, '[id]')
     .replace(/\+?\d[\d\s-]{7,}\d/gu, '[phone]')
     .replace(/\b[A-Za-z0-9]{24,}\b/gu, '[id]')
-    .slice(0, 300);
+    .slice(0, max);
 }
 
 export function errorCardHtml(title, note) {
