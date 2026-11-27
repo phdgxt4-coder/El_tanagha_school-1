@@ -11,6 +11,13 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.active == true;
     }
 
+    // المالك = أدمن نشط مستنده في admins يحمل isOwner == true.
+    // الحقل يُضاف يدويًا من Firebase Console على أول أدمن فقط.
+    function isOwner() {
+      return isActiveAdmin()
+        && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.get('isOwner', false) == true;
+    }
+
     function profile(uid) {
       return get(/databases/$(database)/documents/profiles/$(uid)).data;
     }
@@ -337,8 +344,10 @@ service cloud.firestore {
         && request.resource.data.displayName is string && request.resource.data.displayName.size() <= 80
         && request.resource.data.createdBy == get(/databases/$(database)/documents/adminInvites/$(request.auth.token.email)).data.createdBy
         && request.resource.data.createdAt == request.time;
-      // إيقاف أو تفعيل أدمن آخر (لا يوقف نفسه).
+      // إيقاف أو تفعيل أدمن آخر (لا يوقف نفسه، ولا يوقف المالك).
+      // حصر الحقول في active فقط يمنع أي أدمن من كتابة isOwner لنفسه أو لغيره.
       allow update: if isActiveAdmin() && adminId != request.auth.uid
+        && resource.data.get('isOwner', false) != true
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active']);
       allow delete: if false;
     }
@@ -464,7 +473,7 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // أخطاء المتصفح: أي مستخدم مسجل يكتب خطأً واحدًا بشكل ثابت، والإدارة فقط تقرأ.
+    // أخطاء المتصفح (سجل قديم): أي مستخدم مسجل يكتب خطأً واحدًا بشكل ثابت، والمالك فقط يقرأ.
     match /clientErrors/{errorId} {
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly(['uid', 'message', 'source', 'route', 'agent', 'at'])
@@ -474,7 +483,7 @@ service cloud.firestore {
         && request.resource.data.route is string && request.resource.data.route.size() <= 120
         && request.resource.data.agent is string && request.resource.data.agent.size() <= 150
         && request.resource.data.at == request.time;
-      allow get, list: if isActiveAdmin();
+      allow get, list: if isOwner();
       allow update, delete: if false;
     }
 
@@ -811,6 +820,65 @@ service cloud.firestore {
         && request.resource.data.content is bool && request.resource.data.grade is bool
         && request.resource.data.attendance is bool && request.resource.data.chat is bool;
       allow list, delete: if false;
+    }
+
+    // تقارير الأخطاء: المعرّف = بصمة الخطأ (16 حرف hex). أي مستخدم مسجل يسجّل خطأ
+    // جديدًا أو يزيد عدّاد خطأ موجود (مرة كل 30 ثانية للخطأ الواحد). المالك فقط يقرأ ويعدّل ويحذف.
+    match /errorReports/{fp} {
+      allow get, list, delete: if isOwner();
+
+      allow create: if signedIn()
+        && fp.matches('^[0-9a-f]{16}$')
+        && request.resource.data.keys().hasOnly(['fingerprint', 'kind', 'message', 'source', 'route', 'line', 'stack', 'agent', 'release', 'uid', 'status', 'count', 'firstAt', 'lastAt', 'lastRoute', 'lastRelease', 'clientAtIso'])
+        && request.resource.data.keys().hasAll(['fingerprint', 'kind', 'message', 'route', 'uid', 'status', 'count', 'firstAt', 'lastAt'])
+        && request.resource.data.fingerprint == fp
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.kind in ['error', 'promise', 'resource', 'boundary', 'manual']
+        && request.resource.data.message is string && request.resource.data.message.size() <= 300
+        && request.resource.data.route is string && request.resource.data.route.size() <= 120
+        && request.resource.data.get('source', '') is string && request.resource.data.get('source', '').size() <= 120
+        && request.resource.data.get('stack', '') is string && request.resource.data.get('stack', '').size() <= 1500
+        && request.resource.data.get('agent', '') is string && request.resource.data.get('agent', '').size() <= 150
+        && request.resource.data.get('release', '') is string && request.resource.data.get('release', '').size() <= 40
+        && request.resource.data.get('lastRoute', '') is string && request.resource.data.get('lastRoute', '').size() <= 120
+        && request.resource.data.get('lastRelease', '') is string && request.resource.data.get('lastRelease', '').size() <= 40
+        && request.resource.data.get('clientAtIso', '') is string && request.resource.data.get('clientAtIso', '').size() <= 40
+        && request.resource.data.get('line', 0) is int
+        && request.resource.data.status == 'open'
+        && request.resource.data.count == 1
+        && request.resource.data.firstAt == request.time
+        && request.resource.data.lastAt == request.time;
+
+      // زيادة العدّاد من أي مستخدم مسجل (الحقول الأربعة فقط، وبخطوة +1 فقط).
+      allow update: if signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['count', 'lastAt', 'lastRoute', 'lastRelease'])
+        && request.resource.data.count == resource.data.count + 1
+        && request.resource.data.lastAt == request.time
+        && resource.data.lastAt < request.time - duration.value(30, 's')
+        && request.resource.data.get('lastRoute', '') is string && request.resource.data.get('lastRoute', '').size() <= 120
+        && request.resource.data.get('lastRelease', '') is string && request.resource.data.get('lastRelease', '').size() <= 40;
+
+      // تعديل المالك: الحالة والحل والوقاية والملاحظة.
+      allow update: if isOwner()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'solution', 'prevention', 'ownerNote', 'resolvedAt', 'resolvedBy', 'autoResolved', 'reopenCount'])
+        && request.resource.data.status in ['open', 'likely_fixed', 'resolved'];
+    }
+
+    // تعليقات الصفحات: المالك فقط.
+    match /errorNotes/{noteId} {
+      allow get, list, delete: if isOwner();
+      allow create, update: if isOwner()
+        && request.resource.data.keys().hasOnly(['route', 'text', 'solution', 'done', 'createdAt', 'createdBy', 'updatedAt'])
+        && request.resource.data.route is string && request.resource.data.route.size() <= 120
+        && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 2000;
+    }
+
+    // نتائج مراجعة الكود (تُرفع من ملف JSON الذي ينتجه سكربت المراجعة): المالك فقط.
+    match /reviewRuns/{runId} {
+      allow get, list, delete: if isOwner();
+      allow create: if isOwner()
+        && request.resource.data.keys().hasOnly(['schema', 'generatedAtIso', 'commit', 'summary', 'findings', 'createdAt', 'createdBy']);
+      allow update: if false;
     }
 
     // لا توجد سماحات افتراضية لأي مجموعة أخرى.

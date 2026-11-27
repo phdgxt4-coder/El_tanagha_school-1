@@ -3,8 +3,9 @@ import * as spark from '../../services/spark-backend.js';
 import { invalidateStructure, loadClasses, loadSubjects, loadClassAssignments } from '../../services/structure-service.js';
 import { ALL_TRACKS, TRACKS, trackLabel } from '../../../functions/src/validation.js';
 import { esc, gradeNames, say, shellActions, skeletonRows } from './common.js';
+import { mountOwnerConsole } from './owner-console.js';
 
-const SECTIONS = [['overview', 'نظرة عامة', '▦'], ['classes', 'الصفوف والفصول', '▤'], ['subjects', 'المواد', '✎'], ['teachers', 'المدرسون والإسناد', '☺'], ['students', 'استيراد الطلاب', '⇪'], ['links', 'ربط أولياء الأمور', '⚭'], ['users', 'إدارة الحسابات', '⚙'], ['timetable', 'جدول الحصص', '▦'], ['ops', 'النسخ والأخطاء', '⛁'], ['admins', 'المدراء', '♛'], ['contact', 'رسائل التواصل', '✉']];
+const SECTIONS = [['overview', 'نظرة عامة', '▦'], ['classes', 'الصفوف والفصول', '▤'], ['subjects', 'المواد', '✎'], ['teachers', 'المدرسون والإسناد', '☺'], ['students', 'استيراد الطلاب', '⇪'], ['links', 'ربط أولياء الأمور', '⚭'], ['users', 'إدارة الحسابات', '⚙'], ['timetable', 'جدول الحصص', '▦'], ['ops', 'النسخ والأخطاء', '⛁'], ['diagnostics', 'مركز التشخيص', '✚'], ['admins', 'المدراء', '♛'], ['contact', 'رسائل التواصل', '✉']];
 
 export function renderAdmin(profile) {
   return `<div class="dash dash-admin" data-dash="admin">
@@ -45,7 +46,8 @@ export function renderAdmin(profile) {
       <section data-panel="ops" hidden><h1>النسخ الاحتياطي والأخطاء</h1>
         <p class="dash-muted">النسخ التلقائي المجدول يحتاج خطة Blaze، فهنا نسخة يدوية: تنزل ملف JSON فيه الفصول والمواد والحسابات والدرجات والحضور والمحتوى والمهام والجداول. الرسائل لا تدخل النسخة. كل مستند يُحسب قراءة من الحد المجاني (50 ألف يوميًا)، فاعملها خارج وقت الذروة، مرة أسبوعيًا مثلًا.</p>
         <button class="button" type="button" data-export>تنزيل نسخة احتياطية</button><p class="form-note" data-msg="export" role="status"></p>
-        <h2>آخر أخطاء المتصفح</h2><button class="button ghost" type="button" data-errors-load>تحديث</button><table class="adm-table"><tbody data-errors></tbody></table></section>
+        <h2>آخر أخطاء المتصفح (سجل قديم)</h2><p class="dash-muted">هذا السجل توقف عن التحديث: الأخطاء الجديدة تظهر في «مركز التشخيص» (للمالك فقط). القراءة هنا متاحة للمالك فقط حسب القواعد.</p><button class="button ghost" type="button" data-errors-load>تحديث</button><table class="adm-table"><tbody data-errors></tbody></table></section>
+      <section data-panel="diagnostics" hidden><h1>مركز التشخيص والأخطاء</h1><p class="dash-muted">أداة المالك: سجل الأخطاء المجمّعة، تعليقات الصفحات، نتائج مراجعة الكود، وتقرير جاهز لأي مساعد ذكاء اصطناعي.</p><div data-owner-console></div></section>
       <section data-panel="contact" hidden><h1>رسائل التواصل</h1><p class="dash-muted">الرسائل القادمة من نموذج "تواصل معنا" في الموقع. لا يُرسل بريد؛ الرسائل تُحفظ هنا فقط. آخر 50 رسالة.</p>
         <button class="button ghost" type="button" data-contact-load>تحديث</button><p class="form-note" data-msg="contact" role="status"></p><table class="adm-table"><tbody data-contact-list></tbody></table></section>
       <section data-panel="admins" hidden><h1>المدراء</h1>
@@ -256,8 +258,12 @@ export function mountAdmin(root, { auth, database }) {
   });
   async function errorsPanel() {
     const body = root.querySelector('[data-errors]');
-    const snapshot = await getDocs(query(collection(database, 'clientErrors'), orderBy('at', 'desc'), limit(30)));
-    body.innerHTML = snapshot.docs.length ? snapshot.docs.map(item => { const e = item.data(); return `<tr><td dir="ltr">${esc(e.message)}</td><td>${esc(e.route)}</td><td>${esc(e.at?.toDate?.().toLocaleString('ar-EG') || '')}</td></tr>`; }).join('') : '<tr><td>لا توجد أخطاء مسجلة.</td></tr>';
+    try {
+      const snapshot = await getDocs(query(collection(database, 'clientErrors'), orderBy('at', 'desc'), limit(30)));
+      body.innerHTML = snapshot.docs.length ? snapshot.docs.map(item => { const e = item.data(); return `<tr><td dir="ltr">${esc(e.message)}</td><td>${esc(e.route)}</td><td>${esc(e.at?.toDate?.().toLocaleString('ar-EG') || '')}</td></tr>`; }).join('') : '<tr><td>لا توجد أخطاء مسجلة.</td></tr>';
+    } catch {
+      body.innerHTML = '<tr><td>هذا السجل متاح للمالك فقط. الأخطاء الجديدة تظهر في «مركز التشخيص».</td></tr>';
+    }
   }
   root.querySelector('[data-errors-load]').addEventListener('click', () => guard(errorsPanel, m('export'), '', false));
   async function adminsPanel() {
@@ -286,7 +292,7 @@ export function mountAdmin(root, { auth, database }) {
     const del = event.target.closest('[data-contact-del]');
     if (del && confirmAsk('حذف هذه الرسالة؟')) guard(async () => { await spark.adminDeleteContactMessage(del.dataset.contactDel); await contactPanel(); }, m('contact'), 'تم الحذف.', true);
   });
-  const loaders = { contact: contactPanel, admins: adminsPanel, ops: errorsPanel, timetable: timetablePanel, users: usersPanel, overview, classes, subjects, teachers, links: () => links(true) };
+  const loaders = { contact: contactPanel, admins: adminsPanel, ops: errorsPanel, diagnostics: () => mountOwnerConsole(root.querySelector('[data-owner-console]')), timetable: timetablePanel, users: usersPanel, overview, classes, subjects, teachers, links: () => links(true) };
 
   root.querySelector('.adm-side nav').addEventListener('click', event => {
     const button = event.target.closest('[data-section]');
