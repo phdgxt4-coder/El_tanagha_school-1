@@ -17,10 +17,28 @@ Code on main at **7e314cd**. Start of session: `backup-2026-11-26-start` = 0e235
 | #72 | 499ddf0 | dates shown in Africa/Cairo |
 | #73 | 7e314cd | .nvmrc + engines (Node 22), same as CI |
 
-## Open PRs (not merged by design: chat, parent link or import)
-- #64 chat listeners cleanup. Not exercised in the chat UI.
-- #65 Excel import hardening. Per-row errors and CSV size message not done.
-- #68 parent-link cooldown. Not exercised in a browser.
+## جلسة 27 نوفمبر 2026 — كل الـPRs اتدمجت
+
+| PR | merge | المحتوى |
+|---|---|---|
+| #83 | 2c242ba | زر العين لكلمة المرور (بدون تميمة؛ #44 اتقفل) |
+| #78 | 114419d | ظهور الشخصيات الخمس في اللحظات (Oscar/Chloe/Leo/Arthur) |
+| #64 | 25b6bbe | قفل مستمعين الشات عند تغيير الصفحة |
+| #49 | 248caec | تحصين قوائم التسجيل (صف/مسار/فصل) |
+| #65 | abfd651 | تحصين استيراد الإكسل (حد 5 ميجا واحد بعد إصلاح كود ميت) |
+| #68 | 2cb5b89 | مهلة 60 ثانية بعد 5 محاولات ربط خاطئة لولي الأمر |
+| #81 | a0a81da | إنهاء تعليق التوثيق اللانهائي (مهل 15/10 ثواني + إعادة محاولة) |
+| #82 | cc8cbfc | dist خارج التتبع (CI يبنيه) — نهاية تعارضات dist |
+
+وقبلهم في نفس الليلة: #76 (Living افتراضيًا)، #77 (قفل الجلسة)، #79 (موبايل)، #80 (الفوتر).
+
+### تحقق هذه الجلسة (مقاس)
+- 137 اختبار ناجح / 0 فاشل على main النهائي (cc8cbfc)، وبناء نظيف.
+- لايف بعد النشر: قاعدة قفل الفوتر في الـCSS المنشور، الخمس شخصيات في حزمة wire المنشورة (alex/arthur/oscar/leo/chloe كلهم موجودين)، زر العين وعبارات load-timeout و"اختر الفصل" ورسالة 5 ميجا في الحزم المنشورة.
+- صفر PRs مفتوحة.
+
+### لم يُختبر (كما هو)
+- موبايلات حقيقية، Firebase حقيقي، وصول إيميلات التوثيق، حمل فعلي.
 
 ## Verified (measured)
 - Tests: 140/140 (rules emulator) at 7e314cd. Build OK.
