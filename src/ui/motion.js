@@ -132,10 +132,11 @@ function watchPanels(app){
 }
 
 /* ---------- Prefetch the lazy chunks before the tap ---------- */
+/* firebase-env is not prefetched: it already ships inside the main chunk, so a dynamic import of
+   it was dead weight. content/auth/dashboard stay: they pull the heavy lazy chunks (Firestore SDK). */
 const prefetchers={
   dashboard:()=>import('../pages/dashboard-pages.js'),
   auth:()=>import('../auth/auth-service.js'),
-  firebase:()=>import('../config/firebase-env.js'),
   content:()=>import('../services/content-service.js')
 };
 const warmed=new Set();
@@ -148,12 +149,12 @@ function prefetchFor(event){
   const link=event.target.closest?.('a[href]');
   if(!link)return;
   const href=link.getAttribute('href')||'';
-  if(/\/login/.test(href)){warm('firebase');warm('auth');}
+  if(/\/login/.test(href)){warm('auth');}
   else if(/\/dashboard/.test(href)){warm('dashboard');warm('auth');}
-  else if(/\/teachers/.test(href)){warm('firebase');warm('content');}
+  else if(/\/teachers/.test(href)){warm('content');}
 }
 function idlePrefetch(){
-  const run=()=>{warm('firebase');};
+  const run=()=>{warm('auth');};
   (window.requestIdleCallback||(fn=>setTimeout(fn,2500)))(run,{timeout:4000});
 }
 

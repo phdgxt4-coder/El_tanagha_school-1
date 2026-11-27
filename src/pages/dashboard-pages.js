@@ -1,4 +1,5 @@
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
+import { createResendGuard, resendLabel } from '../auth/action-logic.js';
 import { getFirebaseApp } from '../config/firebase-app.js';
 import { firebaseConfigured } from '../config/firebase-env.js';
 import { sectionHeading, skeletonCards } from '../components/cards.js';
@@ -75,7 +76,6 @@ export async function initializeDashboard(){
       });
       status.querySelector('[data-resend-verify]').addEventListener('click',async event=>{
         const button=event.currentTarget;
-        const {createResendGuard,resendLabel}=await import('../auth/action-logic.js');
         let storage=null;try{storage=window.sessionStorage;}catch{}
         const guard=createResendGuard({storage,key:'tn_resend_action'});
         if(!guard.canSend()){button.textContent=resendLabel(guard);return;}

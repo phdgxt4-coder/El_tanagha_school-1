@@ -1,6 +1,7 @@
 import {home,subjectsPage,subjectPage,teachersPage,renderTeacherCards,newsPage,schedulePage,resultsPage,contactPage,privacyPage,notFound} from './pages/public-pages.js';
 import {loginPage,teacherApprovalPage,adminJoinPage} from './pages/auth-pages.js';
-import {authActionPage} from './pages/auth-action.js';
+import {authActionPage,runActionPage,mountActionMascot} from './pages/auth-action.js';
+import {createResendGuard,resendLabel} from './auth/action-logic.js';
 import {createRouteHelpers,resolveAppLink} from './utils/routes.js';
 import {initErrorReporter} from './services/error-reporter.js';
 import {trackOptions,classState,canSubmitStudent} from './utils/registration-logic.js';
@@ -12,6 +13,10 @@ import {initUpdateNotice} from './ui/update-notice.js';
 import {isPublicRoute,shouldLockSession,gatedRoute} from './auth/session-gate.js';
 import {withTimeout} from './utils/load-state.js';
 import {initMotion,routeStart,routeEnd,withThemeTransition,withPageTransition} from './ui/motion.js';
+/* firebase-env and school-info are already in the main chunk (via the error reporter and the
+   catalog), so import them statically: dynamic import() here only added warnings, never splitting. */
+import {firebaseConfigured} from './config/firebase-env.js';
+import {schoolInfo} from './config/school-info.js';
 
 const moduleScriptUrl=document.querySelector('script[type="module"][src]')?.src;
 const sourceBasePath=moduleScriptUrl?new URL('../',moduleScriptUrl).pathname:'/';
@@ -40,8 +45,7 @@ function setSessionLocked(locked){
 let sessionGateToken=0;
 async function initSessionGate(){
   try{
-    const env=await import('./config/firebase-env.js');
-    if(!env.firebaseConfigured)return;
+    if(!firebaseConfigured)return;
     const auth=await import('./auth/auth-service.js');
     auth.subscribeToAuth(async user=>{
       const token=++sessionGateToken;
@@ -169,7 +173,9 @@ function initializeAuthAction(generation){
   let cancelled=false;
   pageCleanup=()=>{cancelled=true;handle?.dispose();mascot?.destroy?.();};
   const urls={login:routeHelpers.toUrlPath('/login'),dashboard:routeHelpers.toUrlPath('/dashboard')};
-  Promise.all([import('./pages/auth-action.js'),import('./auth/auth-service.js')]).then(([page,auth])=>{
+  // auth-action.js is already imported statically for the route table; only auth-service stays lazy.
+  const page={runActionPage,mountActionMascot};
+  import('./auth/auth-service.js').then(auth=>{
     if(cancelled||generation!==pageGeneration)return;
     const api={
       inspect:auth.inspectActionCode,apply:auth.applyEmailAction,verifyResetCode:auth.verifyResetCode,confirmReset:auth.confirmReset,
@@ -187,6 +193,7 @@ function initializeAuthAction(generation){
     root.innerHTML='<div class="aa-view" data-tone="bad"><h1>تعذر فتح الصفحة</h1><p>حدث خلل في تحميل الصفحة. حدّث الصفحة وأعد المحاولة.</p></div>';
   });
 }
+
 
 function initializeDashboard(generation){
   import('./pages/dashboard-pages.js').then(({dashboardPage,initializeDashboard:loadAccount})=>{
@@ -209,9 +216,9 @@ function initializeTeacherDirectory(generation){
   let cancelled=false;
   let unsubscribe=()=>{};
   pageCleanup=()=>{cancelled=true;unsubscribe();};
-  import('./config/firebase-env.js').then(async env=>{
+  (async()=>{
     if(cancelled||!target.isConnected)return;
-    if(!env.firebaseConfigured){
+    if(!firebaseConfigured){
       showMessage(target.querySelector('p'),'لم يُضبط اتصال Firebase بعد؛ لن تُعرض أسماء تجريبية.');
       return;
     }
@@ -225,7 +232,7 @@ function initializeTeacherDirectory(generation){
           :'تعذر تحميل دليل المدرسين الآن. ستُعاد المحاولة عند تحديث الصفحة.');
       }
     );
-  }).catch(()=>showMessage(target.querySelector('p'),'تعذر تهيئة خدمة Firebase الآن.'));
+  })().catch(()=>showMessage(target.querySelector('p'),'تعذر تهيئة خدمة Firebase الآن.'));
 }
 
 let pendingRegistrationOptions=null;
@@ -304,9 +311,9 @@ function initializeAuthPage(generation){
   registrationView=setupRegistrationSelects(()=>cancelled||!statusTarget?.isConnected);
   let unsubscribe=()=>{};
   pageCleanup=()=>{cancelled=true;unsubscribe();};
-  import('./config/firebase-env.js').then(async env=>{
+  (async()=>{
     if(cancelled||generation!==pageGeneration||!statusTarget?.isConnected)return;
-    if(!env.firebaseConfigured){
+    if(!firebaseConfigured){
       showMessage(statusTarget,'لم تُضبط إعدادات Firebase في بيئة التطبيق، لذلك لا تُرسل بيانات الدخول.');
       registrationView?.setError();
       return;
@@ -339,7 +346,7 @@ function initializeAuthPage(generation){
         }
       }catch(error){showMessage(statusTarget,api.friendlyAuthError(error),'error');}
     },error=>showMessage(statusTarget,api.friendlyAuthError(error),'error'));
-  }).catch(()=>showMessage(statusTarget,'تعذر تهيئة خدمة المصادقة الآن.'));
+  })().catch(()=>showMessage(statusTarget,'تعذر تهيئة خدمة المصادقة الآن.'));
 }
 
 function safeTimestamp(value){
@@ -411,16 +418,16 @@ function initializeTeacherApprovals(generation){
   let cancelled=false;
   let unsubscribe=()=>{};
   pageCleanup=()=>{cancelled=true;unsubscribe();};
-  import('./config/firebase-env.js').then(async env=>{
+  (async()=>{
     if(cancelled||generation!==pageGeneration)return;
-    if(!env.firebaseConfigured){
+    if(!firebaseConfigured){
       showMessage(document.querySelector('[data-admin-message]'),'إعداد Firebase غير مكتمل؛ لم تُحمّل الطلبات.','error');
       return;
     }
     const api=await import('./auth/auth-service.js');
     if(cancelled||generation!==pageGeneration)return;
     unsubscribe=api.subscribeToAuth(()=>{if(!cancelled)loadTeacherApplications();},error=>showMessage(document.querySelector('[data-admin-message]'),api.friendlyAuthError(error),'error'));
-  }).catch(()=>showMessage(document.querySelector('[data-admin-message]'),'تعذر تهيئة خدمة الإدارة.','error'));
+  })().catch(()=>showMessage(document.querySelector('[data-admin-message]'),'تعذر تهيئة خدمة الإدارة.','error'));
 }
 
 function formValues(form){
@@ -464,8 +471,10 @@ async function handleLogin(form){
 /* زر إعادة إرسال رسالة التفعيل بعد التسجيل: نفس قيود صفحة /auth/action (انتظار 60 ثانية وحد أقصى للمحاولات). */
 async function appendResendVerification(target){
   if(!target?.isConnected)return;
-  const [logic,api]=await Promise.all([import('./auth/action-logic.js'),import('./auth/auth-service.js')]).catch(()=>[]);
-  if(!logic||!target.isConnected)return;
+  // action-logic is a static import (pure helpers, already in the main chunk); only auth-service stays lazy.
+  const logic={createResendGuard,resendLabel};
+  const api=await import('./auth/auth-service.js').catch(()=>null);
+  if(!api||!target.isConnected)return;
   let storage=null;try{storage=window.sessionStorage;}catch{}
   const guard=logic.createResendGuard({storage,key:'tn_resend_action'});
   const resend=document.createElement('button');
@@ -664,13 +673,12 @@ document.addEventListener('submit',event=>{
     const note=form.querySelector('.form-note');
     const button=form.querySelector('button[type=submit]');
     button.disabled=true;note.textContent='جارٍ الإرسال...';
-    import('./config/firebase-env.js').then(async env=>{
-      if(!env.firebaseConfigured){
-        const info=(await import('./config/school-info.js')).schoolInfo;
-        const ways=[info.phone&&`الهاتف: ${info.phone}`,info.email&&`البريد: ${info.email}`].filter(Boolean).join(' · ');
+    (async()=>{
+      if(!firebaseConfigured){
+        const ways=[schoolInfo.phone&&`الهاتف: ${schoolInfo.phone}`,schoolInfo.email&&`البريد: ${schoolInfo.email}`].filter(Boolean).join(' · ');
         throw Object.assign(new Error('unconfigured'),{unconfigured:true,ways});
       }
-    }).then(()=>import('./services/spark-backend.js')).then(api=>api.sendContactMessage({name:form.elements.name.value,email:form.elements.email.value,message:form.elements.message.value}))
+    })().then(()=>import('./services/spark-backend.js')).then(api=>api.sendContactMessage({name:form.elements.name.value,email:form.elements.email.value,message:form.elements.message.value}))
       .then(()=>{form.reset();note.textContent='وصلت رسالتك للإدارة. شكرًا لك.';})
       .catch(error=>{note.textContent=error?.unconfigured?`إرسال الرسائل من الموقع غير متاح حاليًا. تواصل مع المدرسة مباشرة. ${error.ways}`:'تعذر الإرسال الآن. حاول لاحقًا أو اتصل بالمدرسة.';})
       .finally(()=>{button.disabled=false;});

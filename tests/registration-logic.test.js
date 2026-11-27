@@ -29,8 +29,10 @@ test('form has no manual class field and clear labels',()=>{
   assert.doesNotMatch(html,/name="className"|data-class-fallback/);
   assert.match(html,/الشعبة \/ المسار/);assert.match(html,/الفصل \(أ، ب، ج\)/);
 });
-test('track select does not depend on Firebase: set up before the firebase import',()=>{
+test('track select does not depend on Firebase: set up before the auth service import',()=>{
   const app=readFileSync(new URL('../src/app.js',import.meta.url),'utf8');
   const init=app.slice(app.indexOf('function initializeAuthPage'));
-  assert.ok(init.indexOf('setupRegistrationSelects(')<init.indexOf("import('./config/firebase-env.js')"));
+  // firebase-env is a tiny static import now; the heavy dependency that must stay after the
+  // synchronous select setup is the auth service (pulls the Firebase SDK chunks).
+  assert.ok(init.indexOf('setupRegistrationSelects(')<init.indexOf("import('./auth/auth-service.js')"));
 });

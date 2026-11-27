@@ -3,11 +3,13 @@
 // - حد للجلسة وفاصل زمني لكل خطأ لحماية حصة الكتابة اليومية.
 // - لا يقرأ من Firestore أبدًا (القراءة للمالك فقط في القواعد).
 // - يقنّع البريد والهاتف وأكواد الربط بنفس scrubMessage الموجودة في error-boundary.js.
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, setDoc, updateDoc, increment, serverTimestamp } from 'firebase/firestore';
-import { getFirebaseApp } from '../config/firebase-app.js';
 import { firebaseConfigured } from '../config/firebase-env.js';
 import { isNoise, scrubMessage } from '../ui/error-boundary.js';
+
+/* Firebase (auth + Firestore, مئات الكيلوبايت) لا يُحمَّل مع أول صفحة: يُجلَب كسولًا عند أول خطأ
+   فعلي فقط. الزائر بلا أخطاء لا يدفع ثمن تتبع الأخطاء أبدًا. */
+const loadAuth = () => Promise.all([import('firebase/auth'), import('../config/firebase-app.js')]);
+const loadFirestore = () => Promise.all([import('firebase/firestore'), import('../config/firebase-app.js')]);
 
 const MAX_PER_SESSION = 15;
 const MIN_GAP_MS = 60_000;
@@ -71,6 +73,7 @@ function build(kind, message, stack, line) {
 }
 
 async function send(item) {
+  const [{ getFirestore, doc, setDoc, updateDoc, increment, serverTimestamp }, { getFirebaseApp }] = await loadFirestore();
   const db = getFirestore(getFirebaseApp());
   const ref = doc(db, 'errorReports', item.fp);
   try {
@@ -87,6 +90,19 @@ async function send(item) {
       await setDoc(ref, { ...item.data, uid, status: 'open', count: 1, firstAt: serverTimestamp(), lastAt: serverTimestamp() });
     } catch { /* لا نكرر الخطأ على المستخدم أبدًا */ }
   }
+}
+
+let authWatchStarted = false;
+/* يبدأ مراقبة الجلسة عند أول خطأ مقابل (وليس عند فتح الموقع) حتى يظل مسار الدخول خفيفًا. */
+function ensureAuthWatch() {
+  if (authWatchStarted) return;
+  authWatchStarted = true;
+  loadAuth().then(([{ getAuth, onAuthStateChanged }, { getFirebaseApp }]) => {
+    onAuthStateChanged(getAuth(getFirebaseApp()), (user) => {
+      uid = user ? user.uid : null;
+      if (uid) flush();
+    });
+  }).catch(() => { authWatchStarted = false; });
 }
 
 async function flush() {
@@ -110,6 +126,7 @@ export function reportError(err, kind = 'manual', line = 0) {
     lastSent.set(item.fp, now);
     total += 1;
     queue.push(item);
+    ensureAuthWatch();
     flush();
   } catch { /* المتتبع لا يكسر التطبيق */ }
 }
@@ -117,14 +134,6 @@ export function reportError(err, kind = 'manual', line = 0) {
 export function installErrorTracker() {
   if (installed || typeof window === 'undefined' || !firebaseConfigured) return;
   installed = true;
-  try {
-    onAuthStateChanged(getAuth(getFirebaseApp()), (u) => {
-      uid = u ? u.uid : null;
-      if (uid) flush();
-    });
-  } catch {
-    return;
-  }
 
   window.addEventListener('error', (ev) => {
     const t = ev.target;
