@@ -80,6 +80,14 @@ export function startLiving(doc=document){
     if(doc.querySelector('[data-page="404"]'))hintOnce('notFound','alex');
   };
 
+  /* Register page: Arthur above the registration form, "يلا سجل" + dance (register-mascot.js).
+     Lazy: the module and Arthur's chunk load only when the register tab is actually open. */
+  let registerMascotMod=null;
+  const checkRegisterMascot=()=>{
+    registerMascotMod=registerMascotMod||import('./register-mascot.js').catch(()=>null);
+    registerMascotMod.then(m=>m?.updateRegisterMascot(doc));
+  };
+
   /* Leo owns network states (guidelines §8): a calm note when the connection drops or returns.
      The app's own offline bar stays; Leo only adds a face, and important info stays real text. */
   let leoNote=null,netWasOff=false;
@@ -121,13 +129,13 @@ export function startLiving(doc=document){
   let queued=false;
   const mo=new MutationObserver(()=>{
     if(queued)return;queued=true;
-    setTimeout(()=>{queued=false;refreshFocus();if(getFocus()==='exam')return;checkAuth();checkHome();checkSpots();},120);
+    setTimeout(()=>{queued=false;refreshFocus();if(getFocus()==='exam')return;checkAuth();checkHome();checkSpots();checkRegisterMascot();},120);
   });
   mo.observe(doc.body,{childList:true,subtree:true,attributes:true,attributeFilter:['data-kind','hidden']});
   doc.addEventListener('focusin',refreshFocus);
   const tick=setInterval(()=>{if(doc.visibilityState==='visible'){refreshFocus();say(director('tick'),'alex');}},TICK_MS);
   addEventListener('pagehide',()=>{clearInterval(tick);remember('route',location.pathname);remember('scroll:'+location.pathname,Math.round(scrollY));});
   addEventListener('popstate',sample);
-  refreshFocus();sample();checkAuth();checkHome();checkSpots();
+  refreshFocus();sample();checkAuth();checkHome();checkSpots();checkRegisterMascot();
 }
 export const _cfg=LIVING;

@@ -20,3 +20,14 @@
 /* Exam: total silence. No motion, no crew, no ambient. */
 [data-sc-focus=exam] .sc-ambient,[data-sc-focus=exam] .sc-living-layer,[data-sc-focus=exam] .sc-scene{display:none!important}
 [data-sc-focus=exam] *,[data-sc-focus=exam] *::before,[data-sc-focus=exam] *::after{animation:none!important;transition:none!important}
+/* Register mascot: Arthur above the registration form. Fixed-height box = zero layout shift,
+   transform-only dance (JS), hidden in exams like the rest of the crew. */
+.sc-register-mascot{display:flex;align-items:center;justify-content:center;gap:var(--sc-space-3,12px);block-size:128px;contain:layout;margin-block-end:var(--sc-space-2,8px)}
+.sc-register-stage .sc-host{--sc-size-character:104px}
+.sc-register-note{margin:0;font-weight:600;font-size:var(--sc-font-size-lg,18px);color:var(--sc-color-gold,#c9a24b)}
+.sc-register-mascot[data-no-character]{block-size:52px}
+[data-sc-focus=exam] .sc-register-mascot{display:none!important}
+@media (max-width:600px){
+  .sc-register-mascot{block-size:104px}
+  .sc-register-stage .sc-host{--sc-size-character:84px}
+}
