@@ -1,4 +1,4 @@
-import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, where, writeBatch } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, setDoc, where, writeBatch } from 'firebase/firestore';
 import { mountChat, renderChatPanel } from '../chat.js';
 import { mountParentChat, renderParentChat } from '../parent-chat.js';
 import { contentLinkError } from '../../utils/links.js';
@@ -103,7 +103,10 @@ export async function mountTeacher(root, { profile, auth, database }) {
     if (!button || !current) return;
     button.disabled = true;
     try {
-      await addDoc(collection(database, 'attendance'), { teacherUid: profile.uid, studentUid: button.dataset.uid, grade: current.grade, classId: current.classId, subjectId: current.subjectId, date: dateInput.value, present: button.dataset.att === '1', createdAt: serverTimestamp() });
+      // Deterministic id (same scheme as the bulk save): a second tap on the same student and date
+      // updates the record instead of piling up duplicate attendance rows for one day.
+      const recordId = `${current.classId}_${current.subjectId}_${dateInput.value}_${button.dataset.uid}`;
+      await setDoc(doc(database, 'attendance', recordId), { teacherUid: profile.uid, studentUid: button.dataset.uid, grade: current.grade, classId: current.classId, subjectId: current.subjectId, date: dateInput.value, present: button.dataset.att === '1', createdAt: serverTimestamp() });
       msg('roster', 'تم تسجيل الحضور.');
     } catch { msg('roster', 'تعذر تسجيل الحضور لهذا الطالب.', 'error'); }
     finally { button.disabled = false; }

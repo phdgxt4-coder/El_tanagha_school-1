@@ -1,4 +1,5 @@
 import { loadErrorMessage, withTimeout } from '../../utils/load-state.js';
+import { registerCleanup } from '../../ui/cleanups.js';
 import { collection, getDocs, limit, query, startAfter } from 'firebase/firestore';
 
 export const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -129,8 +130,13 @@ export async function mountBell(root, { profile, database }) {
     button.setAttribute('aria-expanded', String(!panel.hidden));
     if (!panel.hidden) placeBellPanel(panel);
   });
-  window.addEventListener('resize', () => { if (!panel.hidden) placeBellPanel(panel); });
-  document.addEventListener('click', event => { if (!slot.contains(event.target)) { panel.hidden = true; button.setAttribute('aria-expanded', 'false'); } });
+  // These two listeners live on window/document, not on the panel: without explicit removal they
+  // survive every dashboard visit and pile up. Registered with the page cleanups so navigation releases them.
+  const onResize = () => { if (!panel.hidden) placeBellPanel(panel); };
+  const onOutsideClick = event => { if (!slot.contains(event.target)) { panel.hidden = true; button.setAttribute('aria-expanded', 'false'); } };
+  window.addEventListener('resize', onResize);
+  document.addEventListener('click', onOutsideClick);
+  registerCleanup(() => { stop(); window.removeEventListener('resize', onResize); document.removeEventListener('click', onOutsideClick); });
   list.addEventListener('click', event => {
     const item = event.target.closest('[data-id]');
     if (item && !service.sparkMode) service.markRead(database, item.dataset.id).catch(() => {});
@@ -172,5 +178,7 @@ export function labelOrphans(root) {
     });
   };
   fix(root);
-  new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(node => { if (node.nodeType === 1) fix(node.matches?.('input,select,textarea') ? node.parentNode : node); }))).observe(root, { childList: true, subtree: true });
+  const observer = new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(node => { if (node.nodeType === 1) fix(node.matches?.('input,select,textarea') ? node.parentNode : node); })));
+  observer.observe(root, { childList: true, subtree: true });
+  registerCleanup(() => observer.disconnect());
 }

@@ -76,8 +76,15 @@ export function mountParent(root, { auth, database, profile }) {
     { const st = students.find(item => item.uid === uid); void pchat.setChild(st ? { classId: st.classId, studentName: st.displayName } : null); }
     const gradeRow = item => `<div class="par-row"><span>${esc(item.subjectName || item.subjectId || '')} ${esc(item.title || '')}</span><b>${esc(item.score)}${item.max ? '/' + esc(item.max) : ''}</b></div>`;
     const attRow = item => `<div class="par-row"><span>${esc(item.date)}</span><b class="${item.present ? 'ok' : 'bad'}">${item.present ? 'حاضر' : 'غائب'}</b></div>`;
-    detail.querySelector('[data-more="grades"]').replaceWith(detail.querySelector('[data-more="grades"]').cloneNode(true));
-    detail.querySelector('[data-more="attendance"]').replaceWith(detail.querySelector('[data-more="attendance"]').cloneNode(true));
+    // Fresh nodes for every child switch: each pager attaches click handlers to its list and its
+    // "more" button, so reusing the old nodes would stack one handler set per switch and a retry
+    // would fire stale loads for previously selected children.
+    for (const name of ['grades', 'attendance']) {
+      const list = detail.querySelector(`[data-list="${name}"]`);
+      const more = detail.querySelector(`[data-more="${name}"]`);
+      list.replaceWith(list.cloneNode(false));
+      more.replaceWith(more.cloneNode(true));
+    }
     pager(database, 'grades', [where('studentUid', '==', uid), orderBy('createdAt', 'desc')], gradeRow, { target: detail.querySelector('[data-list="grades"]'), more: detail.querySelector('[data-more="grades"]'), empty: 'لا توجد درجات بعد.' }).load();
     pager(database, 'attendance', [where('studentUid', '==', uid), orderBy('date', 'desc')], attRow, { target: detail.querySelector('[data-list="attendance"]'), more: detail.querySelector('[data-more="attendance"]'), empty: 'لا يوجد حضور مسجل بعد.' }).load();
   }
