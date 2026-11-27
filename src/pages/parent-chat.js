@@ -2,6 +2,7 @@
 import { collection, doc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where, writeBatch } from 'firebase/firestore';
 import { esc, formatDate } from './dashboards/common.js';
 import { MAX_CHAT_TEXT } from './chat.js';
+import { registerCleanup } from '../ui/cleanups.js';
 
 const millis = value => value?.toMillis?.() ?? 0;
 
@@ -106,5 +107,7 @@ export function mountParentChat(root, { profile, database }) {
     openThread(convs.has(id) ? { ...convs.get(id), isNew: false } : { teacherUid: item.teacherUid, teacherName: item.teacherName, studentName: child.studentName, classId: child.classId, subjectId: item.subjectId, isNew: true });
     select.value = '';
   });
-  return { setChild, stop: () => { stopThread(); stopList(); } };
+  const stop = () => { stopThread(); stopList(); };
+  registerCleanup(stop);
+  return { setChild, stop };
 }

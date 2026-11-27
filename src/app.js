@@ -5,6 +5,7 @@ import {initErrorReporter} from './services/error-reporter.js';
 import {initErrorBoundary,errorCardHtml} from './ui/error-boundary.js';
 import {enhancePasswordFields} from './ui/password-toggle.js';
 import {TRACKS} from '../functions/src/validation.js';
+import {runCleanups} from './ui/cleanups.js';
 import {livingEnabled} from './config/features.js';
 import {initUpdateNotice} from './ui/update-notice.js';
 import {isPublicRoute,shouldLockSession,gatedRoute} from './auth/session-gate.js';
@@ -127,6 +128,7 @@ function showSignedInMessage(target,message,kind='status'){
 function render(path=currentRoutePath()){
   const gated=gatedRoute(path,sessionLocked);
   if(gated!==path){history.replaceState({},'',routeHelpers.toUrlPath(gated));path=gated;}
+  runCleanups();
   pageCleanup();
   pageCleanup=()=>{};
   const generation=++pageGeneration;
