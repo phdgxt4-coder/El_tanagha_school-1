@@ -56,7 +56,7 @@ export async function initializeDashboard(){
       return;
     }
     if(account.role!=='admin'&&account.emailVerified!==true){
-      status.innerHTML='<p>وثّق بريدك الإلكتروني أولًا لتفتح لوحتك. افتح الرابط المرسل إلى بريدك ثم اضغط "وثّقت بريدي".</p><button type="button" class="button" data-check-verify>وثّقت بريدي</button> <button type="button" class="button ghost" data-resend-verify>أرسل رابط التوثيق مرة أخرى</button>';
+      status.innerHTML='<p>وثّق بريدك الإلكتروني أولًا لتفتح لوحتك. افتح الرابط المرسل إلى بريدك ثم اضغط "وثّقت بريدي". لو لم تجد الرسالة ابحث في الرسائل غير المرغوبة (Spam).</p><button type="button" class="button" data-check-verify>وثّقت بريدي</button> <button type="button" class="button ghost" data-resend-verify>أرسل رابط التوثيق مرة أخرى</button>';
       // Recheck in place (refresh the auth token, then reload the dashboard state) instead of
       // a full page reload: faster, and the recheck itself is capped so it cannot hang.
       status.querySelector('[data-check-verify]').addEventListener('click',async event=>{
@@ -73,7 +73,16 @@ export async function initializeDashboard(){
           button.textContent='وثّقت بريدي';
         }
       });
-      status.querySelector('[data-resend-verify]').addEventListener('click',async event=>{event.currentTarget.disabled=true;try{await auth.sendVerificationIfNeeded();event.currentTarget.textContent='تم الإرسال. افحص بريدك.';}catch{event.currentTarget.textContent='تعذر الإرسال الآن، حاول لاحقًا.';}});
+      status.querySelector('[data-resend-verify]').addEventListener('click',async event=>{
+        const button=event.currentTarget;
+        const {createResendGuard,resendLabel}=await import('../auth/action-logic.js');
+        let storage=null;try{storage=window.sessionStorage;}catch{}
+        const guard=createResendGuard({storage,key:'tn_resend_action'});
+        if(!guard.canSend()){button.textContent=resendLabel(guard);return;}
+        button.disabled=true;
+        try{await auth.sendVerificationIfNeeded();guard.record();button.textContent='تم الإرسال. افحص بريدك وابحث في Spam.';}catch{button.textContent='تعذر الإرسال الآن، حاول لاحقًا.';}
+        setTimeout(()=>{if(button.isConnected){button.textContent=resendLabel(guard,'أرسل رابط التوثيق مرة أخرى');button.disabled=!guard.canSend();}},4000);
+      });
       return;
     }
     const database=getFirestore(getFirebaseApp());
