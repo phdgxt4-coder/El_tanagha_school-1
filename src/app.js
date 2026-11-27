@@ -1,5 +1,6 @@
 import {home,subjectsPage,subjectPage,teachersPage,renderTeacherCards,newsPage,schedulePage,resultsPage,contactPage,privacyPage,notFound} from './pages/public-pages.js';
 import {loginPage,teacherApprovalPage,adminJoinPage} from './pages/auth-pages.js';
+import {authActionPage} from './pages/auth-action.js';
 import {createRouteHelpers,resolveAppLink} from './utils/routes.js';
 import {initErrorReporter} from './services/error-reporter.js';
 import {trackOptions,classState,canSubmitStudent} from './utils/registration-logic.js';
@@ -77,6 +78,7 @@ const routes=[
   [/^\/privacy\/?$/,privacyPage],
   [/^\/login(?:\/(student|parent|teacher|admin))?\/?$/,loginPage],
   [/^\/dashboard\/?$/,()=>'<section class="section page dashboard-page"><div class="dashboard-shell"><div class="empty-state" role="status"><div class="skeleton-grid" aria-hidden="true"><div class="skeleton-card"><span class="skeleton skeleton-icon"></span><span class="skeleton skeleton-line title"></span><span class="skeleton skeleton-line"></span></div></div><p>جارٍ تحميل لوحة الحساب…</p></div></div></section>'],
+  [/^\/auth\/action\/?$/,authActionPage],
   [/^\/admin\/join\/?$/,adminJoinPage],
   [/^\/admin\/teacher-requests\/?$/,teacherApprovalPage]
 ];
@@ -154,7 +156,36 @@ function render(path=currentRoutePath()){
   if(/^\/login(?:\/|$)/.test(path)||/^\/admin\/join\/?$/.test(path))enhancePasswordFields(app);
   if(/^\/login(?:\/|$)/.test(path)) initializeAuthPage(generation);
   if(/^\/admin\/teacher-requests\/?$/.test(path)) initializeTeacherApprovals(generation);
+  if(/^\/auth\/action\/?$/.test(path)) initializeAuthAction(generation);
   if(/^\/dashboard\/?$/.test(path)) initializeDashboard(generation);
+}
+
+/* /auth/action: روابط البريد من Firebase. تُحمَّل الصفحة والمصادقة عند الطلب فقط. */
+function initializeAuthAction(generation){
+  const root=document.querySelector('[data-action-root]');
+  if(!root)return;
+  let handle=null;
+  let mascot=null;
+  let cancelled=false;
+  pageCleanup=()=>{cancelled=true;handle?.dispose();mascot?.destroy?.();};
+  const urls={login:routeHelpers.toUrlPath('/login'),dashboard:routeHelpers.toUrlPath('/dashboard')};
+  Promise.all([import('./pages/auth-action.js'),import('./auth/auth-service.js')]).then(([page,auth])=>{
+    if(cancelled||generation!==pageGeneration)return;
+    const api={
+      inspect:auth.inspectActionCode,apply:auth.applyEmailAction,verifyResetCode:auth.verifyResetCode,confirmReset:auth.confirmReset,
+      refreshVerifiedSession:auth.refreshVerifiedSession,sendPasswordReset:auth.sendPasswordReset,
+      resendVerification:async()=>{const user=await auth.waitForInitialAuthState();if(!user)throw Object.assign(new Error('no user'),{code:'auth/no-current-user'});await auth.sendVerificationIfNeeded(user);}
+    };
+    let storage=null;try{storage=window.sessionStorage;}catch{}
+    handle=page.runActionPage({root,search:location.search,api,urls,storage,celebrate:anchor=>celebrate(anchor),enhance:el=>enhancePasswordFields(el)});
+    if(livingEnabled()){
+      const stage=document.querySelector('[data-action-mascot]');
+      page.mountActionMascot(stage).then(ctrl=>{if(cancelled)ctrl?.destroy();else mascot=ctrl;}).catch(()=>{});
+    }
+  }).catch(()=>{
+    if(cancelled)return;
+    root.innerHTML='<div class="aa-view" data-tone="bad"><h1>تعذر فتح الصفحة</h1><p>حدث خلل في تحميل الصفحة. حدّث الصفحة وأعد المحاولة.</p></div>';
+  });
 }
 
 function initializeDashboard(generation){
@@ -430,6 +461,27 @@ async function handleLogin(form){
   }finally{if(button.isConnected)button.disabled=false;}
 }
 
+/* زر إعادة إرسال رسالة التفعيل بعد التسجيل: نفس قيود صفحة /auth/action (انتظار 60 ثانية وحد أقصى للمحاولات). */
+async function appendResendVerification(target){
+  if(!target?.isConnected)return;
+  const [logic,api]=await Promise.all([import('./auth/action-logic.js'),import('./auth/auth-service.js')]).catch(()=>[]);
+  if(!logic||!target.isConnected)return;
+  let storage=null;try{storage=window.sessionStorage;}catch{}
+  const guard=logic.createResendGuard({storage,key:'tn_resend_action'});
+  const resend=document.createElement('button');
+  resend.type='button';resend.className='button ghost aa-btn';resend.dataset.resendVerification='true';
+  target.append(document.createTextNode(' '),resend);
+  let timer=null;
+  const paint=()=>{resend.textContent=logic.resendLabel(guard,'إعادة إرسال رسالة التفعيل');resend.disabled=!guard.canSend();if(!resend.isConnected||guard.remainingMs()===0)clearInterval(timer);};
+  paint();timer=setInterval(paint,1000);
+  resend.addEventListener('click',async()=>{
+    if(!guard.canSend())return;
+    resend.disabled=true;
+    try{await api.sendVerificationIfNeeded();guard.record();}catch{resend.textContent='تعذر الإرسال الآن، حاول لاحقًا.';return;}
+    paint();
+  });
+}
+
 async function handleRegistration(form){
   const message=document.querySelector('[data-auth-message]');
   const button=form.querySelector('[type="submit"]');
@@ -453,8 +505,9 @@ async function handleRegistration(form){
       :role==='parent'
         ?'تم إنشاء حساب ولي الأمر. افتح رسالة التأكيد في بريدك وافتح الرابط، وبعدها تفتح لوحتك مباشرة بدون موافقة الإدارة.'
         :'تم إنشاء حساب الطالب. افتح رسالة التأكيد في بريدك وافتح الرابط، وبعدها تفتح لوحتك مباشرة بدون موافقة الإدارة.';
-    const note=verificationSent?' أُرسل رابط توثيق البريد الإلكتروني.':' تعذر إرسال رسالة التوثيق الآن؛ أعد المحاولة لاحقًا.';
+    const note=verificationSent?' أرسلنا رسالة تفعيل لبريدك. لو لم تجدها ابحث في الرسائل غير المرغوبة (Spam).':' تعذر إرسال رسالة التوثيق الآن؛ أعد المحاولة لاحقًا.';
     showMessage(message,`${success}${note}`);
+    appendResendVerification(message);
     celebrate(message);
     if(application.status==='pending')form.reset();
     else if(application.status==='active'){

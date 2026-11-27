@@ -1,4 +1,4 @@
-import { browserLocalPersistence, createUserWithEmailAndPassword, onAuthStateChanged, setPersistence, sendEmailVerification, sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { applyActionCode, browserLocalPersistence, checkActionCode, confirmPasswordReset, createUserWithEmailAndPassword, onAuthStateChanged, setPersistence, sendEmailVerification, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, verifyPasswordResetCode } from 'firebase/auth';
 import { getAuth } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { validateAccountRequest } from '../../functions/src/validation.js';
@@ -66,6 +66,25 @@ export async function sendPasswordReset(email) {
   const normalizedEmail = String(email ?? '').trim().toLowerCase();
   if (!normalizedEmail) throw Object.assign(new Error('اكتب البريد الإلكتروني أولًا.'), {code:'auth/invalid-email'});
   return sendPasswordResetEmail(auth, normalizedEmail);
+}
+
+/* روابط البريد (/auth/action): كلها تحتاج عميل المصادقة الجاهز قبل الاستدعاء. */
+export async function actionAuth() {
+  const {auth, persistence} = getAuthClients();
+  await persistence;
+  return auth;
+}
+export async function inspectActionCode(oobCode) { return checkActionCode(await actionAuth(), oobCode); }
+export async function applyEmailAction(oobCode) { return applyActionCode(await actionAuth(), oobCode); }
+export async function verifyResetCode(oobCode) { return verifyPasswordResetCode(await actionAuth(), oobCode); }
+export async function confirmReset(oobCode, newPassword) { return confirmPasswordReset(await actionAuth(), oobCode, newPassword); }
+/* بعد التأكيد: يحدّث المستخدم الحالي ورمزه حتى تقرأ القواعد email_verified الجديد. يعيد true لو كان البريد موثقًا. */
+export async function refreshVerifiedSession() {
+  const user = getCurrentUser();
+  if (!user) return false;
+  await user.reload();
+  await user.getIdToken(true);
+  return user.emailVerified === true;
 }
 
 export async function signOutUser() {
