@@ -25,11 +25,14 @@ function button(item) {
   return `<button type="button" class="${cls}" data-act="${esc(item.act)}"${item.disabled ? ' disabled' : ''}>${esc(item.label)}</button>`;
 }
 
+let firstPaint = true;
 function view(root, { state, tone = 'info', icon = 'mail', title, body = '', extra = '', actions = [], busy = false }) {
   root.dataset.state = state;
   root.setAttribute('aria-busy', String(busy));
   root.innerHTML = `<div class="aa-view" data-tone="${tone}"><span class="aa-icon${busy ? ' is-spinning' : ''}" aria-hidden="true">${ICONS[icon] ?? icon}</span><h1 tabindex="-1">${esc(title)}</h1>${body ? `<p>${esc(body)}</p>` : ''}${extra}<div class="aa-actions">${actions.map(button).join('')}</div></div>`;
-  root.querySelector('h1')?.focus({ preventScroll: true });
+  /* التركيز على العنوان بعد أي تغيير حالة لقارئات الشاشة، لا عند أول فتح حتى لا يظهر إطار التركيز. */
+  if (!firstPaint) root.querySelector('h1')?.focus({ preventScroll: true });
+  firstPaint = false;
 }
 
 /* api: { inspect, apply, verifyResetCode, confirmReset, refreshVerifiedSession, resendVerification, sendPasswordReset }
