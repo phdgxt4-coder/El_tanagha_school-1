@@ -30,6 +30,9 @@ export function createDirector({rand=Math.random,now=()=>Date.now(),getFocus,pre
       case 'achievement':out.state='Celebrate';out.tier=tierFor('achievement');break;
       case 'streak':out.state='Celebrate';out.tier=tierFor('streak',data);out.message=pick((data.streak>=LIVING.streak.long)?'longStreak':'weekStreak');break;
       case 'return':out.state='Wave';out.message=data.longAway?pick('welcomeBack'):'';if(!data.longAway)out.show=false;break;
+      /* hint: a contextual one-liner from COPY.hints (crew spots outside auth). No tier, no effects;
+         respects the focus policy like any bubble, and exam stays absolute silence above. */
+      case 'hint':{out.state='Wave';out.message=bubbles?(COPY.hints?.[data.hint]||''):'';if(!out.message)out.show=false;break;}
       case 'tick':if(delight()&&pol.bubbles&&pol.motion){out.state='Wave';out.message=pick('delight');}else out.show=false;break;
       default:out.show=false;
     }
