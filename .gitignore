@@ -10,3 +10,4 @@ functions/.env.*
 firebase-debug.log
 firebase-debug.*.log
 firestore-debug.log
+reports/

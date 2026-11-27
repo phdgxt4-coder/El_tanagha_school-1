@@ -23,3 +23,10 @@ test('بطاقة الخطأ عربية وفيها زر إعادة المحاول
   assert.match(html, /إعادة المحاولة/u);
   assert.match(html, /role="alert"/u);
 });
+
+test('scrubMessage يقبل حدًا أقصى اختياريًا للطول', () => {
+  const long = 'أ'.repeat(500);
+  assert.equal(scrubMessage(long).length, 300);
+  assert.equal(scrubMessage(long, 1500).length, 500);
+  assert.equal(scrubMessage(long, 50).length, 50);
+});
