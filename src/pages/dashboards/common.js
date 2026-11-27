@@ -73,6 +73,17 @@ export function shellActions() {
   return '<span data-bell-slot></span><button class="dash-signout" type="button" data-dashboard-sign-out>تسجيل الخروج</button>';
 }
 
+/** يبقي لوحة الإشعارات داخل الشاشة دائمًا (RTL/LTR) بإزاحتها أفقيًا عند الحاجة. */
+export function placeBellPanel(panel, margin = 8) {
+  panel.style.transform = '';
+  const width = document.documentElement.clientWidth;
+  const rect = panel.getBoundingClientRect();
+  let shift = 0;
+  if (rect.right > width - margin) shift = width - margin - rect.right;
+  if (rect.left + shift < margin) shift = margin - rect.left;
+  if (shift) panel.style.transform = `translateX(${Math.round(shift)}px)`;
+}
+
 const NOTICE_ICONS = { content: '📚', grade: '📝', attendance: '📍', chat: '💬', message: '💬', task: '📅' };
 
 /** جرس الإشعارات: عدّاد غير المقروء، قائمة آخر 20، تفضيلات، وتفعيل الإشعارات اللحظية. */
@@ -116,7 +127,9 @@ export async function mountBell(root, { profile, database }) {
   button.addEventListener('click', () => {
     panel.hidden = !panel.hidden;
     button.setAttribute('aria-expanded', String(!panel.hidden));
+    if (!panel.hidden) placeBellPanel(panel);
   });
+  window.addEventListener('resize', () => { if (!panel.hidden) placeBellPanel(panel); });
   document.addEventListener('click', event => { if (!slot.contains(event.target)) { panel.hidden = true; button.setAttribute('aria-expanded', 'false'); } });
   list.addEventListener('click', event => {
     const item = event.target.closest('[data-id]');
